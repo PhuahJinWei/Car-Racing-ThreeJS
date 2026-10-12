@@ -57,6 +57,8 @@ export const ICONS = {
   pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="3.6" height="14" rx="1"/><rect x="13.9" y="5" width="3.6" height="14" rx="1"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></svg>',
   camera: S('<path d="M3.5 8.5h3.2l1.8-2.5h7l1.8 2.5h3.2v10h-17z"/><circle cx="12" cy="13.2" r="3.2"/>'),
+  // a beacon on its base, with light rays
+  siren: S('<path d="M7 17v-4a5 5 0 0 1 10 0v4"/><path d="M5 17h14v3H5z"/><path d="M12 3v2.5M4.6 6.1l1.8 1.8M19.4 6.1l-1.8 1.8"/>'),
   settings: S('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>'),
   back: S('<path d="M14.5 5.5L8 12l6.5 6.5"/>', ' stroke-width="2.4"'),
   left: S('<path d="M14.5 5L7.5 12l7 7"/>', ' stroke-width="2.6"'),

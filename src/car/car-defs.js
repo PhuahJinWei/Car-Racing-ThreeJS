@@ -142,7 +142,7 @@ export const CARS = [
     lights: 'bar',
     exhaust: 2,
     fin: false,
-    // races in its patrol colours when a rival drives it
+    // a police car: a siren for the player, and its patrol colours when a rival drives it
     patrol: true,
   },
   {

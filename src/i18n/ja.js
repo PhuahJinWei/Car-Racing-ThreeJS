@@ -293,6 +293,7 @@ export default {
   'ctl.camera': 'カメラ',
   'ctl.reset': '車をリセット',
   'ctl.pause': 'ポーズ',
+  'ctl.siren': 'サイレン',
   'ctl.steer': 'ステアリング',
   'ctl.throttle': 'アクセル',
   'ctl.brake': 'ブレーキ',

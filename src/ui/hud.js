@@ -46,6 +46,7 @@ export class HUD {
           <div class="btns">
             <button class="icon-btn" data-a="pause" aria-label="${t('pause')}">${ICONS.pause}<span class="kb-badge" data-kb="ESC" data-pad="MENU"></span></button>
             <button class="icon-btn" data-a="camera" aria-label="${t('camera')}">${ICONS.camera}<span class="kb-badge" data-kb="C" data-pad="Y"></span></button>
+            ${race.playerPatrol ? `<button class="icon-btn siren" data-a="siren" aria-label="${t('ctl.siren')}" aria-pressed="false">${ICONS.siren}<span class="kb-badge" data-kb="Q" data-pad="LB"></span></button>` : ''}
           </div>
         </div>
         <div class="combo"><div class="x">x1</div><div class="meter"><i></i></div><div class="style">${t('hud.style', { n: 0 })}</div></div>
@@ -101,6 +102,7 @@ export class HUD {
       fps: $(this.root, '.fps'),
       map: $(this.root, '.minimap'),
       klGrid: $(this.root, '.key-legend .ctl-grid'),
+      siren: $(this.root, '.icon-btn.siren'),
       badges: $$(this.root, '.kb-badge'),
     };
     this.$.unit.textContent = app.settings.units === 'mph' ? 'MPH' : 'KM/H';
@@ -110,6 +112,7 @@ export class HUD {
       e.preventDefault();
       if (b.dataset.a === 'pause') app.pause();
       if (b.dataset.a === 'camera') app.input.press('camera');
+      if (b.dataset.a === 'siren') app.input.press('siren');
       if (b.dataset.a === 'legend') this._legendOpen = true;
     });
     // H shows / hides the controls card (it opens by itself for the start of every race)
@@ -493,9 +496,14 @@ export class HUD {
       this.root.classList.toggle('hints', hints !== 'off');
       this.root.classList.toggle('pad', hints === 'gamepad');
       if (hints !== 'off') {
-        $.klGrid.innerHTML = controlsCells(hints, 2);
+        $.klGrid.innerHTML = controlsCells(hints, 2, this.race.playerPatrol);
         for (const b of $.badges) b.textContent = hints === 'gamepad' ? b.dataset.pad : b.dataset.kb;
       }
+    }
+    if ($.siren && this.cache.siren !== this.race.siren) {
+      this.cache.siren = this.race.siren;
+      $.siren.classList.toggle('on', this.race.siren);
+      $.siren.setAttribute('aria-pressed', String(this.race.siren));
     }
     const open = this._legendOpen ?? (h.phase === 'intro' || h.phase === 'countdown' || (h.phase === 'racing' && (h.time || 0) < 10));
     if (this.cache.klOpen !== open) {

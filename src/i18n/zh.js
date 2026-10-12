@@ -293,6 +293,7 @@ export default {
   'ctl.camera': '视角',
   'ctl.reset': '重置车辆',
   'ctl.pause': '暂停',
+  'ctl.siren': '警笛',
   'ctl.steer': '转向',
   'ctl.throttle': '油门',
   'ctl.brake': '刹车',

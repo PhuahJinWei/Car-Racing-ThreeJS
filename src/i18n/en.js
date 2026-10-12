@@ -298,6 +298,7 @@ export default {
   'ctl.camera': 'Camera',
   'ctl.reset': 'Reset car',
   'ctl.pause': 'Pause',
+  'ctl.siren': 'Siren',
   'ctl.steer': 'Steer',
   'ctl.throttle': 'Throttle',
   'ctl.brake': 'Brake',

@@ -3109,6 +3109,12 @@ kbd.k-pill {
   gap: 0.4rem;
 }
 
+/* a patrol car's siren while it's sounding */
+.hud .icon-btn.siren.on {
+  color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber);
+}
+
 /* speed + rev gauge */
 .gauge {
   --p: 0;

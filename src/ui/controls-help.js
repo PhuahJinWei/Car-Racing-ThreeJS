@@ -25,6 +25,9 @@ export const CONTROLS = {
   ],
 };
 
+// driving a patrol car adds its siren
+const SIREN = { keyboard: { keys: ['Q'], label: 'siren' }, gamepad: { keys: ['LB'], label: 'siren' } };
+
 /** One key cap: square keyboard keys, round controller face buttons, pill-shaped triggers/sticks. */
 export function keyCap(k, pad = false) {
   const cls = pad ? (/^[ABXY]$/.test(k) ? 'k-face' : 'k-pill') : k.length > 1 ? 'k-wide' : '';
@@ -33,11 +36,12 @@ export function keyCap(k, pad = false) {
 
 /**
  * Grid cells (keys, label, keys, label, ...) for a `.ctl-grid` with `columns` key/label pairs per
- * row. device: 'keyboard' | 'gamepad'.
+ * row. device: 'keyboard' | 'gamepad'; siren: add the patrol car's siren.
  */
-export function controlsCells(device, columns = 1) {
+export function controlsCells(device, columns = 1, siren = false) {
   const pad = device === 'gamepad';
-  const list = CONTROLS[pad ? 'gamepad' : 'keyboard'];
+  const kind = pad ? 'gamepad' : 'keyboard';
+  const list = siren ? [...CONTROLS[kind], SIREN[kind]] : CONTROLS[kind];
   const rows = Math.ceil(list.length / columns);
   let html = '';
   for (let r = 0; r < rows; r++) {

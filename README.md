@@ -65,6 +65,7 @@ You can play with a **keyboard**, a **game controller**, or **touch** on a phone
 | Drift | Space, while turning | Hold DRIFT while turning | X or B |
 | Nitro | Shift | NITRO button | A |
 | Change camera | C | Camera button | Y |
+| Siren (police car) | Q | Siren button | LB |
 | Put the car back on the road | R | Happens automatically | Back |
 | Pause | Esc | Pause button | Start |
 

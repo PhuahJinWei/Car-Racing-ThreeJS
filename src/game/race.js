@@ -23,6 +23,8 @@ const _v2 = new THREE.Vector3();
 const _dv = new THREE.Vector3();
 const _dv2 = new THREE.Vector3();
 const _dq = new THREE.Quaternion();
+const _sv = new THREE.Vector3();
+const _sv2 = new THREE.Vector3();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
 // per-frame scratch: car model state, and effect colours (emitters copy them straight away)
@@ -141,6 +143,9 @@ export class Race {
 
     // ---- racers
     const def = getCarDef(cfg.carId);
+    // a patrol car has a siren: off at the start of every race
+    this.playerPatrol = !!def.patrol;
+    this.siren = false;
     this.player = this._makeRacer(def, cfg.custom, true, 'YOU', { number: 7 });
     this.racers = [this.player];
     this.ais = [];
@@ -411,10 +416,12 @@ export class Race {
       if (this.phase === 'finish' && this.phaseTime > 3.2) {
         this.phase = 'results';
         this.phaseTime = 0;
+        this.siren = false;
         this.rig.startTV();
         this.emit('results', this.getResults());
       }
     }
+    if (input.consume('siren') && this.playerPatrol) this.siren = !this.siren;
     if (input.consume('camera')) {
       const m = this.rig.cycleMode();
       app.settings.camera = m;
@@ -1270,6 +1277,31 @@ export class Race {
     st.relSpeed = nearest ? v.speed - nearest.ai.v : 0;
     // how loud the rain is: none under a roof
     st.wet = this.world.rain ? 1 - this.shelter : 0;
+    // sirens: yours (the fast yelp while nitro fires), and once the race is on the nearest rival
+    // patrol car's, heard only close by
+    st.siren = this.siren;
+    st.sirenYelp = this.siren && v.boostTime > 0 && v.boostKind === 'nitro';
+    let patrol = null;
+    let pd = 45;
+    if (this.phase === 'racing' || this.phase === 'finish') {
+      for (const r of this.ais) {
+        if (!r.def.patrol) continue;
+        const d = r.model.group.position.distanceTo(this.camera.position);
+        if (d < pd) {
+          pd = d;
+          patrol = r;
+        }
+      }
+    }
+    st.rivalSiren = patrol ? 1 - pd / 45 : 0;
+    if (patrol) {
+      // which side of the camera it's on, and pitched up while it closes in
+      _sv.subVectors(patrol.model.group.position, this.camera.position);
+      _sv2.setFromMatrixColumn(this.camera.matrixWorld, 0);
+      st.rivalSirenPan = clamp(_sv.dot(_sv2) / Math.max(pd, 1), -1, 1) * 0.85;
+      const closing = patrol.progress < this.player.progress ? patrol.ai.v - v.speed : v.speed - patrol.ai.v;
+      st.rivalSirenPitch = 1 + clamp(closing / 340, -0.12, 0.12);
+    }
     st.dt = dt;
     a.updateRace(st);
   }

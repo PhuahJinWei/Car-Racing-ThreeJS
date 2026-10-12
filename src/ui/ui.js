@@ -1187,7 +1187,7 @@ export class UI {
           kb
             ? `<div class="keys glass anim-r" style="--d:140">
                 <div class="eyebrow">${t(pad ? 'pause.controller' : 'pause.keyboard')}</div>
-                <div class="ctl-grid">${controlsCells(pad ? 'gamepad' : 'keyboard')}</div>
+                <div class="ctl-grid">${controlsCells(pad ? 'gamepad' : 'keyboard', 1, !!app.race?.playerPatrol)}</div>
                 ${pad ? '' : `<div class="kl-note">${t('pause.kbNote')}</div>`}
               </div>`
             : ''

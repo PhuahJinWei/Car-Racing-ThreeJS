@@ -10,6 +10,8 @@ const BINDINGS = {
   camera: ['KeyC'],
   pause: ['Escape', 'KeyP'],
   reset: ['KeyR'],
+  // a patrol car's siren
+  siren: ['KeyQ'],
 };
 
 /**
@@ -160,6 +162,7 @@ export class Input {
       edge(3, 'camera');
       edge(9, 'pause');
       edge(8, 'reset');
+      edge(4, 'siren');
       edge(12, 'ui-up');
       edge(13, 'ui-down');
       edge(14, 'ui-left');

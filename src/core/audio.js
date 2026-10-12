@@ -254,6 +254,7 @@ export class AudioEngine {
       try {
         for (const o of [e.oscA, e.oscB, e.oscC, e.whine, e.lfo, e.spool, e.squeal, e.sqLfo, e.opp, e.opp2]) o.stop();
         for (const n of [e.wind, e.screech, e.screech2, e.scrape, e.roar, e.jet, e.rain]) n.src.stop();
+        for (const s of [e.siren, e.rivalSiren]) if (s) for (const o of [s.a, s.b, s.wail, s.yelpLfo]) o.stop();
         e.bed.disconnect();
       } catch {
         /* already stopped */
@@ -318,6 +319,76 @@ export class AudioEngine {
     aim(e.opp2.frequency, fo * 2.01, t, 0.05);
     // slow motion = muffled world
     aim(this.slowmo.frequency, ts < 0.95 ? 500 + ts * 5000 : 20000, t, 0.06);
+    // sirens, each built the first time it's needed: yours, and a nearby rival patrol car's
+    if (p.siren || e.siren) {
+      const s = e.siren || (e.siren = this._sirenVoice(e.bed));
+      if (!!p.siren !== s.on) {
+        s.on = !!p.siren;
+        // winds up when switched on, sags as it dies away
+        for (const o of [s.a, s.b]) {
+          o.detune.cancelScheduledValues(t);
+          if (s.on) o.detune.setValueAtTime(-900, t);
+          o.detune.setTargetAtTime(s.on ? 0 : -700, t, s.on ? 0.25 : 0.3);
+        }
+        s.out.gain.cancelScheduledValues(t);
+        s.out.gain.setTargetAtTime(s.on ? 0.09 : 0, t, s.on ? 0.06 : 0.18);
+      }
+      const yelp = s.on && !!p.sirenYelp;
+      if (yelp !== s.yelp) {
+        s.yelp = yelp;
+        s.wailDepth.gain.setTargetAtTime(yelp ? 0 : 400, t, 0.04);
+        s.yelpDepth.gain.setTargetAtTime(yelp ? 400 : 0, t, 0.04);
+      }
+    }
+    if (p.rivalSiren > 0 || e.rivalSiren) {
+      const r = e.rivalSiren || (e.rivalSiren = this._sirenVoice(e.bed));
+      const near = p.rivalSiren || 0;
+      aim(r.out.gain, near * near * 0.08, t, 0.08);
+      if (near > 0) {
+        if (r.pan) aim(r.pan.pan, p.rivalSirenPan || 0, t, 0.05);
+        const cents = 1200 * Math.log2(p.rivalSirenPitch || 1);
+        aim(r.a.detune, cents, t, 0.1);
+        aim(r.b.detune, cents, t, 0.1);
+      }
+    }
+  }
+
+  /**
+   * A siren: a sawtooth and a square swept between about 650 and 1450 Hz by a slow wail (a rise and
+   * fall every 4 s) or the fast yelp, through a band-pass like a horn speaker. Silent until its level
+   * is raised; panned where the browser can.
+   */
+  _sirenVoice(dest) {
+    const ctx = this.ctx;
+    const v = { on: false, yelp: false };
+    v.a = this._osc('sawtooth', 1050);
+    v.b = this._osc('square', 1053);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1250;
+    bp.Q.value = 0.8;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 4500;
+    v.a.connect(this._gain(0.55)).connect(bp);
+    v.b.connect(this._gain(0.22)).connect(bp);
+    v.wail = this._osc('sine', 0.25);
+    v.yelpLfo = this._osc('triangle', 3.4);
+    v.wailDepth = this._gain(400);
+    v.yelpDepth = this._gain(0);
+    v.wail.connect(v.wailDepth);
+    v.yelpLfo.connect(v.yelpDepth);
+    for (const o of [v.a, v.b]) {
+      v.wailDepth.connect(o.frequency);
+      v.yelpDepth.connect(o.frequency);
+    }
+    v.out = this._gain(0);
+    bp.connect(lp).connect(v.out);
+    v.pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (v.pan) v.out.connect(v.pan).connect(dest);
+    else v.out.connect(dest);
+    for (const o of [v.a, v.b, v.wail, v.yelpLfo]) o.start();
+    return v;
   }
 
   shift() {
