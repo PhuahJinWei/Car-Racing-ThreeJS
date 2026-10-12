@@ -4,6 +4,7 @@ import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
 import { CATEGORIES, findItem, PAINTS, resolveCustom, itemFits, DEFAULT_CUSTOM, DEFAULT_CUSTOM_BY_CAR } from '../car/customization.js';
 import { getDaily, msUntilTomorrow } from '../game/daily.js';
+import { devMode, setDevMode, devCredits, devUnlockAll, devResetDaily, DEV_TAPS } from '../core/dev.js';
 import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
 import { DIFFICULTY } from '../game/ai.js';
@@ -1064,6 +1065,15 @@ export class UI {
     const row = (label, hint, ctl) => `<div class="srow"><div class="lbl"><b>${label}</b>${hint ? `<span>${hint}</span>` : ''}</div><div class="ctl">${ctl}</div></div>`;
     const swRow = (key, label, hint) => row(label, hint, sw(key, label));
     const st = app.storage.data.stats;
+    const devBtn = (act, label) => `<button class="btn ghost small" data-dev="${act}">${label}</button>`;
+    const devHtml = () => `
+          <div class="dev-block">
+            <h4 class="dev-title">${ICONS.settings}${t('dev.title')}</h4>
+            ${row(t('dev.credits'), t('dev.creditsHint'), devBtn('cr5', '+5,000') + devBtn('cr50', '+50,000'))}
+            ${row(t('dev.unlock'), t('dev.unlockHint'), devBtn('unlock', t('dev.unlockBtn')))}
+            ${row(t('dev.daily'), t('dev.dailyHint'), devBtn('daily', t('set.resetBtn')))}
+            ${import.meta.env.DEV ? '' : row(t('dev.mode'), t('dev.modeHint'), devBtn('off', t('dev.offBtn')))}
+          </div>`;
     const SECTIONS = {
       graphics: {
         name: t('set.graphics'),
@@ -1118,6 +1128,7 @@ export class UI {
               .join('')}
           </div>
           ${row(t('set.reset'), t('set.resetHint'), `<button class="btn ghost small" data-reset="1">${t('set.resetBtn')}</button>`)}
+          ${devMode() ? devHtml() : ''}
           <p class="about">${t('set.about')}</p>`,
       },
       language: {
@@ -1140,7 +1151,50 @@ export class UI {
       panel.innerHTML = `<h3 class="panel-title">${SECTIONS[tab].name}</h3>${SECTIONS[tab].html()}`;
       panel.scrollTop = 0;
     };
+    // developer mode: tap the Profile title seven times (a pause of over a second starts over)
+    let taps = 0;
+    let lastTap = 0;
+    const devTap = () => {
+      if (devMode()) return;
+      const now = performance.now();
+      taps = now - lastTap > 1200 ? 1 : taps + 1;
+      lastTap = now;
+      const left = DEV_TAPS - taps;
+      if (left <= 0) {
+        setDevMode(true);
+        taps = 0;
+        app.audio?.play('unlock');
+        this.toast(t('dev.on'));
+        renderTab();
+      } else if (left <= 3) this.toast(t('dev.tapsLeft', { n: left }));
+    };
+    const devAction = (act) => {
+      const S = app.storage;
+      if (act === 'cr5' || act === 'cr50') {
+        const n = act === 'cr5' ? 5000 : 50000;
+        devCredits(S, n);
+        this.refreshCredits();
+        this.toast(`+${formatNumber(n)} CR`);
+        app.audio?.play('buy');
+        return;
+      }
+      if (act === 'unlock') {
+        devUnlockAll(S);
+        this.toast(t('dev.unlockDone'));
+      } else if (act === 'daily') {
+        devResetDaily(S);
+        this.toast(t('dev.dailyDone'));
+      } else if (act === 'off') {
+        setDevMode(false);
+        this.toast(t('dev.off'));
+        renderTab();
+      }
+      app.audio?.play('ui');
+    };
     view.addEventListener('click', (e) => {
+      const d = e.target.closest('[data-dev]');
+      if (d) return devAction(d.dataset.dev);
+      if (tab === 'profile' && e.target.closest('.panel-title')) return devTap();
       const b = e.target.closest('[data-tab]');
       if (!b) return;
       tab = b.dataset.tab;
