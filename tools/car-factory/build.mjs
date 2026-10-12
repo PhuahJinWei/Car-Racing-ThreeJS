@@ -123,7 +123,7 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
   const groups = [];
   for (const lod of LODS) {
     const t2 = performance.now();
-    const parts = await buildParts(design.sdf, mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, stages: (lod.name === 'lod0' ? STAGES : FAR_STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
+    const parts = await buildParts(design.sdf, mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, stages: (lod.name === 'lod0' ? STAGES : FAR_STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
     // the far LOD keeps opaque glass, so the cockpit behind it can go
     if (lod.name !== 'lod0') delete parts[MAT.interior];
     const list = Object.entries(parts).map(([m, p]) => ({ mat: +m, ...p }));

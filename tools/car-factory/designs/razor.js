@@ -333,12 +333,13 @@ export function buildRazor() {
       const d = pocket(headFoot.sample(ax, y), sh, 0.028, po);
       acc.cut(d, po.wall ? MAT.trim : MAT.head, 0.003);
     }
-    // side intakes
+    // side intakes: a shallow body-coloured duct, so the mesh at its back still catches light
+    // instead of reading as a black hole, split by body-coloured strakes
     if (ax > 0.6 && z < -0.1 && z > -1.1 && y > 0.28 && y < 0.82) {
       const reg = sideIntake.sample(z, y);
-      acc.cut(pocket(reg, bP, 0.12, po), po.wall ? MAT.trim : MAT.grille, 0.006);
-      for (const ys of [0.5, 0.61]) {
-        acc.add(Math.max(reg, Math.abs(y - ys - (z + 0.6) * 0.05) - 0.007, bP + 0.004, -(bP + 0.11)), MAT.carbon, 0.003);
+      acc.cut(pocket(reg, bP, 0.055, po), po.wall ? MAT.paint : MAT.grille, 0.008);
+      for (const ys of [0.45, 0.55, 0.65]) {
+        acc.add(Math.max(reg, Math.abs(y - ys - (z + 0.6) * 0.05) - 0.011, bP + 0.006, -(bP + 0.05)), MAT.paint, 0.004);
       }
     }
     // Y tail lights
@@ -428,6 +429,8 @@ export function buildRazor() {
     sdf,
     shell,
     decals,
+    // the intake meshes sit deep in their ducts: full AO turns them into flat black holes
+    aoStrength: { [MAT.grille]: 0.45 },
     bounds: { min: [-1.2, 0.0, -2.52], max: [1.2, 1.4, 2.52] },
     meta: {
       wheels: WH,

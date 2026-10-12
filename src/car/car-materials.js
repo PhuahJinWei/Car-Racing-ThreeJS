@@ -77,9 +77,9 @@ float carbonTwill(vec2 p) {
   return m;
 }
 
-/** Black hexagonal mesh: lit frame, dark holes. */
+/** Dark satin-metal hexagonal mesh: lit frame, dark holes (light enough to read inside a duct). */
 export function makeGrilleMaterial() {
-  const m = new THREE.MeshStandardMaterial({ color: 0x2a2c31, metalness: 0.5, roughness: 0.4, vertexColors: true });
+  const m = new THREE.MeshStandardMaterial({ color: 0x484c54, metalness: 0.7, roughness: 0.35, vertexColors: true });
   m.onBeforeCompile = (shader) => {
     objVaryings(shader);
     shader.fragmentShader = shader.fragmentShader

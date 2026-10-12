@@ -366,7 +366,14 @@ function prepare(sdf, mesh, opts) {
   // AO is baked here, before simplification, so the simplifier can see it: baked afterwards, a
   // single crease vertex smeared its darkness across a whole large triangle as a black wedge
   const AO = bakeAO(sdf, P, N, out, opts.ao);
-  prep = { split, P, N, AO, vm: Uint8Array.from(vm) };
+  // designs can lighten AO on chosen materials (e.g. a mesh deep in an intake that should still show)
+  if (opts.aoStrength) {
+    for (let v = 0; v < n; v++) {
+      const s = opts.aoStrength[vm[v]];
+      if (s !== undefined) AO[v] = 1 - (1 - AO[v]) * s;
+    }
+  }
+  prep ={ split, P, N, AO, vm: Uint8Array.from(vm) };
   prepared.set(mesh, prep);
   return prep;
 }
