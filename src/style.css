@@ -35,6 +35,14 @@
   --st: env(safe-area-inset-top, 0px);
   --sb: env(safe-area-inset-bottom, 0px);
   --u: clamp(12px, 1.1vmin + 7px, 18px);
+  /* on-screen controls: they grow with the screen's short side up to tablet sizes (phones stay
+     within the old sizes), times the Control size setting (--tscale, set by the app) */
+  --tscale: 1;
+  --t-stick: calc(clamp(112px, 32vmin, 224px) * var(--tscale));
+  --t-drift: calc(min(25vh, clamp(118px, 20vmin, 165px)) * var(--tscale));
+  --t-nitro: calc(min(20vh, clamp(94px, 16vmin, 132px)) * var(--tscale));
+  /* how high they reach above the bottom edge, so the HUD can stay clear of them */
+  --t-top: calc(max(1.4rem + var(--t-stick), 0.8rem + var(--t-drift) * 0.48 + var(--t-nitro)) + 0.5rem);
 }
 
 html {
@@ -3663,7 +3671,7 @@ kbd.k-pill {
 /* steering: a stick that stays put at the bottom left. The zone is its touch area, reaching a
    little past the stick on every side so a thumb just off its edge still counts */
 .touch .stick-zone {
-  --size: clamp(112px, 32vmin, 160px);
+  --size: var(--t-stick);
   --reach: calc(var(--size) * 0.4);
   position: absolute;
   left: 0;
@@ -3762,8 +3770,8 @@ kbd.k-pill {
   position: absolute;
   right: calc(var(--sr) + 0.8rem);
   bottom: calc(var(--sb) + 0.8rem);
-  width: min(30vw, 230px);
-  height: min(56vh, 250px);
+  width: calc(var(--t-drift) * 1.08 + var(--t-nitro));
+  height: calc(var(--t-drift) * 0.48 + var(--t-nitro));
   pointer-events: none;
 }
 
@@ -3785,16 +3793,17 @@ kbd.k-pill {
     border-color 0.1s;
 }
 
+/* button text is sized in em from the button (below), so it grows and shrinks with it */
 .tbtn .lbl {
-  font-size: 0.8rem;
+  font-size: 1em;
   letter-spacing: calc(0.2em * var(--track));
   padding-left: 0.2em;
 }
 
 .tbtn .sub {
-  margin-top: 0.15rem;
+  margin-top: 0.25em;
   padding-left: 0.2em;
-  font-size: 0.56rem;
+  font-size: 0.7em;
   letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-3);
 }
@@ -3802,8 +3811,9 @@ kbd.k-pill {
 .tbtn.drift {
   right: 0;
   bottom: 0;
-  width: min(25vh, 118px);
-  height: min(25vh, 118px);
+  width: var(--t-drift);
+  height: var(--t-drift);
+  font-size: calc(var(--t-drift) * 0.11);
 }
 
 .tbtn.drift.on {
@@ -3814,10 +3824,11 @@ kbd.k-pill {
 
 .tbtn.nitro {
   --p: 0;
-  right: min(27vh, 128px);
-  bottom: min(12vh, 56px);
-  width: min(20vh, 94px);
-  height: min(20vh, 94px);
+  right: calc(var(--t-drift) * 1.08);
+  bottom: calc(var(--t-drift) * 0.48);
+  width: var(--t-nitro);
+  height: var(--t-nitro);
+  font-size: calc(var(--t-nitro) * 0.17);
 }
 
 .tbtn.nitro .ring {
@@ -3830,8 +3841,8 @@ kbd.k-pill {
 }
 
 .tbtn.nitro .ico {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.35em;
+  height: 1.35em;
   color: var(--ice);
   display: grid;
 }
@@ -3842,13 +3853,13 @@ kbd.k-pill {
 }
 
 .tbtn.nitro .cnt {
-  font-size: 1.15rem;
+  font-size: 1.15em;
   line-height: 1;
-  margin-top: 0.05rem;
+  margin-top: 0.05em;
 }
 
 .tbtn.nitro .lbl {
-  font-size: 0.56rem;
+  font-size: 0.56em;
   letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-2);
 }
@@ -4605,15 +4616,12 @@ kbd.k-pill {
     align-items: start;
     overflow-y: auto;
   }
-  .touch .actions {
-    width: 42vw;
-  }
   .hud.has-touch .gauge {
-    bottom: calc(var(--sb) + min(30vh, 210px));
+    bottom: calc(var(--sb) + max(min(30vh, 210px), var(--t-top)));
     transform: translateX(-50%) scale(0.9);
   }
   .hud.has-touch .drift-tier {
-    bottom: calc(var(--sb) + min(30vh, 210px) + 9.5rem);
+    bottom: calc(var(--sb) + max(min(30vh, 210px), var(--t-top)) + 9.5rem);
   }
   .standings-mini {
     display: none;

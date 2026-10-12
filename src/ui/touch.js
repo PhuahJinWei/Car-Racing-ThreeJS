@@ -10,6 +10,9 @@ const DEAD = 0.1;
 const BRAKE_ON = 0.5;
 const BRAKE_OFF = 0.3;
 
+/** The Control size setting: how much the stick and buttons are scaled (CSS --tscale). */
+export const TOUCH_SIZES = { s: 0.85, m: 1, l: 1.2 };
+
 /**
  * On-screen controls for phones/tablets (multi-touch via Pointer Events):
  *  - left: a steering stick that stays put at the bottom left (or tilt steering). A thumb on its

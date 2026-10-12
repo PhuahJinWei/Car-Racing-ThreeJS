@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS = {
   controls: 'buttons',
   autoAccel: true,
   tiltSensitivity: 1,
+  // on-screen controls: 's' | 'm' | 'l' (see TOUCH_SIZES in ui/touch.js)
+  touchSize: 'm',
   showFps: false,
   keyHints: true,
   reduceFlashes: false,

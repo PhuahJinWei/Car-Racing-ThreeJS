@@ -4,7 +4,7 @@ import { AudioEngine } from './core/audio.js';
 import { Storage } from './core/storage.js';
 import { UI } from './ui/ui.js';
 import { HUD } from './ui/hud.js';
-import { TouchControls } from './ui/touch.js';
+import { TouchControls, TOUCH_SIZES } from './ui/touch.js';
 import { Garage } from './scenes/garage.js';
 import { MenuStreet } from './scenes/street.js';
 import { Race } from './game/race.js';
@@ -343,6 +343,7 @@ export class App {
       if (changed === 'camera') this.race.rig.setMode(s.camera);
     }
     if (changed === 'controls' && this.touch) this.touch.setMode(s.controls);
+    document.documentElement.style.setProperty('--tscale', String(TOUCH_SIZES[s.touchSize] ?? 1));
     if (changed === 'units' && this.hud) this.hud.$.unit.textContent = s.units === 'mph' ? 'MPH' : 'KM/H';
     if (changed === 'language') {
       setLanguage(s.language);
