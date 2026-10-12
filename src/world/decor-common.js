@@ -343,7 +343,8 @@ export function buildChevrons(track, palette, opts = {}) {
     _m.setPosition(_p);
     mesh.setMatrixAt(n, _m);
     posts.setMatrixAt(n, _m);
-    dirAttr.setX(n, side > 0 ? -1 : 1);
+    // arrows point the way the road turns: a left turn (board on the right) reads "<" from the road
+    dirAttr.setX(n, side > 0 ? 1 : -1);
   });
   mesh.computeBoundingSphere();
   posts.computeBoundingSphere();
