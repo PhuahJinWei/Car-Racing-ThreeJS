@@ -24,6 +24,32 @@ export function delegate(root, handlers, eventName = 'click') {
   });
 }
 
+/**
+ * Shrink a one-line label until it fits its box, never below `min` of its styled size (past
+ * that its ellipsis takes over). Labels that already fit keep their size. Measures, so the
+ * label has to be on show.
+ */
+export function fitText(n, min = 0.75) {
+  n.style.fontSize = '';
+  // exact (fractional) widths: a text a fraction of a pixel too wide still gets its ellipsis
+  const cs = getComputedStyle(n);
+  const box = n.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const range = document.createRange();
+  range.selectNodeContents(n);
+  const width = () => range.getBoundingClientRect().width;
+  const w = width();
+  if (box <= 0 || w <= box) return;
+  const base = parseFloat(cs.fontSize);
+  const floor = base * min;
+  let size = Math.max(floor, ((base * box) / w) * 0.99);
+  n.style.fontSize = `${size}px`;
+  // glyphs don't scale exactly with the size: step down until it fits
+  while (width() > box && size > floor) {
+    size = Math.max(floor, size - 0.25);
+    n.style.fontSize = `${size}px`;
+  }
+}
+
 // 24x24 line icons drawn for the game (stroke = currentColor).
 const S = (body, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
 

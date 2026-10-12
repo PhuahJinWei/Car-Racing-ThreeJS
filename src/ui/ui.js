@@ -1,4 +1,4 @@
-import { el, $, $$, delegate, ICONS } from './dom.js';
+import { el, $, $$, delegate, fitText, ICONS } from './dom.js';
 import { TRACKS, getTrackDef } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
@@ -720,6 +720,20 @@ export class UI {
       return base;
     };
 
+    // long names (SPECTER LMP, Magenta Streak...) step down in size to fit: measured once on
+    // show after every redraw, and again when the window changes size
+    let fitFrame = 0;
+    const fitNames = () => {
+      fitFrame = 0;
+      fitText($(root, '.ci-name-row .car-name'));
+      for (const n of $$(root, '.items .nm')) fitText(n, 0.8);
+    };
+    const fitSoon = () => {
+      if (!fitFrame) fitFrame = requestAnimationFrame(fitNames);
+    };
+    window.addEventListener('resize', fitSoon);
+    document.fonts?.ready.then(fitSoon);
+
     const renderCar = () => {
       const c = car();
       $(root, '.car-name').textContent = c.name;
@@ -735,6 +749,7 @@ export class UI {
         act.innerHTML = `<button class="btn primary" data-action="buycar" ${short > 0 ? 'disabled' : ''}>${ICONS.lock}${short > 0 ? t('garage.needCr', { n: formatNumber(short) }) : t('garage.buyCar', { n: formatNumber(c.price) })}</button>`;
       } else if (S.data.car === c.id) act.innerHTML = `<div class="status">${ICONS.check}${t('garage.selected')}</div>`;
       else act.innerHTML = `<button class="btn primary" data-action="selectcar">${t('garage.selectCar')}</button>`;
+      fitSoon();
     };
 
     const renderItems = () => {
@@ -763,6 +778,7 @@ export class UI {
           return `<button class="${cls}" data-action="item" data-id="${it.id}">${isEq ? `<span class="tick">${ICONS.check}</span>` : ''}${swatchFor(cat, it, look)}<span class="nm">${itemName(it)}</span>${tag}</button>`;
         })
         .join('');
+      fitSoon();
     };
 
     const renderBuyBar = () => {
@@ -870,6 +886,8 @@ export class UI {
       el: root,
       dispose: () => {
         if (pending) app.garage.setCustom(S.customFor(car().id));
+        window.removeEventListener('resize', fitSoon);
+        cancelAnimationFrame(fitFrame);
       },
     };
   }
