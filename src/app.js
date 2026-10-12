@@ -10,7 +10,8 @@ import { MenuStreet } from './scenes/street.js';
 import { Race } from './game/race.js';
 import { getTrackDef } from './world/tracks.js';
 import { evaluateDaily, dailyProgress, todayKey } from './game/daily.js';
-import { ordinal, clamp } from './core/math.js';
+import { clamp } from './core/math.js';
+import { setLanguage, t } from './core/i18n.js';
 import { DIFFICULTY } from './game/ai.js';
 import { CARS } from './car/car-defs.js';
 import { loadManifest, ensureCarAssets, previewModelFile } from './car/car-assets.js';
@@ -21,6 +22,7 @@ export class App {
   constructor() {
     this.storage = new Storage();
     this.settings = this.storage.settings;
+    setLanguage(this.settings.language);
     this.canvas = document.getElementById('game');
     this.renderer = new Renderer(this.canvas);
     this.input = new Input();
@@ -51,7 +53,7 @@ export class App {
   }
 
   async init() {
-    this.ui.showLoading('LOADING');
+    this.ui.showLoading(t('loading'));
     try {
       await Promise.race([Promise.all([document.fonts.load('900 20px Orbitron'), document.fonts.load('700 20px Rajdhani')]), new Promise((r) => setTimeout(r, 2500))]);
     } catch {
@@ -171,7 +173,7 @@ export class App {
     this.street?.dispose();
     this.ui.clearScreen();
     this.ui.hidePause();
-    this.ui.showLoading(`BUILDING ${getTrackDef(cfg.trackId).name}`, { trackId: cfg.trackId, variant: v, mode: full.mode, laps: full.laps });
+    this.ui.showLoading(t('building', { track: getTrackDef(cfg.trackId).name }), { trackId: cfg.trackId, variant: v, mode: full.mode, laps: full.laps });
     this.state = 'loading';
     await nextFrame();
     await ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer);
@@ -181,7 +183,7 @@ export class App {
     } catch (e) {
       console.error(e);
       this.ui.hideLoading();
-      this.ui.toast('Could not build the track');
+      this.ui.toast(t('race.buildFailed'));
       this.toMenu();
       return;
     }
@@ -203,15 +205,13 @@ export class App {
   }
 
   _tips(race) {
-    const kb = !this.input.isTouchDevice();
-    const tips = kb
-      ? ['Hold <b>SPACE</b> while steering to drift - release for a turbo', 'Press <b>SHIFT</b> for nitro. Drifts, near misses and big air refill it', '<b>C</b> changes camera · <b>R</b> resets your car · <b>ESC</b> pauses']
-      : ['Hold <b>DRIFT</b> while steering - release for a turbo boost', 'Tap <b>NITRO</b> to boost. Drifts, near misses and big air refill it', '<b>DRIFT</b> without steering brakes'];
+    const kind = this.input.isTouchDevice() ? 'touch' : 'kb';
+    const tips = [1, 2, 3].map((i) => t(`intro.${kind}${i}`));
     race.on('countdown', (c) => {
       if (c.value !== 'GO') return;
-      tips.forEach((t, i) =>
+      tips.forEach((tip, i) =>
         setTimeout(() => {
-          if (this.race === race && !race.paused) this.ui.tip(t);
+          if (this.race === race && !race.paused) this.ui.tip(tip);
         }, 900 + i * 6000),
       );
     });
@@ -275,16 +275,16 @@ export class App {
     const lapMul = clamp(cfg.laps / 3, 0.5, 1.6);
     if (res.mode !== 'timetrial') {
       const table = [1500, 1000, 700, 500, 350, 250];
-      lines.push([`${ordinal(res.place)} PLACE`, Math.round((table[res.place - 1] || 200) * diffMul * lapMul)]);
+      lines.push([t('rw.place', { n: res.place }), Math.round((table[res.place - 1] || 200) * diffMul * lapMul)]);
     } else {
-      lines.push(['TIME TRIAL', Math.round(400 * lapMul)]);
+      lines.push([t('mode.timetrial'), Math.round(400 * lapMul)]);
     }
-    if (res.style > 0) lines.push(['STYLE BONUS', Math.round(res.style / 10)]);
+    if (res.style > 0) lines.push([t('rw.styleBonus'), Math.round(res.style / 10)]);
     const prev = S.getRecord(res.trackKey, res.mode);
     const hadRecord = !!(prev && prev.bestTime);
     const rec = S.setRecord(res.trackKey, res.mode, res.time, res.bestLap);
     const reward = { lines, newRecord: rec.newTime && hadRecord, newLap: rec.newLap && hadRecord };
-    if (reward.newRecord) lines.push(['NEW RECORD', 500]);
+    if (reward.newRecord) lines.push([t('res.newRecord'), 500]);
     if (res.mode === 'timetrial' && rec.newTime && res.ghost) S.setGhost(res.trackKey, res.ghost);
     if (res.mode === 'daily' && this.currentDaily) {
       const d = this.currentDaily;
@@ -299,8 +299,8 @@ export class App {
         ds.lastCompleted = d.key;
         ds.date = d.key;
         ds.completed = true;
-        lines.push(['DAILY CHALLENGE', d.reward]);
-        if (ds.streak > 1) lines.push([`STREAK x${ds.streak}`, Math.min(1000, (ds.streak - 1) * 200)]);
+        lines.push([t('mode.daily'), d.reward]);
+        if (ds.streak > 1) lines.push([t('rw.streak', { n: ds.streak }), Math.min(1000, (ds.streak - 1) * 200)]);
       } else if (!ok && ds.date !== d.key) {
         ds.date = d.key;
         ds.completed = false;
@@ -344,6 +344,10 @@ export class App {
     }
     if (changed === 'controls' && this.touch) this.touch.setMode(s.controls);
     if (changed === 'units' && this.hud) this.hud.$.unit.textContent = s.units === 'mph' ? 'MPH' : 'KM/H';
+    if (changed === 'language') {
+      setLanguage(s.language);
+      this.ui.onLanguage();
+    }
     this.storage.save();
   }
 

@@ -14,9 +14,9 @@ import { StuntTracker } from './stunts.js';
 import { GhostRecorder, GhostPlayer } from './ghost.js';
 import { DEFAULT_FX } from '../core/postfx.js';
 import { clamp, damp, lerp, rng, hashString, wrap, smoothstep } from '../core/math.js';
+import { t, trackTagline } from '../core/i18n.js';
 
 const TIER_COLORS = [null, [0.4, 1.6, 6.0], [6.0, 2.4, 0.4], [5.0, 0.6, 6.0]];
-const TIER_LABELS = ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'];
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -234,7 +234,7 @@ export class Race {
     this.phase = 'intro';
     this.phaseTime = 0;
     this.rig.startIntro(3.4);
-    this.emit('intro', { name: this.world.def.name, tagline: this.world.def.tagline });
+    this.emit('intro', { name: this.world.def.name, tagline: trackTagline(this.world.def) });
   }
 
   skipIntro() {
@@ -275,7 +275,7 @@ export class Race {
     this.perfectStart = true;
     const v = this.player.vehicle;
     v.giveBoost(1.4, 'start');
-    this.stunts.add('perfectStart', 300, 'PERFECT START', { big: true });
+    this.stunts.add('perfectStart', 300, t('pop.perfectStart'), { big: true });
     this.flash = 0.08;
     this.flashColor = [1.0, 0.75, 0.4];
     this.rig.kick(10);
@@ -332,7 +332,7 @@ export class Race {
       }
       if (input.consume('nitro')) {
         this.startPressTime = -remain;
-        if (remain > 0.32) this.emit('popup', { kind: 'fail', label: 'TOO EARLY', points: 0, combo: 1 });
+        if (remain > 0.32) this.emit('popup', { kind: 'fail', label: t('pop.tooEarly'), points: 0, combo: 1 });
       }
       if (remain <= 0) this._go();
     } else if (this.phase === 'racing' && !P.finished) {
@@ -340,7 +340,7 @@ export class Race {
       if (this.phaseTime < 0.25 && input.consume('nitro') && !this.perfectStart) this._perfectStart();
       else if (input.consume('nitro')) {
         if (v.fireNitro()) this._onNitro();
-        else this.emit('popup', { kind: 'fail', label: 'NO NITRO', points: 0, combo: 1 });
+        else this.emit('popup', { kind: 'fail', label: t('pop.noNitro'), points: 0, combo: 1 });
       }
       if (input.consume('reset')) this.respawn();
       // auto-recover when stuck (driving but not getting anywhere) or going the wrong way for too
@@ -650,7 +650,7 @@ export class Race {
       if (st.prevDs > 0 && ds <= 0 && Math.abs(ds) < 10) {
         if (!st.touched && st.minDD < 3.4 && v.vf - a.v > 3 && v.speed > 25) {
           const razor = st.minDD < 2.45;
-          this.stunts.add('nearMiss', razor ? 450 : 220, razor ? 'RAZOR CLOSE' : 'NEAR MISS', { big: razor });
+          this.stunts.add('nearMiss', razor ? 450 : 220, t(razor ? 'pop.razor' : 'pop.nearMiss'), { big: razor });
           v.addNitro(razor ? 0.5 : 0.3);
           this.rig.kick(razor ? 9 : 5);
           this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d) });
@@ -662,7 +662,7 @@ export class Race {
           }
         }
         if (st.slipUntil > this.clock) {
-          this.stunts.add('slipstream', 250, 'SLINGSHOT');
+          this.stunts.add('slipstream', 250, t('pop.slingshot'));
           st.slipUntil = 0;
         }
         st.minDD = 99;
@@ -682,7 +682,7 @@ export class Race {
           st.slipUntil = this.clock + 2.5;
           if (!st.slipShown) {
             st.slipShown = true;
-            this.emit('popup', { kind: 'info', label: 'SLIPSTREAM', points: 0, combo: 1 });
+            this.emit('popup', { kind: 'info', label: t('pop.slipstream'), points: 0, combo: 1 });
           }
         }
       } else {
@@ -727,7 +727,7 @@ export class Race {
           this.app.audio?.play('tier', { tier: e.tier });
           break;
         case 'miniturbo': {
-          this.emit('popup', { kind: 'turbo', label: TIER_LABELS[e.tier], points: 0, combo: 1, tier: e.tier });
+          this.emit('popup', { kind: 'turbo', label: t(`turbo.${e.tier}`), points: 0, combo: 1, tier: e.tier });
           this.rig.kick(5 + e.tier * 3);
           this.app.audio?.play('turbo', { tier: e.tier });
           this.app.input.vibrate(20 + e.tier * 10);
@@ -765,7 +765,7 @@ export class Race {
         }
         case 'land': {
           if (e.air > 0.55 && !P.finished && this.phase === 'racing') {
-            this.stunts.add('air', Math.round(e.air * 650), e.air > 1.1 ? 'MASSIVE AIR' : 'BIG AIR', { big: e.air > 1.1 });
+            this.stunts.add('air', Math.round(e.air * 650), t(e.air > 1.1 ? 'pop.massiveAir' : 'pop.bigAir'), { big: e.air > 1.1 });
             v.addNitro(0.4);
           }
           if (e.strength > 5) {
@@ -859,7 +859,7 @@ export class Race {
     this.order = sorted;
     if (this.phase === 'racing' && prev && this.player.place < prev && !this.player.finished) {
       const gained = prev - this.player.place;
-      for (let k = 0; k < gained; k++) this.stunts.add('overtake', 100, 'OVERTAKE', { chain: false });
+      for (let k = 0; k < gained; k++) this.stunts.add('overtake', 100, t('pop.overtake'), { chain: false });
     }
   }
 

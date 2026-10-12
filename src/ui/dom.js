@@ -61,6 +61,7 @@ export const ICONS = {
   audio: S('<path d="M4 9.5h3.4L12 5.6v12.8l-4.6-3.9H4z"/><path d="M15.6 9.2a4.2 4.2 0 0 1 0 5.6M18.2 6.6a8 8 0 0 1 0 10.8"/>'),
   gamepad: S('<path d="M7.2 8h9.6a4 4 0 0 1 3.9 4.9l-.9 3.8a2.2 2.2 0 0 1-3.8 1L14.5 16h-5L8 17.7a2.2 2.2 0 0 1-3.8-1l-.9-3.8A4 4 0 0 1 7.2 8z"/><path d="M8.2 10.6v3M6.7 12.1h3"/><circle cx="15.6" cy="11.4" r=".6" fill="currentColor"/><circle cx="17.4" cy="13.2" r=".6" fill="currentColor"/>'),
   profile: S('<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>'),
+  globe: S('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5s1.2-6.1 3.6-8.5z"/>'),
   info: S('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.2"/>'),
   rotate: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><rect x="20" y="8" width="24" height="48" rx="4"/><circle cx="32" cy="50" r="1.6" fill="currentColor"/></svg>',
 };

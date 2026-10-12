@@ -75,6 +75,8 @@ export function loadManifest() {
         if (e.class) def.class = e.class.toUpperCase();
         if (e.price != null) def.price = e.price;
         if (e.blurb) def.blurb = e.blurb;
+        // its own words are shown as written (the translations follow the built-in catalogue)
+        if (e.class || e.blurb) def.ownText = true;
         if (e.stats) Object.assign(def.stats, e.stats);
         if (e.display) Object.assign(def.display, e.display);
         // `v` (written by the car factory) busts caches whenever a model is rebuilt

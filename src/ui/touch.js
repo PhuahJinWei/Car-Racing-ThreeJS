@@ -1,5 +1,6 @@
 import { el, $, ICONS } from './dom.js';
 import { clamp } from '../core/math.js';
+import { t } from '../core/i18n.js';
 
 /**
  * On-screen controls for phones/tablets (multi-touch via Pointer Events):
@@ -16,10 +17,10 @@ export class TouchControls {
           <div class="pad l">${ICONS.left}</div>
           <div class="pad r">${ICONS.right}</div>
         </div>
-        <div class="tilt-hint" style="display:none">TILT TO STEER</div>
+        <div class="tilt-hint" style="display:none">${t('touch.tilt')}</div>
         <div class="actions">
-          <div class="tbtn nitro"><span class="ring"></span><span class="ico">${ICONS.bolt}</span><span class="cnt">1</span><span class="lbl">NITRO</span></div>
-          <div class="tbtn drift"><span class="lbl">DRIFT</span><span class="sub">HOLD · BRAKE</span></div>
+          <div class="tbtn nitro"><span class="ring"></span><span class="ico">${ICONS.bolt}</span><span class="cnt">1</span><span class="lbl">${t('touch.nitro')}</span></div>
+          <div class="tbtn drift"><span class="lbl">${t('touch.drift')}</span><span class="sub">${t('touch.driftSub')}</span></div>
         </div>
       </div>`);
     this.steerEl = $(this.root, '.steer');
@@ -45,14 +46,14 @@ export class TouchControls {
     if (tilt) {
       this.input.enableTilt().then((ok) => {
         if (!ok) {
-          this.app.ui.toast('Tilt not available - using touch pads');
+          this.app.ui.toast(t('touch.noTilt'));
           this.setMode('buttons');
           return;
         }
         // No sensor data arriving (e.g. desktop / denied) -> fall back to the pads.
         setTimeout(() => {
           if (this.mode === 'tilt' && !this.input.tilt.has) {
-            this.app.ui.toast('No motion sensor detected - using touch pads');
+            this.app.ui.toast(t('touch.noSensor'));
             this.setMode('buttons');
           }
         }, 1500);

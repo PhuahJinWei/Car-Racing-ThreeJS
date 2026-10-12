@@ -1,8 +1,8 @@
 import { el, $, $$, ICONS } from './dom.js';
 import { controlsCells } from './controls-help.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
+import { t } from '../core/i18n.js';
 
-const SUFFIX = (n) => (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH');
 const TIER_CLASS = ['', 'turbo1', 'turbo2', 'turbo3'];
 const TIER_COLOR = ['#ffffff', '#a8d8ff', '#ffb466', '#ff7a6b'];
 
@@ -14,23 +14,23 @@ export class HUD {
     this.root = el(`
       <div class="hud ${race.cfg.mode === 'timetrial' ? 'tt' : ''}">
         <div class="hud-tl">
-          <div class="pos-box"><span class="p">-</span><span class="suf"></span><span class="of"></span></div>
-          <div class="lap-box"><span class="lbl">LAP</span><b class="l">1</b><span class="ls">/3</span></div>
+          <div class="pos-box"><span class="pre"></span><span class="p">-</span><span class="suf"></span><span class="of"></span></div>
+          <div class="lap-box"><span class="lbl">${t('hud.lap')}</span><b class="l">1</b><span class="ls">/3</span></div>
           <div class="standings-mini"></div>
         </div>
         <div class="hud-tc">
           <div class="time">00:00.00</div>
-          <div class="sub"><span>LAP <b class="lapt">00:00.00</b></span><span>BEST <b class="best">--:--.--</b></span></div>
+          <div class="sub"><span>${t('hud.lapTime')} <b class="lapt">00:00.00</b></span><span>${t('hud.best')} <b class="best">--:--.--</b></span></div>
         </div>
         <div class="hud-tr">
           <canvas class="minimap" width="200" height="200"></canvas>
           <div class="btns">
-            <button class="icon-btn" data-a="pause" aria-label="Pause">${ICONS.pause}<span class="kb-badge" data-kb="ESC" data-pad="MENU"></span></button>
-            <button class="icon-btn" data-a="camera" aria-label="Camera">${ICONS.camera}<span class="kb-badge" data-kb="C" data-pad="Y"></span></button>
+            <button class="icon-btn" data-a="pause" aria-label="${t('pause')}">${ICONS.pause}<span class="kb-badge" data-kb="ESC" data-pad="MENU"></span></button>
+            <button class="icon-btn" data-a="camera" aria-label="${t('camera')}">${ICONS.camera}<span class="kb-badge" data-kb="C" data-pad="Y"></span></button>
           </div>
         </div>
-        <div class="combo"><div class="x">x1</div><div class="meter"><i></i></div><div class="style">STYLE 0</div></div>
-        <div class="drift-tier"><span class="lbl">DRIFT</span><span class="pts">0</span></div>
+        <div class="combo"><div class="x">x1</div><div class="meter"><i></i></div><div class="style">${t('hud.style', { n: 0 })}</div></div>
+        <div class="drift-tier"><span class="lbl">${t('hud.drift')}</span><span class="pts">0</span></div>
         <div class="popups"></div>
         <div class="center-msg"></div>
         <div class="gauge">
@@ -44,16 +44,17 @@ export class HUD {
         </div>
         <div class="key-legend">
           <div class="kl-panel">
-            <div class="kl-head"><span>CONTROLS</span><span class="kl-hide"><kbd>H</kbd>HIDE</span></div>
+            <div class="kl-head"><span>${t('hud.controls')}</span><span class="kl-hide"><kbd>H</kbd>${t('hud.hide')}</span></div>
             <div class="ctl-grid two"></div>
-            <div class="kl-note">Arrow keys work too</div>
+            <div class="kl-note">${t('hud.arrows')}</div>
           </div>
-          <button class="kl-pill" data-a="legend" aria-label="Show controls"><kbd>H</kbd>CONTROLS</button>
+          <button class="kl-pill" data-a="legend" aria-label="${t('hud.showControls')}"><kbd>H</kbd>${t('hud.controls')}</button>
         </div>
         <div class="fps"></div>
       </div>`);
     this.$ = {
       posBox: $(this.root, '.pos-box'),
+      pre: $(this.root, '.pos-box .pre'),
       p: $(this.root, '.p'),
       suf: $(this.root, '.suf'),
       of: $(this.root, '.of'),
@@ -109,8 +110,8 @@ export class HUD {
     race.on('popup', (p) => this.popup(p));
     race.on('countdown', (c) => this.countdown(c.value));
     race.on('lap', (l) => {
-      if (l.final) this.banner('FINAL LAP', 'info');
-      else this.banner(`LAP ${l.lap}`, 'info');
+      if (l.final) this.banner(t('hud.finalLap'), 'info');
+      else this.banner(t('hud.lapN', { n: l.lap }), 'info');
       // lap split, with the gap to the best lap so far
       const prev = this._lapBest ?? Infinity;
       let delta = '';
@@ -119,13 +120,17 @@ export class HUD {
         delta = `<span class="delta ${d <= 0 ? 'good' : 'bad'}">${d <= 0 ? '-' : '+'}${Math.abs(d).toFixed(2)}</span>`;
       }
       this._lapBest = Math.min(prev, l.time);
-      this.popup({ kind: 'lap', label: `LAP ${l.lap - 1} · ${formatTime(l.time)}${delta}`, points: 0, combo: 1 });
+      this.popup({ kind: 'lap', label: `${t('hud.split', { n: l.lap - 1, time: formatTime(l.time) })}${delta}`, points: 0, combo: 1 });
     });
     race.on('finish', (f) =>
-      this.banner(race.cfg.mode === 'timetrial' ? 'FINISH' : f.place === 1 ? 'VICTORY' : `FINISHED ${f.place}${SUFFIX(f.place)}`, f.place === 1 && race.cfg.mode !== 'timetrial' ? 'win' : 'info', true),
+      this.banner(
+        race.cfg.mode === 'timetrial' ? t('hud.finish') : f.place === 1 ? t('hud.victory') : t('hud.finished', { n: f.place }),
+        f.place === 1 && race.cfg.mode !== 'timetrial' ? 'win' : 'info',
+        true,
+      ),
     );
     race.on('intro', (i) => this.intro(i));
-    race.on('camera', (m) => this.popup({ kind: 'info', label: `CAMERA · ${m.toUpperCase()}`, points: 0, combo: 1 }));
+    race.on('camera', (m) => this.popup({ kind: 'info', label: t('hud.camera', { mode: t(`cam.${m}`) }), points: 0, combo: 1 }));
   }
 
   mount(parent) {
@@ -135,13 +140,13 @@ export class HUD {
   intro(info) {
     const cfg = this.race.cfg;
     const v = cfg.variant || {};
-    const mode = cfg.mode === 'timetrial' ? 'TIME TRIAL' : cfg.mode === 'daily' ? 'DAILY CHALLENGE' : 'RACE';
+    const mode = t(`mode.${cfg.mode === 'timetrial' || cfg.mode === 'daily' ? cfg.mode : 'race'}`);
     const chips = [
-      `${cfg.laps} ${cfg.laps === 1 ? 'LAP' : 'LAPS'}`,
-      v.reverse ? 'REVERSE' : null,
-      v.mirror ? 'MIRROR' : null,
-      v.weather === 'rain' ? `${ICONS.rain}RAIN` : `${ICONS.moon}CLEAR`,
-      cfg.mode === 'timetrial' ? null : `${cfg.opponents || 5} RIVALS`,
+      t('laps', { n: cfg.laps }),
+      v.reverse ? t('reverse') : null,
+      v.mirror ? t('mirror') : null,
+      v.weather === 'rain' ? `${ICONS.rain}${t('weather.rain')}` : `${ICONS.moon}${t('weather.clear')}`,
+      cfg.mode === 'timetrial' ? null : t('rivals', { n: cfg.opponents || 5 }),
     ].filter(Boolean);
     const card = el(`
       <div class="intro-card">
@@ -151,7 +156,7 @@ export class HUD {
         <div class="chips">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>
       </div>`);
     this.root.appendChild(card);
-    const skip = el(`<div class="skip-hint">SKIP ${ICONS.chevron}</div>`);
+    const skip = el(`<div class="skip-hint">${t('hud.skip')} ${ICONS.chevron}</div>`);
     skip.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.race.skipIntro();
@@ -173,7 +178,7 @@ export class HUD {
       this.root.classList.remove('intro');
     }
     this.$.center.innerHTML = '';
-    this.$.center.appendChild(el(`<div class="countdown ${v === 'GO' ? 'go' : ''}">${v}</div>`));
+    this.$.center.appendChild(el(`<div class="countdown ${v === 'GO' ? 'go' : ''}">${v === 'GO' ? t('hud.go') : v}</div>`));
   }
 
   banner(text, kind = 'info', long = false) {
@@ -323,7 +328,7 @@ export class HUD {
     this.$.standings.innerHTML = order
       .map((r, i) => {
         const near = Math.abs(i - meIdx) <= 1 ? 'near' : '';
-        return `<div class="sm-row ${r.isPlayer ? 'me' : ''} ${near}"><span class="n">${i + 1}</span><i style="--c:${r.color}"></i><span>${r.isPlayer ? 'YOU' : r.name}</span></div>`;
+        return `<div class="sm-row ${r.isPlayer ? 'me' : ''} ${near}"><span class="n">${i + 1}</span><i style="--c:${r.color}"></i><span>${r.isPlayer ? t('you') : r.name}</span></div>`;
       })
       .join('');
   }
@@ -346,8 +351,9 @@ export class HUD {
         $.posBox.classList.add('changed');
       }
       this.cache.place = place;
+      this._set('pre', $.pre, place ? t('ord.pre', { n: place }) : '');
       this._set('p', $.p, place ? String(place) : '-');
-      this._set('suf', $.suf, place ? SUFFIX(place) : '');
+      this._set('suf', $.suf, place ? t('ord.suf', { n: place }) : '');
       this._set('of', $.of, `/${h.total || '-'}`);
     }
     this._set('l', $.l, String(h.lap || 1));
@@ -395,7 +401,7 @@ export class HUD {
     }
     if (drifting) {
       const tier = h.driftTier;
-      this._set('dl', $.driftLbl, tier > 0 ? ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'][tier] : 'DRIFT');
+      this._set('dl', $.driftLbl, tier > 0 ? t(`turbo.${tier}`) : t('hud.drift'));
       this._set('dp', $.driftPts, formatNumber(h.driftPoints * (h.combo || 1)));
       const col = TIER_COLOR[tier];
       if (this.cache.dc !== col) {
@@ -411,11 +417,11 @@ export class HUD {
     }
     this._set('cx', $.comboX, `x${h.combo || 1}`);
     $.comboBar.style.transform = `scaleX(${clamp(h.comboTimer || 0, 0, 1).toFixed(3)})`;
-    this._set('st', $.style, `STYLE ${formatNumber(h.style || 0)}`);
+    this._set('st', $.style, t('hud.style', { n: formatNumber(h.style || 0) }));
     // wrong way
     if (h.wrongWay && !this._wrongShown) {
       this._wrongShown = true;
-      this.banner('WRONG WAY', 'warn');
+      this.banner(t('hud.wrongWay'), 'warn');
     } else if (!h.wrongWay) this._wrongShown = false;
     // minimap ~30 fps, standings 4 Hz
     this._mapT = (this._mapT || 0) + dt;

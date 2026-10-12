@@ -8,11 +8,17 @@ import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
 import { DIFFICULTY } from '../game/ai.js';
 import { controlsCells } from './controls-help.js';
+import { t, locale, LANGUAGES, carClass, carBlurb, trackTagline, itemName } from '../core/i18n.js';
 import districtShot from '../assets/tracks/district.jpg';
 import lumenShot from '../assets/tracks/lumen.jpg';
 import circuitShot from '../assets/tracks/circuit.jpg';
 
-const THEME_LABEL = { tunnel: 'EXPRESSWAY', city: 'STREET', stadium: 'CIRCUIT' };
+const themeLabel = (def) => t(`theme.${def.theme}`);
+const modeLabel = (mode) => t(`mode.${mode === 'timetrial' || mode === 'daily' ? mode : 'race'}`);
+const diffLabel = (key) => t(`diff.${DIFFICULTY[key] ? key : 'easy'}`);
+const km = (meters) => t('km', { n: (meters / 1000).toFixed(1) });
+// loading-screen tips (tip.1 ... tip.N in the interface text)
+const TIP_COUNT = 8;
 
 // In-game shots for the track cards; focus is the crop point when a card's shape differs from the 16:9 shot.
 const TRACK_SHOTS = {
@@ -23,19 +29,6 @@ const TRACK_SHOTS = {
 // Event setup order (TRACKS keeps its own order: the daily challenge picks from it by index)
 const SETUP_ORDER = ['district', 'lumen', 'circuit'];
 const SETUP_TRACKS = [...TRACKS].sort((a, b) => (SETUP_ORDER.indexOf(a.id) + 1 || 99) - (SETUP_ORDER.indexOf(b.id) + 1 || 99));
-const MODE_LABEL = { race: 'RACE', timetrial: 'TIME TRIAL', daily: 'DAILY CHALLENGE' };
-const SUFFIX = (n) => (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH');
-
-const TIPS = [
-  'Hold <b>DRIFT</b> through a corner, then let go for a turbo boost. Longer drifts give bigger boosts.',
-  'Hit <b>NITRO</b> just as the start lights go out for a perfect launch.',
-  'Drifts, near misses, slipstreams and big air all refill your nitro.',
-  'Chain stunts within four seconds of each other to build your <b>combo</b> multiplier.',
-  'Tuck in behind a rival to catch their <b>slipstream</b>, then slingshot past.',
-  'Blue chevron pads give you a free burst of speed.',
-  'Daily challenges change at midnight. Complete them in a row to grow your streak bonus.',
-  'Time Trial saves a ghost of your best run, so you can race against yourself.',
-];
 
 const LOGO = (cls = '') => `<div class="logo ${cls}"><span class="l1">MIDNIGHT</span><span class="l2">OVERDRIVE</span><span class="trail"></span></div>`;
 
@@ -114,10 +107,10 @@ function seg(name, options, value) {
 
 function statList(c) {
   return [
-    ['SPEED', c.display.speed],
-    ['ACCEL', c.display.accel],
-    ['HANDLING', c.display.handling],
-    ['NITRO', c.display.nitro],
+    [t('stat.speed'), c.display.speed],
+    [t('stat.accel'), c.display.accel],
+    [t('stat.handling'), c.display.handling],
+    [t('stat.nitro'), c.display.nitro],
   ];
 }
 
@@ -181,18 +174,14 @@ export class UI {
     this.hudLayer = el('<div class="layer"></div>');
     this.overlayLayer = el('<div class="layer"></div>');
     this.toasts = el('<div class="toasts"></div>');
-    this.rotateHint = el(`
-      <div class="rotate-hint">
-        <div class="rh-icon">${ICONS.rotate}</div>
-        <div class="rh-title">ROTATE YOUR DEVICE</div>
-        <div class="rh-sub">Midnight Overdrive plays best in landscape.</div>
-        <button class="btn ghost small" data-action="playanyway">PLAY ANYWAY</button>
-      </div>`);
+    this.rotateHint = el('<div class="rotate-hint"></div>');
+    this._fillRotateHint();
     this.root.append(this.screenLayer, this.hudLayer, this.overlayLayer, this.toasts, this.rotateHint);
     this.screen = null;
     this.overlay = null;
     this.portraitOk = false;
-    this.rotateHint.querySelector('button').addEventListener('click', () => {
+    this.rotateHint.addEventListener('click', (e) => {
+      if (!e.target.closest('button')) return;
       this.portraitOk = true;
       this.updateRotateHint();
     });
@@ -338,6 +327,20 @@ export class UI {
     this.root.classList.toggle('lite', !!on);
   }
 
+  _fillRotateHint() {
+    this.rotateHint.innerHTML = `
+      <div class="rh-icon">${ICONS.rotate}</div>
+      <div class="rh-title">${t('rotate.title')}</div>
+      <div class="rh-sub">${t('rotate.sub')}</div>
+      <button class="btn ghost small" data-action="playanyway">${t('rotate.anyway')}</button>`;
+  }
+
+  /** The language changed (in settings): redraw the text on show in the new one. */
+  onLanguage() {
+    this._fillRotateHint();
+    if (this.screen?.name === 'settings') this.show('settings', { tab: 'language' });
+  }
+
   updateRotateHint() {
     const portrait = window.innerHeight > window.innerWidth * 1.05;
     const touch = this.app.input.isTouchDevice();
@@ -364,19 +367,19 @@ export class UI {
   }
 
   toast(msg) {
-    const t = el(`<div class="toast">${msg}</div>`);
-    this.toasts.appendChild(t);
-    setTimeout(() => t.remove(), 2700);
+    const n = el(`<div class="toast">${msg}</div>`);
+    this.toasts.appendChild(n);
+    setTimeout(() => n.remove(), 2700);
   }
 
   tip(msg) {
-    const t = el(`<div class="tip"><span class="tag">TIP</span><span>${msg}</span></div>`);
-    this.hudLayer.appendChild(t);
-    setTimeout(() => t.remove(), 5100);
+    const n = el(`<div class="tip"><span class="tag">${t('tip')}</span><span>${msg}</span></div>`);
+    this.hudLayer.appendChild(n);
+    setTimeout(() => n.remove(), 5100);
   }
 
   creditsHtml() {
-    return `<div class="credits" title="Credits">${ICONS.coin}<b>${formatNumber(this.app.storage.credits)}</b><small>CR</small></div>`;
+    return `<div class="credits" title="${t('credits')}">${ICONS.coin}<b>${formatNumber(this.app.storage.credits)}</b><small>CR</small></div>`;
   }
 
   refreshCredits() {
@@ -391,7 +394,7 @@ export class UI {
   _head(eyebrow, title, right = '') {
     return `
       <header class="topbar anim-down">
-        <button class="icon-btn" data-action="back" data-sfx="ui-back" aria-label="Back">${ICONS.back}</button>
+        <button class="icon-btn" data-action="back" data-sfx="ui-back" aria-label="${t('back')}">${ICONS.back}</button>
         <div class="title-block"><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div>
         <div class="spacer"></div>
         ${right}
@@ -410,26 +413,26 @@ export class UI {
       tr = previewTrack(info.trackId, v);
       const laps = info.laps || def.laps;
       const chips = [
-        `${ICONS.laps}${laps} ${laps === 1 ? 'LAP' : 'LAPS'}`,
-        v.reverse ? `${ICONS.reverse}REVERSE` : null,
-        v.mirror ? `${ICONS.mirror}MIRROR` : null,
-        v.weather === 'rain' ? `${ICONS.rain}RAIN` : `${ICONS.moon}CLEAR`,
+        `${ICONS.laps}${t('laps', { n: laps })}`,
+        v.reverse ? `${ICONS.reverse}${t('reverse')}` : null,
+        v.mirror ? `${ICONS.mirror}${t('mirror')}` : null,
+        v.weather === 'rain' ? `${ICONS.rain}${t('weather.rain')}` : `${ICONS.moon}${t('weather.clear')}`,
       ].filter(Boolean);
-      const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+      const tip = t(`tip.${1 + Math.floor(Math.random() * TIP_COUNT)}`);
       body = `
         <div class="race-load">
           <canvas class="rl-map" width="320" height="320"></canvas>
           <div class="rl-info">
-            <div class="eyebrow accent">${MODE_LABEL[info.mode] || 'RACE'} · ${THEME_LABEL[def.theme] || ''} · ${(tr.length / 1000).toFixed(1)} KM</div>
+            <div class="eyebrow accent">${modeLabel(info.mode)} · ${themeLabel(def)} · ${km(tr.length)}</div>
             <h2>${def.name}</h2>
-            <p>${def.tagline}</p>
+            <p>${trackTagline(def)}</p>
             <div class="chips">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>
           </div>
         </div>
         <div class="load-foot">
           <div class="load-bar"><i></i></div>
           <div class="load-text">${text}</div>
-          <div class="load-tip"><span class="tag">TIP</span><span>${tip}</span></div>
+          <div class="load-tip"><span class="tag">${t('tip')}</span><span>${tip}</span></div>
         </div>`;
     } else {
       body = `${LOGO('load')}<div class="load-bar"><i></i></div><div class="load-text">${text}</div>`;
@@ -454,10 +457,10 @@ export class UI {
       <div class="screen title-screen">
         <div class="title-center">
           ${LOGO('xl')}
-          <div class="title-tag">NIGHT STREET RACING</div>
+          <div class="title-tag">${t('title.tag')}</div>
         </div>
-        <div class="press-start"><i></i><span>${touch ? 'TAP TO START' : 'PRESS ANY KEY'}</span><i></i></div>
-        <div class="title-footer">${touch ? 'BEST IN LANDSCAPE' : 'KEYBOARD · GAMEPAD · TOUCH'}<span class="dot"></span>HEADPHONES RECOMMENDED</div>
+        <div class="press-start"><i></i><span>${t(touch ? 'title.tap' : 'title.press')}</span><i></i></div>
+        <div class="title-footer">${t(touch ? 'title.landscape' : 'title.inputs')}<span class="dot"></span>${t('title.headphones')}</div>
       </div>`);
     let done = false;
     const go = (e) => {
@@ -493,17 +496,16 @@ export class UI {
       </button>`;
     // one click back into the last event you set up
     const ls = S.data.lastSetup;
-    const qTrack = SETUP_TRACKS.find((t) => t.id === ls.trackId) || SETUP_TRACKS[0];
+    const qTrack = SETUP_TRACKS.find((d) => d.id === ls.trackId) || SETUP_TRACKS[0];
     const shot = TRACK_SHOTS[qTrack.id];
-    const weather = { auto: 'AUTO WEATHER', clear: 'CLEAR', rain: 'RAIN' }[ls.weather] || 'AUTO WEATHER';
-    const rivals = (DIFFICULTY[ls.difficulty] || DIFFICULTY.easy).label;
+    const weather = t(ls.weather === 'clear' || ls.weather === 'rain' ? `weather.${ls.weather}` : 'weather.autoLong');
     const quick = `
       <button class="quick-race" data-action="quick" data-nav-first>
         ${shot ? `<img class="qr-shot" src="${shot.src}" alt="" draggable="false" style="object-position:${shot.focus}">` : ''}
         <span class="qr-text">
-          <span class="qr-eyebrow">QUICK RACE</span>
+          <span class="qr-eyebrow">${t('menu.quick')}</span>
           <span class="qr-name">${qTrack.name}</span>
-          <span class="qr-meta">${ls.laps} ${ls.laps === 1 ? 'LAP' : 'LAPS'} · ${rivals} RIVALS · ${weather}</span>
+          <span class="qr-meta">${t('menu.quickMeta', { laps: t('laps', { n: ls.laps }), rivals: diffLabel(ls.difficulty), weather })}</span>
         </span>
         <span class="qr-go">${ICONS.play}</span>
       </button>`;
@@ -512,15 +514,15 @@ export class UI {
     const next = CARS.filter((c) => !S.ownsCar(c.id)).sort((a, b) => a.price - b.price)[0];
     const progress = next
       ? `<div class="next-car anim-up" style="--d:420">
-          <span class="nc-label">NEXT CAR</span>
+          <span class="nc-label">${t('menu.nextCar')}</span>
           <span class="nc-name">${next.name}</span>
           <span class="nc-bar"><i style="--p:${clamp(S.credits / next.price, 0, 1)}"></i></span>
-          <span class="nc-sub ${S.credits >= next.price ? 'ready' : ''}">${S.credits >= next.price ? 'READY TO BUY IN THE GARAGE' : `${formatNumber(next.price - S.credits)} CR TO GO`}</span>
+          <span class="nc-sub ${S.credits >= next.price ? 'ready' : ''}">${S.credits >= next.price ? t('menu.readyToBuy') : t('menu.crToGo', { n: formatNumber(next.price - S.credits) })}</span>
         </div>`
       : `<div class="career anim-up" style="--d:480">
-          <div><b>${st.races}</b><span>RACES</span></div>
-          <div><b>${st.wins}</b><span>WINS</span></div>
-          <div><b>${st.podiums}</b><span>PODIUMS</span></div>
+          <div><b>${st.races}</b><span>${t('career.races')}</span></div>
+          <div><b>${st.wins}</b><span>${t('career.wins')}</span></div>
+          <div><b>${st.podiums}</b><span>${t('career.podiums')}</span></div>
         </div>`;
     const root = el(`
       <div class="screen menu-screen">
@@ -528,22 +530,22 @@ export class UI {
           ${LOGO('sm')}
           <div class="spacer"></div>
           ${this.creditsHtml()}
-          <button class="icon-btn" data-action="fullscreen" aria-label="Fullscreen">${ICONS.fullscreen}</button>
-          <button class="icon-btn" data-action="settings" aria-label="Settings">${ICONS.settings}</button>
+          <button class="icon-btn" data-action="fullscreen" aria-label="${t('fullscreen')}">${ICONS.fullscreen}</button>
+          <button class="icon-btn" data-action="settings" aria-label="${t('settings')}">${ICONS.settings}</button>
         </header>
         <main class="menu-main">
           <nav class="menu-list">
             ${quick}
-            ${item(1, 'race', 'flag', 'RACE', `Pick a track · ${TRACKS.length} to choose from`)}
-            ${item(2, 'timetrial', 'stopwatch', 'TIME TRIAL', 'Race your own ghost')}
-            ${item(3, 'daily', 'calendar', 'DAILY', daily.objective.label, dailyDone ? `<span class="pill good">${ICONS.check}DONE</span>` : '<span class="pill">NEW</span>', dailyReward)}
-            ${item(4, 'garage', 'car', 'GARAGE', 'Cars & customization')}
+            ${item(1, 'race', 'flag', t('menu.race'), t('menu.raceSub', { n: TRACKS.length }))}
+            ${item(2, 'timetrial', 'stopwatch', t('menu.tt'), t('menu.ttSub'))}
+            ${item(3, 'daily', 'calendar', t('menu.daily'), daily.objective.label, dailyDone ? `<span class="pill good">${ICONS.check}${t('menu.done')}</span>` : `<span class="pill">${t('menu.new')}</span>`, dailyReward)}
+            ${item(4, 'garage', 'car', t('menu.garage'), t('menu.garageSub'))}
           </nav>
         </main>
         <footer class="menu-footer">
           ${progress}
           <div class="car-card anim-r" style="--d:300">
-            <div class="eyebrow">${car.class}</div>
+            <div class="eyebrow">${carClass(car)}</div>
             <div class="car-name">${car.name}</div>
             <div class="mini-stats">${statList(car)
               .map(([n, v]) => `<div class="mini-stat"><span>${n}</span><i style="--v:${v}"></i></div>`)
@@ -576,38 +578,38 @@ export class UI {
     const S = app.storage;
     const st = { ...S.data.lastSetup };
     if (!['auto', 'clear', 'rain'].includes(st.weather)) st.weather = 'auto';
-    if (!SETUP_TRACKS.some((t) => t.id === st.trackId)) st.trackId = SETUP_TRACKS[0].id;
+    if (!SETUP_TRACKS.some((d) => d.id === st.trackId)) st.trackId = SETUP_TRACKS[0].id;
     const isTT = mode === 'timetrial';
     const car = getCarDef(S.data.car);
     const root = el(`
       <div class="screen setup-screen">
-        ${this._head(isTT ? 'SOLO · BEAT YOUR GHOST' : 'EVENT · 5 RIVALS', isTT ? 'TIME TRIAL' : 'RACE', this.creditsHtml())}
+        ${this._head(isTT ? t('setup.ttEyebrow') : t('setup.raceEyebrow', { n: 5 }), modeLabel(mode), this.creditsHtml())}
         <div class="setup-body">
           <div class="track-cards">
-            ${SETUP_TRACKS.map((t, i) => {
-              const shot = TRACK_SHOTS[t.id];
+            ${SETUP_TRACKS.map((d, i) => {
+              const shot = TRACK_SHOTS[d.id];
               return `
-              <button class="track-card anim-up" style="--d:${80 + i * 70}" data-action="track" data-id="${t.id}">
+              <button class="track-card anim-up" style="--d:${80 + i * 70}" data-action="track" data-id="${d.id}">
                 ${shot ? `<img class="tc-shot" src="${shot.src}" alt="" draggable="false" style="object-position:${shot.focus}">` : ''}
                 <span class="tc-check">${ICONS.check}</span>
                 <canvas class="tc-map" width="120" height="120"></canvas>
                 <span class="tc-text">
                   <span class="tc-meta"></span>
-                  <span class="tc-name">${t.name}</span>
+                  <span class="tc-name">${d.name}</span>
                   <span class="tc-best"></span>
                 </span>
               </button>`;
             }).join('')}
           </div>
           <section class="setup-opts glass anim-up" style="--d:290">
-            <div class="opt"><label>CONDITIONS</label>${seg('weather', [['auto', `${ICONS.shuffle}AUTO`], ['clear', `${ICONS.moon}CLEAR`], ['rain', `${ICONS.rain}RAIN`]], st.weather)}</div>
-            <div class="opt"><label>LAPS</label>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], st.laps)}</div>
-            ${isTT ? '' : `<div class="opt"><label>RIVALS</label>${seg('difficulty', [['rookie', 'ROOKIE'], ['easy', 'EASY'], ['normal', 'NORMAL'], ['hard', 'HARD']], st.difficulty)}</div>`}
+            <div class="opt"><label>${t('setup.conditions')}</label>${seg('weather', [['auto', `${ICONS.shuffle}${t('weather.auto')}`], ['clear', `${ICONS.moon}${t('weather.clear')}`], ['rain', `${ICONS.rain}${t('weather.rain')}`]], st.weather)}</div>
+            <div class="opt"><label>${t('setup.laps')}</label>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], st.laps)}</div>
+            ${isTT ? '' : `<div class="opt"><label>${t('setup.rivals')}</label>${seg('difficulty', ['rookie', 'easy', 'normal', 'hard'].map((d) => [d, diffLabel(d)]), st.difficulty)}</div>`}
           </section>
         </div>
         <footer class="setup-footer anim-up" style="--d:220">
-          <button class="car-chip" data-action="garage">${ICONS.car}<span><small>YOUR CAR</small><b>${car.name}</b></span><em>CHANGE</em></button>
-          <button class="btn primary big" data-action="start">START${ICONS.chevron}</button>
+          <button class="car-chip" data-action="garage">${ICONS.car}<span><small>${t('setup.yourCar')}</small><b>${car.name}</b></span><em>${t('setup.change')}</em></button>
+          <button class="btn primary big" data-action="start">${t('setup.start')}${ICONS.chevron}</button>
         </footer>
       </div>`);
     // events always run forward and unmirrored; AUTO weather is rolled when the race starts
@@ -618,7 +620,7 @@ export class UI {
       const def = getTrackDef(card.dataset.id);
       const tr = previewTrack(def.id, forward);
       drawTrackPreview($(card, '.tc-map'), tr, { width: 1.5 });
-      $(card, '.tc-meta').textContent = `${THEME_LABEL[def.theme] || ''} · ${(tr.length / 1000).toFixed(1)} KM`;
+      $(card, '.tc-meta').textContent = `${themeLabel(def)} · ${km(tr.length)}`;
     }
     const refresh = () => {
       for (const card of $$(root, '.track-card')) {
@@ -629,7 +631,7 @@ export class UI {
         // AUTO shows the better of the clear and wet records
         const best = Math.min(...conditions().map((w) => S.getRecord(recordKey(id, w), mode)?.bestTime || Infinity));
         const ghost = isTT && conditions().some((w) => S.getGhost(recordKey(id, w)));
-        $(card, '.tc-best').innerHTML = `${isFinite(best) ? `BEST <b>${formatTime(best)}</b>` : 'NO TIME SET'}${ghost ? '<i class="tc-ghost">GHOST</i>' : ''}`;
+        $(card, '.tc-best').innerHTML = `${isFinite(best) ? t('setup.best', { time: formatTime(best) }) : t('setup.noTime')}${ghost ? `<i class="tc-ghost">${t('setup.ghost')}</i>` : ''}`;
       }
       for (const s of $$(root, '.seg')) {
         const v = st[s.dataset.opt];
@@ -642,8 +644,8 @@ export class UI {
     };
     delegate(root, {
       back: () => app.toMenu(),
-      track: (t) => {
-        st.trackId = t.dataset.id;
+      track: (b) => {
+        st.trackId = b.dataset.id;
         if (!st.lapsTouched) st.laps = getTrackDef(st.trackId).laps;
         refresh();
       },
@@ -685,15 +687,15 @@ export class UI {
     let pending = null; // { cat, item } preview awaiting purchase
     const root = el(`
       <div class="screen garage-screen">
-        ${this._head('CARS & STYLE', 'GARAGE', this.creditsHtml())}
+        ${this._head(t('garage.eyebrow'), t('garage.title'), this.creditsHtml())}
         <div class="garage-body">
           <section class="car-info glass anim-l" style="--d:80">
             <div class="ci-top"><span class="eyebrow accent ci-cls"></span><span class="ci-count"></span></div>
             <div class="ci-name-row">
               <h2 class="car-name"></h2>
               <div class="ci-arrows">
-                <button class="icon-btn sm" data-action="prevcar" aria-label="Previous car">${ICONS.left}</button>
-                <button class="icon-btn sm" data-action="nextcar" aria-label="Next car">${ICONS.right}</button>
+                <button class="icon-btn sm" data-action="prevcar" aria-label="${t('garage.prevCar')}">${ICONS.left}</button>
+                <button class="icon-btn sm" data-action="nextcar" aria-label="${t('garage.nextCar')}">${ICONS.right}</button>
               </div>
             </div>
             <p class="blurb"></p>
@@ -702,10 +704,10 @@ export class UI {
           </section>
         </div>
         <section class="dock glass anim-up" style="--d:160">
-          <div class="dock-tabs hscroll">${CATEGORIES.map((c) => `<button data-action="tab" data-cat="${c.key}">${c.name}</button>`).join('')}</div>
+          <div class="dock-tabs hscroll">${CATEGORIES.map((c) => `<button data-action="tab" data-cat="${c.key}">${t(`cat.${c.key}`)}</button>`).join('')}</div>
           <div class="dock-row">
             <div class="items hscroll"></div>
-            <div class="buy-box"><div class="info"></div><button class="btn primary small" data-action="buy">BUY</button></div>
+            <div class="buy-box"><div class="info"></div><button class="btn primary small" data-action="buy">${t('garage.buy')}</button></div>
           </div>
         </section>
       </div>`);
@@ -721,18 +723,18 @@ export class UI {
     const renderCar = () => {
       const c = car();
       $(root, '.car-name').textContent = c.name;
-      $(root, '.ci-cls').textContent = c.class;
+      $(root, '.ci-cls').textContent = carClass(c);
       $(root, '.ci-count').textContent = `${carIdx + 1} / ${CARS.length}`;
-      $(root, '.blurb').textContent = c.blurb;
+      $(root, '.blurb').textContent = carBlurb(c);
       $(root, '.stats').innerHTML = statList(c)
         .map(([n, v]) => `<div class="stat"><span>${n}</span><span class="bar"><i style="--v:${v}"></i></span><b>${Math.round(v * 100)}</b></div>`)
         .join('');
       const act = $(root, '.car-action');
       if (!owned()) {
         const short = c.price - S.credits;
-        act.innerHTML = `<button class="btn primary" data-action="buycar" ${short > 0 ? 'disabled' : ''}>${ICONS.lock}${short > 0 ? `NEED ${formatNumber(short)} CR` : `BUY · ${formatNumber(c.price)} CR`}</button>`;
-      } else if (S.data.car === c.id) act.innerHTML = `<div class="status">${ICONS.check}SELECTED</div>`;
-      else act.innerHTML = '<button class="btn primary" data-action="selectcar">SELECT CAR</button>';
+        act.innerHTML = `<button class="btn primary" data-action="buycar" ${short > 0 ? 'disabled' : ''}>${ICONS.lock}${short > 0 ? t('garage.needCr', { n: formatNumber(short) }) : t('garage.buyCar', { n: formatNumber(c.price) })}</button>`;
+      } else if (S.data.car === c.id) act.innerHTML = `<div class="status">${ICONS.check}${t('garage.selected')}</div>`;
+      else act.innerHTML = `<button class="btn primary" data-action="selectcar">${t('garage.selectCar')}</button>`;
     };
 
     const renderItems = () => {
@@ -745,7 +747,7 @@ export class UI {
       }
       const box = $(root, '.items');
       if (!owned()) {
-        box.innerHTML = `<div class="items-empty">${ICONS.lock}<span>Buy the <b>${car().name}</b> to customize it.</span></div>`;
+        box.innerHTML = `<div class="items-empty">${ICONS.lock}<span>${t('garage.buyToCustomize', { car: car().name })}</span></div>`;
         return;
       }
       const c = CATEGORIES.find((x) => x.key === cat);
@@ -757,8 +759,8 @@ export class UI {
           const isEq = eq === it.id;
           const sel = pending && pending.item.id === it.id && pending.cat === cat;
           const cls = ['item', own ? '' : 'locked', isEq ? 'equipped' : '', sel ? 'selected' : ''].join(' ');
-          const tag = own ? (isEq ? '<span class="pr eq">EQUIPPED</span>' : '<span class="pr own">OWNED</span>') : `<span class="pr">${ICONS.lock}${formatNumber(it.price)}</span>`;
-          return `<button class="${cls}" data-action="item" data-id="${it.id}">${isEq ? `<span class="tick">${ICONS.check}</span>` : ''}${swatchFor(cat, it, look)}<span class="nm">${it.name}</span>${tag}</button>`;
+          const tag = own ? (isEq ? `<span class="pr eq">${t('garage.equipped')}</span>` : `<span class="pr own">${t('garage.owned')}</span>`) : `<span class="pr">${ICONS.lock}${formatNumber(it.price)}</span>`;
+          return `<button class="${cls}" data-action="item" data-id="${it.id}">${isEq ? `<span class="tick">${ICONS.check}</span>` : ''}${swatchFor(cat, it, look)}<span class="nm">${itemName(it)}</span>${tag}</button>`;
         })
         .join('');
     };
@@ -771,12 +773,12 @@ export class UI {
       box.style.display = owned() ? '' : 'none';
       if (pending) {
         const short = pending.item.price - S.credits;
-        info.innerHTML = `<b>${pending.item.name}</b><span class="price">${ICONS.coin}${formatNumber(pending.item.price)} CR</span>`;
+        info.innerHTML = `<b>${itemName(pending.item)}</b><span class="price">${ICONS.coin}${formatNumber(pending.item.price)} CR</span>`;
         btn.style.display = '';
         btn.disabled = short > 0;
-        btn.textContent = short > 0 ? `NEED ${formatNumber(short)}` : 'BUY & EQUIP';
+        btn.textContent = short > 0 ? t('garage.need', { n: formatNumber(short) }) : t('garage.buyEquip');
       } else {
-        info.innerHTML = '<span class="hint">Tap a style to try it on</span>';
+        info.innerHTML = `<span class="hint">${t('garage.hint')}</span>`;
         btn.style.display = 'none';
       }
     };
@@ -792,8 +794,8 @@ export class UI {
     };
 
     const scrollToSelected = () => {
-      const t = $(root, '.item.selected, .item.equipped');
-      if (t) t.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      const n = $(root, '.item.selected, .item.equipped');
+      if (n) n.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     };
 
     delegate(root, {
@@ -815,7 +817,7 @@ export class UI {
           S.data.car = car().id;
           S.save();
           app.audio?.play('unlock');
-          this.toast(`${car().name} UNLOCKED`);
+          this.toast(t('garage.unlocked', { car: car().name }));
           this.refreshCredits();
           showCar();
         } else app.audio?.play('error');
@@ -824,7 +826,7 @@ export class UI {
         S.data.car = car().id;
         S.save();
         renderCar();
-        this.toast(`${car().name} SELECTED`);
+        this.toast(t('garage.carSelected', { car: car().name }));
       },
       tab: (b) => {
         cat = b.dataset.cat;
@@ -852,7 +854,7 @@ export class UI {
         if (S.buyItem(pending.cat, pending.item)) {
           S.equip(car().id, pending.cat, pending.item.id);
           app.audio?.play('buy');
-          this.toast(`${pending.item.name} PURCHASED`);
+          this.toast(t('garage.purchased', { item: itemName(pending.item) }));
           pending = null;
           this.refreshCredits();
           previewCustom();
@@ -873,74 +875,83 @@ export class UI {
   }
 
   // ---------------------------------------------------------------- settings
-  /** Tabbed settings panel. `tabs` picks which sections are shown (the pause menu uses a subset). */
-  settingsView(tabs = ['graphics', 'camera', 'audio', 'controls', 'profile']) {
+  /**
+   * Tabbed settings panel. `tabs` picks which sections are shown (the pause menu uses a subset),
+   * `tab` the one open first.
+   */
+  settingsView(tabs = ['graphics', 'camera', 'audio', 'controls', 'profile', 'language'], tab = tabs[0]) {
     const app = this.app;
     const s = app.settings;
     const pct = (v) => `${Math.round(v * 100)}%`;
     const range = (key, min, max, step, fmt = pct) =>
       `<input class="range" type="range" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${s[key]}" style="--val:${(((s[key] - min) / (max - min)) * 100).toFixed(1)}%" data-fmt="${fmt === pct ? 'pct' : 'x'}"><output>${fmt(s[key])}</output>`;
     const segS = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-    const sw = (key) => `<button class="switch" data-key="${key}" aria-pressed="${s[key] ? 'true' : 'false'}" aria-label="${key}"></button>`;
+    const sw = (key, label) => `<button class="switch" data-key="${key}" aria-pressed="${s[key] ? 'true' : 'false'}" aria-label="${label}"></button>`;
     const row = (label, hint, ctl) => `<div class="srow"><div class="lbl"><b>${label}</b>${hint ? `<span>${hint}</span>` : ''}</div><div class="ctl">${ctl}</div></div>`;
+    const swRow = (key, label, hint) => row(label, hint, sw(key, label));
     const st = app.storage.data.stats;
     const SECTIONS = {
       graphics: {
-        name: 'GRAPHICS',
+        name: t('set.graphics'),
         icon: 'display',
         html: () =>
-          row('QUALITY', 'Auto picks a level that keeps your device smooth.', segS('quality', [['auto', 'AUTO'], ['low', 'LOW'], ['medium', 'MED'], ['high', 'HIGH']])) +
-          row('SHOW FPS', 'Frame rate, render scale and draw calls in the HUD.', sw('showFps')),
+          row(t('set.quality'), t('set.qualityHint'), segS('quality', [['auto', t('set.auto')], ['low', t('set.low')], ['medium', t('set.med')], ['high', t('set.high')]])) +
+          swRow('showFps', t('set.fps'), t('set.fpsHint')),
       },
       camera: {
-        name: 'CAMERA & FX',
+        name: t('set.camera'),
         icon: 'camera',
         html: () =>
-          row('CAMERA', 'Change it any time in a race with C or the camera button.', segS('camera', [['chase', 'CHASE'], ['near', 'NEAR'], ['bumper', 'BUMPER']])) +
-          row('CAMERA SHAKE', '', range('shake', 0, 1.5, 0.05)) +
-          row('MOTION BLUR', '', range('motionBlur', 0, 1.5, 0.05)) +
-          row('LENS FRINGE', 'Colour fringing at the edges at high speed.', sw('chromatic')) +
-          row('SPEED LINES', '', sw('speedLines')),
+          row(t('set.cameraMode'), t('set.cameraHint'), segS('camera', ['chase', 'near', 'bumper'].map((m) => [m, t(`cam.${m}`)]))) +
+          row(t('set.shake'), '', range('shake', 0, 1.5, 0.05)) +
+          row(t('set.blur'), '', range('motionBlur', 0, 1.5, 0.05)) +
+          swRow('chromatic', t('set.fringe'), t('set.fringeHint')) +
+          swRow('speedLines', t('set.speedLines'), ''),
       },
       audio: {
-        name: 'AUDIO',
+        name: t('set.audio'),
         icon: 'audio',
-        html: () => row('MASTER', '', range('master', 0, 1, 0.05)) + row('MUSIC', '', range('music', 0, 1, 0.05)) + row('EFFECTS', 'Engine, tyres, impacts and menus.', range('sfx', 0, 1, 0.05)),
+        html: () => row(t('set.master'), '', range('master', 0, 1, 0.05)) + row(t('set.music'), '', range('music', 0, 1, 0.05)) + row(t('set.sfx'), t('set.sfxHint'), range('sfx', 0, 1, 0.05)),
       },
       controls: {
-        name: 'CONTROLS',
+        name: t('set.controls'),
         icon: 'gamepad',
         html: () =>
-          row('KEY HINTS', 'Keyboard and controller prompts in races. Press H to show or hide the controls card.', sw('keyHints')) +
-          row('TOUCH STEERING', 'Steering pads, or tilt your device to steer.', segS('controls', [['buttons', 'PADS'], ['tilt', 'TILT']])) +
-          row('AUTO ACCELERATE', 'Touch: the throttle is held for you.', sw('autoAccel')) +
-          row('TILT SENSITIVITY', '', range('tiltSensitivity', 0.5, 2, 0.05, (v) => `${Number(v).toFixed(2)}×`)) +
-          row('HAPTICS', 'Vibrate on impacts and boosts.', sw('haptics')) +
-          row('SPEED UNITS', '', segS('units', [['kmh', 'KM/H'], ['mph', 'MPH']])),
+          swRow('keyHints', t('set.keyHints'), t('set.keyHintsHint')) +
+          row(t('set.touch'), t('set.touchHint'), segS('controls', [['buttons', t('set.pads')], ['tilt', t('set.tilt')]])) +
+          swRow('autoAccel', t('set.autoAccel'), t('set.autoAccelHint')) +
+          row(t('set.tiltSens'), '', range('tiltSensitivity', 0.5, 2, 0.05, (v) => `${Number(v).toFixed(2)}×`)) +
+          swRow('haptics', t('set.haptics'), t('set.hapticsHint')) +
+          row(t('set.units'), '', segS('units', [['kmh', 'KM/H'], ['mph', 'MPH']])),
       },
       profile: {
-        name: 'PROFILE',
+        name: t('set.profile'),
         icon: 'profile',
         html: () => `
           <div class="career-grid">
             ${[
-              ['RACES', formatNumber(st.races)],
-              ['WINS', formatNumber(st.wins)],
-              ['PODIUMS', formatNumber(st.podiums)],
-              ['NEAR MISSES', formatNumber(st.nearMisses)],
-              ['BEST DRIFT', formatNumber(st.bestDrift)],
-              ['BEST COMBO', `x${st.bestCombo}`],
-              ['DRIFT DISTANCE', `${(st.driftDistance / 1000).toFixed(1)} KM`],
-              ['CREDITS EARNED', formatNumber(st.creditsEarned)],
+              [t('set.races'), formatNumber(st.races)],
+              [t('set.wins'), formatNumber(st.wins)],
+              [t('set.podiums'), formatNumber(st.podiums)],
+              [t('set.nearMisses'), formatNumber(st.nearMisses)],
+              [t('set.bestDrift'), formatNumber(st.bestDrift)],
+              [t('set.bestCombo'), `x${st.bestCombo}`],
+              [t('set.driftDistance'), km(st.driftDistance)],
+              [t('set.creditsEarned'), formatNumber(st.creditsEarned)],
             ]
               .map(([l, v]) => `<div class="kv"><span>${l}</span><b>${v}</b></div>`)
               .join('')}
           </div>
-          ${row('RESET PROGRESS', 'Credits, cars, styles, records and ghosts. Settings are kept.', '<button class="btn ghost small" data-reset="1">RESET</button>')}
-          <p class="about">Midnight Overdrive · procedural night city, synthesized audio. Built with three.js.</p>`,
+          ${row(t('set.reset'), t('set.resetHint'), `<button class="btn ghost small" data-reset="1">${t('set.resetBtn')}</button>`)}
+          <p class="about">${t('set.about')}</p>`,
+      },
+      language: {
+        name: t('set.language'),
+        icon: 'globe',
+        // each language named in its own script
+        html: () => row(t('set.lang'), t('set.langHint'), segS('language', [['auto', t('set.auto')], ...LANGUAGES.map((l) => [l.id, `<span lang="${l.lang}">${l.name}</span>`])])),
       },
     };
-    let tab = tabs[0];
     const view = el(`
       <div class="settings-body">
         <nav class="settings-nav anim-l" style="--d:60">${tabs
@@ -955,9 +966,9 @@ export class UI {
       panel.scrollTop = 0;
     };
     view.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-tab]');
-      if (!t) return;
-      tab = t.dataset.tab;
+      const b = e.target.closest('[data-tab]');
+      if (!b) return;
+      tab = b.dataset.tab;
       renderTab();
     });
     renderTab();
@@ -1001,7 +1012,7 @@ export class UI {
         if (k === 'controls' && v === 'tilt') {
           app.input.enableTilt().then((ok) => {
             if (!ok) {
-              this.toast('Motion sensors unavailable - using touch pads');
+              this.toast(t('set.noMotion'));
               s.controls = 'buttons';
               for (const x of $$(segEl, 'button')) x.classList.toggle('on', x.dataset.v === 'buttons');
               app.applySettings('controls');
@@ -1017,23 +1028,23 @@ export class UI {
           app.storage.reset();
           app.garage.setCar(app.storage.data.car, app.storage.customFor(app.storage.data.car));
           this.refreshCredits();
-          this.toast('PROGRESS RESET');
-          r.textContent = 'RESET';
+          this.toast(t('set.resetDone'));
+          r.textContent = t('set.resetBtn');
           r.classList.remove('danger');
           delete r.dataset.confirm;
         } else {
           r.dataset.confirm = '1';
           r.classList.add('danger');
-          r.textContent = 'TAP AGAIN TO CONFIRM';
+          r.textContent = t('set.resetConfirm');
         }
       }
     });
   }
 
-  _screen_settings() {
+  _screen_settings({ tab }) {
     const app = this.app;
-    const root = el(`<div class="screen settings-screen">${this._head('OPTIONS', 'SETTINGS')}</div>`);
-    root.appendChild(this.settingsView());
+    const root = el(`<div class="screen settings-screen">${this._head(t('settings.eyebrow'), t('settings.title'))}</div>`);
+    root.appendChild(this.settingsView(undefined, tab));
     delegate(root, { back: () => app.toMenu() });
     return { el: root };
   }
@@ -1047,36 +1058,36 @@ export class UI {
     const done = today && ds.completed;
     const v = d.variant;
     const chips = [
-      `${ICONS.laps}${d.laps} LAPS`,
-      v.reverse ? `${ICONS.reverse}REVERSE` : `${ICONS.forward}FORWARD`,
-      v.mirror ? `${ICONS.mirror}MIRROR` : null,
-      v.weather === 'rain' ? `${ICONS.rain}RAIN` : `${ICONS.moon}CLEAR`,
+      `${ICONS.laps}${t('laps', { n: d.laps })}`,
+      v.reverse ? `${ICONS.reverse}${t('reverse')}` : `${ICONS.forward}${t('forward')}`,
+      v.mirror ? `${ICONS.mirror}${t('mirror')}` : null,
+      v.weather === 'rain' ? `${ICONS.rain}${t('weather.rain')}` : `${ICONS.moon}${t('weather.clear')}`,
     ].filter(Boolean);
-    const date = new Date(`${d.key}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
+    const date = new Date(`${d.key}T12:00:00`).toLocaleDateString(locale(), { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
     const root = el(`
       <div class="screen daily-screen">
-        ${this._head(date, 'DAILY CHALLENGE', this.creditsHtml())}
+        ${this._head(date, t('mode.daily'), this.creditsHtml())}
         <div class="daily-body">
           <section class="daily-card glass anim-r" style="--d:100">
             <div class="daily-map"><canvas width="300" height="300"></canvas></div>
             <div class="daily-info">
               <div class="eyebrow accent">${d.trackName}</div>
-              <div class="obj-label">${ICONS.target}OBJECTIVE</div>
+              <div class="obj-label">${ICONS.target}${t('daily.objective')}</div>
               <h2 class="obj">${d.objective.label}</h2>
               <p class="obj-detail">${d.objective.detail}</p>
               <div class="chips">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>
               <div class="daily-meta">
-                <div class="kv"><span>CAR PROVIDED</span><b>${d.carName}</b></div>
-                <div class="kv"><span>REWARD</span><b class="gold">${ICONS.coin}${formatNumber(d.reward)}</b></div>
-                <div class="kv"><span>STREAK</span><b class="${ds.streak ? 'amber' : ''}">${ICONS.flame}${ds.streak || 0}</b></div>
+                <div class="kv"><span>${t('daily.carProvided')}</span><b>${d.carName}</b></div>
+                <div class="kv"><span>${t('daily.reward')}</span><b class="gold">${ICONS.coin}${formatNumber(d.reward)}</b></div>
+                <div class="kv"><span>${t('daily.streak')}</span><b class="${ds.streak ? 'amber' : ''}">${ICONS.flame}${ds.streak || 0}</b></div>
               </div>
             </div>
-            ${done ? `<div class="done-stamp">${ICONS.check}COMPLETED</div>` : ''}
+            ${done ? `<div class="done-stamp">${ICONS.check}${t('daily.completed')}</div>` : ''}
           </section>
         </div>
         <footer class="daily-footer anim-up" style="--d:200">
-          <div class="daily-countdown">NEW CHALLENGE IN <b data-countdown></b></div>
-          <button class="btn primary big" data-action="start">${done ? 'PLAY AGAIN' : 'ACCEPT'}${ICONS.chevron}</button>
+          <div class="daily-countdown">${t('daily.newIn')} <b data-countdown></b></div>
+          <button class="btn primary big" data-action="start">${t(done ? 'daily.again' : 'daily.accept')}${ICONS.chevron}</button>
         </footer>
       </div>`);
     drawTrackPreview($(root, '.daily-map canvas'), previewTrack(d.trackId, v), { width: 1.25 });
@@ -1115,26 +1126,26 @@ export class UI {
     const o = el(`
       <div class="overlay pause-overlay">
         <div class="pause-side">
-          <div class="eyebrow accent anim-l">${MODE_LABEL[race?.cfg.mode] || 'RACE'} · ${race?.world?.def.name || ''}</div>
-          <h2 class="pause-title anim-l" style="--d:40">PAUSED</h2>
+          <div class="eyebrow accent anim-l">${modeLabel(race?.cfg.mode)} · ${race?.world?.def.name || ''}</div>
+          <h2 class="pause-title anim-l" style="--d:40">${t('pause.paused')}</h2>
           <div class="pause-stats anim-l" style="--d:80">
-            ${tt ? '' : `<div class="kv"><span>POSITION</span><b>${h.place || '-'}<small>/${h.total || '-'}</small></b></div>`}
-            <div class="kv"><span>LAP</span><b>${h.lap || 1}<small>/${h.laps || 1}</small></b></div>
-            <div class="kv"><span>TIME</span><b>${formatTime(h.time || 0)}</b></div>
+            ${tt ? '' : `<div class="kv"><span>${t('pause.position')}</span><b>${h.place || '-'}<small>/${h.total || '-'}</small></b></div>`}
+            <div class="kv"><span>${t('pause.lap')}</span><b>${h.lap || 1}<small>/${h.laps || 1}</small></b></div>
+            <div class="kv"><span>${t('pause.time')}</span><b>${formatTime(h.time || 0)}</b></div>
           </div>
           <nav class="pause-menu">
-            ${pm(0, 'resume', 'play', 'RESUME')}
-            ${pm(1, 'restart', 'restart', 'RESTART')}
-            ${pm(2, 'settings', 'settings', 'SETTINGS')}
-            ${pm(3, 'quit', 'exit', 'QUIT TO MENU', 'ui-back')}
+            ${pm(0, 'resume', 'play', t('pause.resume'))}
+            ${pm(1, 'restart', 'restart', t('pause.restart'))}
+            ${pm(2, 'settings', 'settings', t('pause.settings'))}
+            ${pm(3, 'quit', 'exit', t('pause.quit'), 'ui-back')}
           </nav>
         </div>
         ${
           kb
             ? `<div class="keys glass anim-r" style="--d:140">
-                <div class="eyebrow">${pad ? 'CONTROLLER' : 'KEYBOARD'}</div>
+                <div class="eyebrow">${t(pad ? 'pause.controller' : 'pause.keyboard')}</div>
                 <div class="ctl-grid">${controlsCells(pad ? 'gamepad' : 'keyboard')}</div>
-                ${pad ? '' : '<div class="kl-note">Arrow keys work too · H shows the controls in a race</div>'}
+                ${pad ? '' : `<div class="kl-note">${t('pause.kbNote')}</div>`}
               </div>`
             : ''
         }
@@ -1156,8 +1167,8 @@ export class UI {
     const o = el(`
       <div class="overlay pause-overlay settings-overlay">
         <header class="topbar anim-down">
-          <button class="icon-btn" data-action="back" data-sfx="ui-back" aria-label="Back">${ICONS.back}</button>
-          <div class="title-block"><div class="eyebrow">PAUSED</div><h1>SETTINGS</h1></div>
+          <button class="icon-btn" data-action="back" data-sfx="ui-back" aria-label="${t('back')}">${ICONS.back}</button>
+          <div class="title-block"><div class="eyebrow">${t('pause.paused')}</div><h1>${t('settings.title')}</h1></div>
         </header>
       </div>`);
     o.appendChild(this.settingsView(['camera', 'audio', 'controls']));
@@ -1180,58 +1191,59 @@ export class UI {
     const app = this.app;
     const isTT = res.mode === 'timetrial';
     const tags = [];
-    if (reward.newRecord) tags.push(`<span class="chip c-gold">${ICONS.trophy}NEW RECORD</span>`);
-    if (reward.newLap) tags.push(`<span class="chip c-ice">${ICONS.stopwatch}BEST LAP</span>`);
-    if (reward.daily === true) tags.push(`<span class="chip c-good">${ICONS.check}DAILY COMPLETE</span>`);
-    if (reward.daily === false) tags.push(`<span class="chip c-bad">DAILY FAILED · ${reward.dailyProgress}</span>`);
+    if (reward.newRecord) tags.push(`<span class="chip c-gold">${ICONS.trophy}${t('res.newRecord')}</span>`);
+    if (reward.newLap) tags.push(`<span class="chip c-ice">${ICONS.stopwatch}${t('res.bestLap')}</span>`);
+    if (reward.daily === true) tags.push(`<span class="chip c-good">${ICONS.check}${t('res.dailyComplete')}</span>`);
+    if (reward.daily === false) tags.push(`<span class="chip c-bad">${t('res.dailyFailed', { p: reward.dailyProgress })}</span>`);
     const leader = res.rows[0]?.time || 0;
+    const ordPre = t('ord.pre', { n: res.place });
     const hero = isTT
       ? `<div class="res-time anim-pop">${formatTime(res.time)}</div>`
-      : `<div class="res-place anim-pop p${res.place}"><span class="n">${res.place}</span><span class="suf">${SUFFIX(res.place)}</span><span class="of">/ ${res.total}</span></div>`;
+      : `<div class="res-place anim-pop p${res.place}">${ordPre ? `<span class="pre">${ordPre}</span>` : ''}<span class="n">${res.place}</span><span class="suf">${t('ord.suf', { n: res.place })}</span><span class="of">/ ${res.total}</span></div>`;
     const rows = isTT
       ? res.lapTimes
-          .map((t, i) => {
-            const best = t === res.bestLap;
-            return `<div class="st-row ${best ? 'me' : ''}" style="--i:${i}"><span class="pos">${i + 1}</span><i class="stripe" style="--c:${best ? 'var(--ice)' : 'rgba(255,255,255,.25)'}"></i><span class="nm"><b>LAP ${i + 1}</b>${best ? '<small>FASTEST</small>' : ''}</span><span class="tm">${formatTime(t)}</span></div>`;
+          .map((time, i) => {
+            const best = time === res.bestLap;
+            return `<div class="st-row ${best ? 'me' : ''}" style="--i:${i}"><span class="pos">${i + 1}</span><i class="stripe" style="--c:${best ? 'var(--ice)' : 'rgba(255,255,255,.25)'}"></i><span class="nm"><b>${t('res.lap', { n: i + 1 })}</b>${best ? `<small>${t('res.fastest')}</small>` : ''}</span><span class="tm">${formatTime(time)}</span></div>`;
           })
           .join('')
       : res.rows
           .map((r, i) => {
             const gap = i === 0 ? formatTime(r.time) : `+${Math.max(0, r.time - leader).toFixed(2)}`;
-            return `<div class="st-row ${r.isPlayer ? 'me' : ''}" style="--i:${i}"><span class="pos">${r.place}</span><i class="stripe" style="--c:${r.color}"></i><span class="nm"><b>${r.name}</b><small>${r.car}</small></span><span class="tm">${r.estimated ? '~' : ''}${gap}</span></div>`;
+            return `<div class="st-row ${r.isPlayer ? 'me' : ''}" style="--i:${i}"><span class="pos">${r.place}</span><i class="stripe" style="--c:${r.color}"></i><span class="nm"><b>${r.isPlayer ? t('you') : r.name}</b><small>${r.car}</small></span><span class="tm">${r.estimated ? '~' : ''}${gap}</span></div>`;
           })
           .join('');
     const stats = [
-      ['STYLE', formatNumber(res.style)],
-      ['NEAR MISSES', res.counts.nearMiss || 0],
-      ['BEST DRIFT', formatNumber(res.best.drift || 0)],
-      ['TOP COMBO', `x${res.best.combo || 1}`],
-      ['OVERTAKES', res.counts.overtake || 0],
+      [t('res.style'), formatNumber(res.style)],
+      [t('res.nearMisses'), res.counts.nearMiss || 0],
+      [t('res.bestDrift'), formatNumber(res.best.drift || 0)],
+      [t('res.topCombo'), `x${res.best.combo || 1}`],
+      [t('res.overtakes'), res.counts.overtake || 0],
     ];
     const o = el(`
       <div class="overlay results-overlay">
         <div class="results scroll">
           <section class="res-hero">
-            <div class="eyebrow accent anim-l">${res.trackName} · ${MODE_LABEL[res.mode] || 'RACE'}</div>
+            <div class="eyebrow accent anim-l">${res.trackName} · ${modeLabel(res.mode)}</div>
             ${hero}
             <div class="res-times anim-l" style="--d:220">
-              ${isTT ? '' : `<div class="kv"><span>TOTAL TIME</span><b>${formatTime(res.time)}</b></div>`}
-              <div class="kv"><span>BEST LAP</span><b>${formatTime(res.bestLap)}</b></div>
+              ${isTT ? '' : `<div class="kv"><span>${t('res.totalTime')}</span><b>${formatTime(res.time)}</b></div>`}
+              <div class="kv"><span>${t('res.bestLap')}</span><b>${formatTime(res.bestLap)}</b></div>
             </div>
             ${tags.length ? `<div class="res-tags anim-l" style="--d:280">${tags.join('')}</div>` : ''}
             <div class="res-stats">${stats.map(([l, v], i) => `<div class="res-stat anim-up" style="--d:${320 + i * 50}"><span>${l}</span><b>${v}</b></div>`).join('')}</div>
           </section>
           <section class="res-side glass anim-r" style="--d:160">
-            <h3 class="panel-title">${isTT ? 'LAP TIMES' : 'STANDINGS'}</h3>
+            <h3 class="panel-title">${t(isTT ? 'res.lapTimes' : 'res.standings')}</h3>
             <div class="standings">${rows}</div>
             <div class="rewards">
               ${reward.lines.map(([l, v]) => `<div class="rw"><span>${l}</span><b>+${formatNumber(v)}</b></div>`).join('')}
-              <div class="rw-total"><span>EARNED</span><b>${ICONS.coin}<span data-earned>0</span><small>CR</small></b></div>
+              <div class="rw-total"><span>${t('res.earned')}</span><b>${ICONS.coin}<span data-earned>0</span><small>CR</small></b></div>
             </div>
             <div class="res-actions">
-              <button class="btn ghost" data-action="menu" data-sfx="ui-back">MENU</button>
-              <button class="btn ghost" data-action="garage">GARAGE</button>
-              <button class="btn primary" data-action="retry">${ICONS.restart}RETRY</button>
+              <button class="btn ghost" data-action="menu" data-sfx="ui-back">${t('res.menu')}</button>
+              <button class="btn ghost" data-action="garage">${t('res.garage')}</button>
+              <button class="btn primary" data-action="retry">${ICONS.restart}${t('res.retry')}</button>
             </div>
           </section>
         </div>

@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS = {
   showFps: false,
   keyHints: true,
   reduceFlashes: false,
+  // 'auto' follows the device; or a language id from core/i18n.js
+  language: 'auto',
 };
 
 function defaultSave() {

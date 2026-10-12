@@ -27,6 +27,8 @@
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
   --font: 'Rajdhani', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-brand: 'Orbitron', 'Rajdhani', 'Segoe UI', sans-serif;
+  /* scales every letter-spacing: wide tracking suits Latin capitals, not kana / hanzi */
+  --track: 1;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --sl: env(safe-area-inset-left, 0px);
   --sr: env(safe-area-inset-right, 0px);
@@ -186,7 +188,7 @@ svg {
 .eyebrow {
   font-weight: 700;
   font-size: 0.72rem;
-  letter-spacing: 0.28em;
+  letter-spacing: calc(0.28em * var(--track));
   text-transform: uppercase;
   color: var(--ink-2);
   line-height: 1.2;
@@ -207,7 +209,7 @@ svg {
   margin: 0 0 0.4rem;
   font-weight: 700;
   font-size: 0.76rem;
-  letter-spacing: 0.3em;
+  letter-spacing: calc(0.3em * var(--track));
   color: var(--ink-2);
 }
 
@@ -221,7 +223,7 @@ svg {
 .kv span {
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-3);
   white-space: nowrap;
 }
@@ -232,7 +234,7 @@ svg {
   gap: 0.3em;
   font-weight: 700;
   font-size: 1.1rem;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   color: var(--ink);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -283,14 +285,14 @@ svg {
   font-family: var(--font);
   font-weight: 700;
   font-size: 0.36em;
-  letter-spacing: 0.72em;
+  letter-spacing: calc(0.72em * var(--track));
   color: var(--ink-2);
   margin: 0 0 0.16em 0.1em;
 }
 
 .logo .l2 {
   font-style: italic;
-  letter-spacing: 0.015em;
+  letter-spacing: calc(0.015em * var(--track));
   color: var(--ink);
   background: linear-gradient(100deg, #ffffff 0%, #ffffff 42%, #ffd9b8 50%, #ffffff 58%, #ffffff 100%);
   background-size: 260% 100%;
@@ -317,7 +319,7 @@ svg {
 }
 
 .logo.sm .l1 {
-  letter-spacing: 0.62em;
+  letter-spacing: calc(0.62em * var(--track));
 }
 
 /* ------------------------------------------------------------------ buttons */
@@ -333,7 +335,7 @@ svg {
   gap: 0.55em;
   font-weight: 700;
   font-size: 0.98rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   text-transform: uppercase;
   color: var(--ink);
   padding: 0.72em 1.7em;
@@ -485,7 +487,7 @@ svg {
   border: 1px solid var(--hair-2);
   font-weight: 700;
   font-size: 1.08rem;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   color: var(--ink);
   pointer-events: auto;
   font-variant-numeric: tabular-nums;
@@ -500,7 +502,7 @@ svg {
 .credits small {
   font-size: 0.66em;
   color: var(--ink-3);
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
 }
 
 .credits.bump {
@@ -524,7 +526,7 @@ svg {
   border: 1px solid var(--hair);
   font-weight: 700;
   font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--track));
   color: var(--ink-2);
   text-transform: uppercase;
   white-space: nowrap;
@@ -568,7 +570,7 @@ svg {
   border-radius: 3px;
   vertical-align: middle;
   font-size: 0.42em;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: #170b02;
   background: var(--amber);
   transform: translateY(-0.2em);
@@ -604,7 +606,7 @@ svg {
   color: var(--ink-2);
   font-weight: 700;
   font-size: 0.8rem;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em * var(--track));
   padding: 0.48em 0.85em;
   border-radius: 5px;
   display: inline-flex;
@@ -772,7 +774,7 @@ output {
   font-weight: 700;
   font-size: 1.55rem;
   line-height: 1;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em * var(--track));
   white-space: nowrap;
 }
 
@@ -818,7 +820,7 @@ output {
   padding-left: 0.6em;
   font-weight: 700;
   font-size: 0.82rem;
-  letter-spacing: 0.6em;
+  letter-spacing: calc(0.6em * var(--track));
   color: var(--ink-2);
   animation: fadeUp 1s var(--ease) 0.6s both;
 }
@@ -834,7 +836,7 @@ output {
   gap: 1.1rem;
   font-weight: 700;
   font-size: 1rem;
-  letter-spacing: 0.42em;
+  letter-spacing: calc(0.42em * var(--track));
   color: var(--ink);
   animation: fadeUp 0.9s var(--ease) 1s both;
 }
@@ -865,7 +867,7 @@ output {
   gap: 0.8em;
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.26em;
+  letter-spacing: calc(0.26em * var(--track));
   color: var(--ink-3);
   animation: fadeUp 1s var(--ease) 1.2s both;
 }
@@ -988,7 +990,7 @@ output {
   font-weight: 700;
   font-size: 1.4rem;
   line-height: 1;
-  letter-spacing: 0.1em;
+  letter-spacing: calc(0.1em * var(--track));
   white-space: nowrap;
 }
 
@@ -997,7 +999,7 @@ output {
   margin-top: 0.22rem;
   font-weight: 600;
   font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--track));
   color: var(--ink-2);
   text-transform: uppercase;
   white-space: nowrap;
@@ -1120,7 +1122,7 @@ output {
 .qr-eyebrow {
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.3em;
+  letter-spacing: calc(0.3em * var(--track));
   color: var(--amber);
 }
 
@@ -1129,7 +1131,7 @@ output {
   font-weight: 700;
   font-size: 1.75rem;
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1140,7 +1142,7 @@ output {
   margin-top: 0.32rem;
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
@@ -1182,7 +1184,7 @@ output {
   gap: 0.2rem;
   font-weight: 700;
   font-size: 0.8rem;
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1245,7 +1247,7 @@ output {
   margin-top: 0.22rem;
   font-weight: 700;
   font-size: 0.62rem;
-  letter-spacing: 0.26em;
+  letter-spacing: calc(0.26em * var(--track));
   color: var(--ink-3);
 }
 
@@ -1264,14 +1266,14 @@ output {
 .nc-label {
   font-weight: 700;
   font-size: 0.62rem;
-  letter-spacing: 0.26em;
+  letter-spacing: calc(0.26em * var(--track));
   color: var(--ink-3);
 }
 
 .nc-name {
   font-weight: 700;
   font-size: 1.05rem;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
 }
 
 .nc-bar {
@@ -1297,7 +1299,7 @@ output {
   grid-column: 1 / -1;
   font-weight: 700;
   font-size: 0.62rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   color: var(--ink-2);
 }
 
@@ -1311,7 +1313,7 @@ output {
   gap: 0.6rem;
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.3em;
+  letter-spacing: calc(0.3em * var(--track));
   color: var(--ink-3);
 }
 
@@ -1334,7 +1336,7 @@ output {
   font-weight: 700;
   font-size: 2.1rem;
   line-height: 1;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
   margin-top: 0.15rem;
 }
 
@@ -1351,7 +1353,7 @@ output {
   text-align: left;
   font-weight: 700;
   font-size: 0.6rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   color: var(--ink-3);
 }
 
@@ -1541,7 +1543,7 @@ output {
 .tc-meta {
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
@@ -1552,7 +1554,7 @@ output {
   font-weight: 700;
   font-size: 1.32rem;
   line-height: 1.02;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55);
 }
 
@@ -1563,7 +1565,7 @@ output {
   margin-top: 0.18rem;
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -1600,7 +1602,7 @@ output {
 .opt label {
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.26em;
+  letter-spacing: calc(0.26em * var(--track));
   color: var(--ink-3);
 }
 
@@ -1654,21 +1656,21 @@ output {
 .car-chip small {
   font-weight: 700;
   font-size: 0.62rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-3);
 }
 
 .car-chip b {
   font-weight: 700;
   font-size: 1rem;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
 }
 
 .car-chip em {
   font-style: normal;
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   color: var(--amber);
   margin-left: 0.4rem;
 }
@@ -1710,7 +1712,7 @@ output {
 .ci-count {
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   color: var(--ink-3);
 }
 
@@ -1727,7 +1729,7 @@ output {
   font-weight: 700;
   font-size: 1.85rem;
   line-height: 1;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1760,7 +1762,7 @@ output {
   gap: 0.6rem;
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   color: var(--ink-2);
 }
 
@@ -1787,7 +1789,7 @@ output {
 .stat b {
   font-weight: 700;
   font-size: 0.9rem;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em * var(--track));
   color: var(--ink);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1809,7 +1811,7 @@ output {
   color: var(--good);
   font-weight: 700;
   font-size: 0.86rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
 }
 
 .status svg {
@@ -1841,7 +1843,7 @@ output {
   color: var(--ink-3);
   font-weight: 700;
   font-size: 0.74rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   padding: 0.45rem 0.75rem;
   border-radius: 5px;
   white-space: nowrap;
@@ -1985,7 +1987,7 @@ output {
   font-weight: 700;
   font-size: 0.72rem;
   line-height: 1.1;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1999,7 +2001,7 @@ output {
   gap: 0.25em;
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
@@ -2012,13 +2014,13 @@ output {
 
 .item .pr.own {
   color: var(--ink-3);
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   font-size: 0.62rem;
 }
 
 .item .pr.eq {
   color: var(--amber);
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   font-size: 0.62rem;
 }
 
@@ -2071,7 +2073,7 @@ output {
 .buy-box .info b {
   font-weight: 700;
   font-size: 1rem;
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2140,7 +2142,7 @@ output {
   border-radius: var(--radius);
   font-weight: 700;
   font-size: 0.86rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   text-align: left;
   white-space: nowrap;
   position: relative;
@@ -2210,7 +2212,7 @@ output {
   display: block;
   font-weight: 700;
   font-size: 0.95rem;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em * var(--track));
 }
 
 .srow .lbl span {
@@ -2290,7 +2292,7 @@ output {
   margin-top: 0.7rem;
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.28em;
+  letter-spacing: calc(0.28em * var(--track));
   color: var(--ink-3);
 }
 
@@ -2305,7 +2307,7 @@ output {
   font-weight: 700;
   font-size: 1.75rem;
   line-height: 1.02;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
 }
 
 .obj-detail {
@@ -2334,7 +2336,7 @@ output {
   gap: 0.4em;
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: var(--good);
 }
 
@@ -2356,13 +2358,13 @@ output {
   align-items: flex-end;
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-3);
 }
 
 .daily-countdown b {
   font-size: 1.15rem;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -2417,7 +2419,7 @@ output {
   padding-left: 0.34em;
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.34em;
+  letter-spacing: calc(0.34em * var(--track));
   color: var(--ink-3);
 }
 
@@ -2440,7 +2442,7 @@ output {
   font-weight: 700;
   font-size: 2.7rem;
   line-height: 0.95;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
 }
 
 .rl-info p {
@@ -2488,7 +2490,7 @@ output {
   border-radius: 3px;
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: #170b02;
   background: var(--amber);
 }
@@ -2519,7 +2521,7 @@ output {
   font-weight: 700;
   font-size: 3.1rem;
   line-height: 0.9;
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--track));
 }
 
 .pause-stats {
@@ -2568,7 +2570,7 @@ output {
 .ctl-lbl {
   font-weight: 700;
   font-size: 0.78rem;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em * var(--track));
   color: var(--ink-2);
   text-transform: uppercase;
   white-space: nowrap;
@@ -2578,7 +2580,7 @@ output {
   margin-top: 0.5rem;
   font-weight: 600;
   font-size: 0.64rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-3);
   text-transform: uppercase;
 }
@@ -2593,7 +2595,7 @@ kbd {
   font-family: var(--font);
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
   color: var(--ink);
   background: rgba(255, 255, 255, 0.08);
   box-shadow:
@@ -2654,13 +2656,19 @@ kbd.k-pill {
 
 .res-place .n {
   font-size: 7rem;
-  letter-spacing: -0.03em;
+  letter-spacing: calc(-0.03em * var(--track));
 }
 
 .res-place .suf {
   margin: 0.25rem 0 0 0.25rem;
   font-size: 2.1rem;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
+}
+
+/* an ordinal written before the number (Chinese 第) */
+.res-place .pre {
+  margin: 0.25rem 0.25rem 0 0;
+  font-size: 2.1rem;
 }
 
 .res-place .of {
@@ -2671,6 +2679,7 @@ kbd.k-pill {
 }
 
 .res-place.p1 .n,
+.res-place.p1 .pre,
 .res-place.p1 .suf {
   color: var(--gold);
 }
@@ -2679,7 +2688,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 4.4rem;
   line-height: 0.9;
-  letter-spacing: 0.01em;
+  letter-spacing: calc(0.01em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
@@ -2715,7 +2724,7 @@ kbd.k-pill {
 .res-stat span {
   font-weight: 700;
   font-size: 0.62rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: var(--ink-3);
   white-space: nowrap;
   overflow: hidden;
@@ -2779,12 +2788,12 @@ kbd.k-pill {
 }
 
 .st-row .nm b {
-  letter-spacing: 0.08em;
+  letter-spacing: calc(0.08em * var(--track));
 }
 
 .st-row .nm small {
   font-size: 0.72em;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em * var(--track));
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2793,7 +2802,7 @@ kbd.k-pill {
 .st-row .tm {
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
 }
 
 .st-row.me {
@@ -2818,13 +2827,13 @@ kbd.k-pill {
   justify-content: space-between;
   font-weight: 700;
   font-size: 0.74rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-2);
 }
 
 .rw b {
   color: var(--gold);
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
@@ -2838,7 +2847,7 @@ kbd.k-pill {
 .rw-total > span {
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.3em;
+  letter-spacing: calc(0.3em * var(--track));
   color: var(--ink-3);
 }
 
@@ -2860,7 +2869,7 @@ kbd.k-pill {
 
 .rw-total b small {
   font-size: 0.42em;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-3);
   align-self: flex-end;
   margin-bottom: 0.25em;
@@ -2910,14 +2919,23 @@ kbd.k-pill {
 
 .pos-box .p {
   font-size: 3.7rem;
-  letter-spacing: -0.02em;
+  letter-spacing: calc(-0.02em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
 .pos-box .suf {
   margin: 0.1rem 0 0 0.12rem;
   font-size: 1.15rem;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
+}
+
+.pos-box .pre {
+  margin: 0.1rem 0.12rem 0 0;
+  font-size: 1.15rem;
+}
+
+.pos-box .pre:empty {
+  display: none;
 }
 
 .pos-box .of {
@@ -2937,20 +2955,20 @@ kbd.k-pill {
   gap: 0.4rem;
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-2);
 }
 
 .lap-box b {
   font-size: 1.35rem;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em * var(--track));
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 .lap-box .ls {
   font-size: 0.95rem;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em * var(--track));
   margin-left: -0.3rem;
 }
 
@@ -2979,7 +2997,7 @@ kbd.k-pill {
   padding: 0.18rem 0.5rem 0.18rem 0.35rem;
   font-weight: 700;
   font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  letter-spacing: calc(0.1em * var(--track));
   color: var(--ink-2);
   background: linear-gradient(90deg, rgba(8, 9, 12, 0.55), rgba(8, 9, 12, 0));
   white-space: nowrap;
@@ -3017,7 +3035,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 1.8rem;
   line-height: 1;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
@@ -3028,7 +3046,7 @@ kbd.k-pill {
   margin-top: 0.22rem;
   font-weight: 700;
   font-size: 0.7rem;
-  letter-spacing: 0.16em;
+  letter-spacing: calc(0.16em * var(--track));
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -3036,7 +3054,7 @@ kbd.k-pill {
 
 .hud .sub b {
   color: var(--ink);
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
 }
 
 .hud-tr {
@@ -3144,7 +3162,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 3.5rem;
   line-height: 0.85;
-  letter-spacing: -0.01em;
+  letter-spacing: calc(-0.01em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
@@ -3153,7 +3171,7 @@ kbd.k-pill {
   padding-left: 0.3em;
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.3em;
+  letter-spacing: calc(0.3em * var(--track));
   color: var(--ink-2);
 }
 
@@ -3219,7 +3237,7 @@ kbd.k-pill {
   text-align: center;
   font-weight: 700;
   font-size: 0.78rem;
-  letter-spacing: 0.32em;
+  letter-spacing: calc(0.32em * var(--track));
   opacity: 0;
   transition:
     opacity 0.15s,
@@ -3240,7 +3258,7 @@ kbd.k-pill {
   display: block;
   font-size: 2rem;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: calc(0.02em * var(--track));
   font-variant-numeric: tabular-nums;
 }
 
@@ -3286,7 +3304,7 @@ kbd.k-pill {
   margin-top: 0.3rem;
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
@@ -3307,7 +3325,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 1.35rem;
   line-height: 1.1;
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--track));
   color: var(--ink);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
   animation: popIn 1.5s var(--ease) forwards;
@@ -3317,7 +3335,7 @@ kbd.k-pill {
 .popup .pts {
   color: var(--gold);
   margin-left: 0.45em;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
 }
 
 .popup.big {
@@ -3335,7 +3353,7 @@ kbd.k-pill {
 
 .popup .delta {
   margin-left: 0.5em;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em * var(--track));
 }
 
 .popup .delta.good {
@@ -3380,7 +3398,7 @@ kbd.k-pill {
 
 .countdown.go {
   color: var(--good);
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
 }
 
 .banner {
@@ -3391,7 +3409,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 1.9rem;
   line-height: 1;
-  letter-spacing: 0.28em;
+  letter-spacing: calc(0.28em * var(--track));
   color: var(--ink);
   background: linear-gradient(90deg, transparent, rgba(8, 9, 12, 0.78) 18%, rgba(8, 9, 12, 0.78) 82%, transparent);
   animation: bannerIn 2.2s var(--ease) forwards;
@@ -3439,7 +3457,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 2.8rem;
   line-height: 0.95;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em * var(--track));
 }
 
 .intro-card .t3 {
@@ -3469,7 +3487,7 @@ kbd.k-pill {
   border: 1px solid var(--hair-2);
   font-weight: 700;
   font-size: 0.68rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-2);
   pointer-events: auto;
   cursor: pointer;
@@ -3532,7 +3550,7 @@ kbd.k-pill {
   margin-bottom: 0.5rem;
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.28em;
+  letter-spacing: calc(0.28em * var(--track));
   color: var(--ink-3);
 }
 
@@ -3540,7 +3558,7 @@ kbd.k-pill {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  letter-spacing: 0.18em;
+  letter-spacing: calc(0.18em * var(--track));
 }
 
 .key-legend kbd {
@@ -3574,7 +3592,7 @@ kbd.k-pill {
   background: rgba(8, 9, 12, 0.55);
   font-weight: 700;
   font-size: 0.64rem;
-  letter-spacing: 0.22em;
+  letter-spacing: calc(0.22em * var(--track));
   color: var(--ink-2);
   cursor: pointer;
   pointer-events: auto;
@@ -3606,7 +3624,7 @@ kbd.k-pill {
   font-weight: 700;
   font-size: 0.6rem;
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: calc(0.06em * var(--track));
   color: var(--ink);
   background: rgba(8, 9, 12, 0.9);
   border: 1px solid var(--hair-2);
@@ -3711,7 +3729,7 @@ kbd.k-pill {
 
 .tbtn .lbl {
   font-size: 0.8rem;
-  letter-spacing: 0.2em;
+  letter-spacing: calc(0.2em * var(--track));
   padding-left: 0.2em;
 }
 
@@ -3719,7 +3737,7 @@ kbd.k-pill {
   margin-top: 0.15rem;
   padding-left: 0.2em;
   font-size: 0.56rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-3);
 }
 
@@ -3773,7 +3791,7 @@ kbd.k-pill {
 
 .tbtn.nitro .lbl {
   font-size: 0.56rem;
-  letter-spacing: 0.24em;
+  letter-spacing: calc(0.24em * var(--track));
   color: var(--ink-2);
 }
 
@@ -3793,7 +3811,7 @@ kbd.k-pill {
   bottom: calc(var(--sb) + 1rem);
   font-weight: 700;
   font-size: 0.66rem;
-  letter-spacing: 0.26em;
+  letter-spacing: calc(0.26em * var(--track));
   color: var(--ink-3);
 }
 
@@ -3819,7 +3837,7 @@ kbd.k-pill {
   box-shadow: var(--shadow);
   font-weight: 700;
   font-size: 0.82rem;
-  letter-spacing: 0.14em;
+  letter-spacing: calc(0.14em * var(--track));
   color: var(--ink);
   white-space: nowrap;
   animation: toast 2.7s var(--ease) forwards;
@@ -3879,7 +3897,7 @@ kbd.k-pill {
 .rh-title {
   font-weight: 700;
   font-size: 1.3rem;
-  letter-spacing: 0.28em;
+  letter-spacing: calc(0.28em * var(--track));
 }
 
 .rh-sub {
@@ -4086,12 +4104,12 @@ kbd.k-pill {
   0% {
     opacity: 0;
     transform: scaleX(0.6);
-    letter-spacing: 0.6em;
+    letter-spacing: calc(0.6em * var(--track));
   }
   14% {
     opacity: 1;
     transform: none;
-    letter-spacing: 0.28em;
+    letter-spacing: calc(0.28em * var(--track));
   }
   82% {
     opacity: 1;
@@ -4556,4 +4574,41 @@ kbd.k-pill {
   .menu-list {
     width: 26rem;
   }
+}
+
+/* ==========================================================================
+   Japanese and Chinese (the game sets <html lang>)
+   Numbers and names stay in Rajdhani / Orbitron; kana and hanzi fall back to the
+   system's Japanese or Chinese UI font, so each script gets its own glyph shapes.
+   Tracking is tightened; the logo keeps its own.
+   ========================================================================== */
+
+:root {
+  --font-ja: 'Rajdhani', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', 'Noto Sans CJK JP', system-ui, sans-serif;
+  --font-zh: 'Rajdhani', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', system-ui, sans-serif;
+}
+
+:root:lang(ja) {
+  --font: var(--font-ja);
+  --font-brand: 'Orbitron', var(--font-ja);
+  --track: 0.35;
+}
+
+:root:lang(zh) {
+  --font: var(--font-zh);
+  --font-brand: 'Orbitron', var(--font-zh);
+  --track: 0.35;
+}
+
+/* text marked with its own language (the language picker names each in its own script) */
+[lang|='ja'] {
+  font-family: var(--font-ja);
+}
+
+[lang|='zh'] {
+  font-family: var(--font-zh);
+}
+
+.logo {
+  --track: 1;
 }

@@ -1,6 +1,7 @@
 import { TRACKS } from '../world/tracks.js';
 import { CARS } from '../car/car-defs.js';
 import { rng, hashString } from '../core/math.js';
+import { t } from '../core/i18n.js';
 
 export function todayKey(date = new Date()) {
   const y = date.getFullYear();
@@ -11,8 +12,8 @@ export function todayKey(date = new Date()) {
 
 export function msUntilTomorrow() {
   const now = new Date();
-  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return t - now;
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return next - now;
 }
 
 /** Deterministic daily challenge: same track, variant and objective for everyone on a given day. */
@@ -27,31 +28,27 @@ export function getDaily(date = new Date()) {
   let objective;
   switch (kind) {
     case 'win':
-      objective = { type: 'win', label: 'WIN THE RACE', detail: 'Normal rivals. Take first place.', difficulty: 'normal' };
+      objective = { type: 'win', difficulty: 'normal' };
       break;
     case 'podium':
-      objective = { type: 'podium', label: 'FINISH ON THE PODIUM', detail: 'Normal rivals. Top 3 or bust.', difficulty: 'normal' };
+      objective = { type: 'podium', difficulty: 'normal' };
       break;
-    case 'style': {
-      const target = 5000 + Math.floor(r() * 5) * 1000;
-      objective = { type: 'style', target, label: `SCORE ${target.toLocaleString('en-US')} STYLE`, detail: 'Drifts, near misses, big air and overtakes all count.' };
+    case 'style':
+      objective = { type: 'style', target: 5000 + Math.floor(r() * 5) * 1000 };
       break;
-    }
-    case 'nearMiss': {
-      const target = 5 + Math.floor(r() * 6);
-      objective = { type: 'nearMiss', target, label: `${target} NEAR MISSES`, detail: 'Pass rivals close enough to feel the paint.' };
+    case 'nearMiss':
+      objective = { type: 'nearMiss', target: 5 + Math.floor(r() * 6) };
       break;
-    }
-    case 'drift': {
-      const target = 1500 + Math.floor(r() * 5) * 500;
-      objective = { type: 'drift', target, label: `LAND A ${target.toLocaleString('en-US')}+ DRIFT`, detail: 'One single drift. Hold it, link it, cash it.' };
+    case 'drift':
+      objective = { type: 'drift', target: 1500 + Math.floor(r() * 5) * 500 };
       break;
-    }
-    default: {
-      const target = 3 + Math.floor(r() * 3);
-      objective = { type: 'combo', target, label: `REACH A x${target} COMBO`, detail: 'Chain stunts within four seconds of each other.' };
-    }
+    default:
+      objective = { type: 'combo', target: 3 + Math.floor(r() * 3) };
   }
+  // in the current language: built whenever the screens ask for today's challenge
+  const n = objective.target?.toLocaleString('en-US');
+  objective.label = t(`obj.${objective.type}`, { n });
+  objective.detail = t(`obj.${objective.type}Detail`);
   return {
     key,
     trackId: track.id,
@@ -98,6 +95,6 @@ export function dailyProgress(daily, res) {
     case 'combo':
       return `x${res.best.combo || 1} / x${o.target}`;
     default:
-      return `P${res.place}`;
+      return t('daily.place', { n: res.place });
   }
 }

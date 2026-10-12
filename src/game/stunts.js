@@ -1,5 +1,7 @@
 // Style scoring: drifts, near misses, slipstreams, air, overtakes - chained into combos.
 
+import { t } from '../core/i18n.js';
+
 export class StuntTracker {
   constructor(onPopup) {
     this.onPopup = onPopup;
@@ -35,7 +37,7 @@ export class StuntTracker {
   }
 
   breakCombo() {
-    if (this.combo > 1) this.onPopup?.({ kind: 'break', label: 'COMBO LOST', points: 0, combo: 1 });
+    if (this.combo > 1) this.onPopup?.({ kind: 'break', label: t('pop.comboLost'), points: 0, combo: 1 });
     this.combo = 1;
     this.comboTimer = 0;
   }
@@ -51,16 +53,16 @@ export class StuntTracker {
     const pts = Math.round(this.driftPoints);
     this.driftPoints = 0;
     if (failed) {
-      this.onPopup?.({ kind: 'fail', label: 'DRIFT FAILED', points: 0, combo: 1 });
+      this.onPopup?.({ kind: 'fail', label: t('pop.driftFailed'), points: 0, combo: 1 });
       this.breakCombo();
       return 0;
     }
     if (pts < 60) return 0;
     this.best.drift = Math.max(this.best.drift, pts);
-    let label = 'DRIFT';
-    if (pts > 3500) label = 'INSANE DRIFT';
-    else if (pts > 1800) label = 'EPIC DRIFT';
-    else if (pts > 900) label = 'GREAT DRIFT';
-    return this.add('drift', pts, label, { big: pts > 1800 });
+    let label = 'pop.drift';
+    if (pts > 3500) label = 'pop.insaneDrift';
+    else if (pts > 1800) label = 'pop.epicDrift';
+    else if (pts > 900) label = 'pop.greatDrift';
+    return this.add('drift', pts, t(label), { big: pts > 1800 });
   }
 }
