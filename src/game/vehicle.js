@@ -15,6 +15,10 @@ const STOPPED = 0.05;
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
 const SHIFT_CUT = 0.12; // torque gap of an upshift
 const PAYBACK = 12; // how fast lost drive is returned once the tyres hook up again
+// nitro (in charges; three fit): drifting is the main source
+const NITRO_DRIFT = 0.4; // per second of a full-angle drift at speed
+const NITRO_TIER = [0, 0.15, 0.3, 0.5]; // bonus for a drift released at each mini-turbo tier
+const NITRO_TRICKLE = 0.02; // per second of racing, whatever you do
 
 /**
  * Arcade vehicle dynamics in world space (x/z plane) with the track providing height,
@@ -146,6 +150,7 @@ export class Vehicle {
 
     // ---------------- boost bookkeeping
     if (this.boostTime > 0) this.boostTime = Math.max(0, this.boostTime - dt);
+    if (!this.frozen) this.addNitro(dt * NITRO_TRICKLE);
     const boostTarget = this.boostTime > 0 ? 1 : 0;
     this.boostLevel = damp(this.boostLevel, boostTarget, boostTarget > this.boostLevel ? 14 : 3, dt);
     const vmax = st.topSpeed * (1 + 0.3 * this.boostLevel + 0.07 * this.slipstream);
@@ -184,13 +189,14 @@ export class Vehicle {
         D.tier = tier;
         this.events.push({ type: 'driftTier', tier });
       }
-      this.addNitro(dt * 0.2 * clamp(D.slip / 0.45, 0, 1.2) * clamp(fwdSpeed / 50, 0.3, 1.3));
+      this.addNitro(dt * NITRO_DRIFT * clamp(D.slip / 0.45, 0, 1.2) * clamp(fwdSpeed / 50, 0.3, 1.3));
       const end = !driftBtn || fwdSpeed < 12 || !this.grounded || (D.time > 0.35 && D.slip < 0.05 && into < 0);
       if (end) {
         D.active = false;
         if (D.tier > 0) {
           const dur = [0, 0.7, 1.15, 1.7][D.tier];
           this.giveBoost(dur, 'mini');
+          this.addNitro(NITRO_TIER[D.tier]);
           this.events.push({ type: 'miniturbo', tier: D.tier });
         }
         this.events.push({ type: 'driftEnd', time: D.time, tier: D.tier });

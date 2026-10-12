@@ -162,7 +162,7 @@ export class AIDriver {
 
     // ---- nitro usage on straights
     this._nitroCooldown -= dt;
-    this.nitro = Math.min(3, this.nitro + dt * 0.05);
+    this.nitro = Math.min(3, this.nitro + dt * 0.07);
     if (!this.frozen && this._nitroCooldown <= 0 && this.nitro >= 1 && this.boostTime <= 0) {
       const ahead = tr.sampleArray(tr.speedProfile, this.s + 120);
       const here = tr.sampleArray(tr.speedProfile, this.s + 30);

@@ -645,7 +645,7 @@ export class Race {
         if (!st.touched && st.minDD < 3.4 && v.vf - a.v > 3 && v.speed > 25) {
           const razor = st.minDD < 2.45;
           this.stunts.add('nearMiss', razor ? 450 : 220, razor ? 'RAZOR CLOSE' : 'NEAR MISS', { big: razor });
-          v.addNitro(razor ? 0.35 : 0.22);
+          v.addNitro(razor ? 0.5 : 0.3);
           this.rig.kick(razor ? 9 : 5);
           this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d) });
           this.app.input.vibrate(18);
@@ -672,7 +672,7 @@ export class Race {
         st.slip = Math.min(1.5, st.slip + dt);
         slipTarget = Math.max(slipTarget, clamp(st.slip / 0.7, 0, 1));
         if (st.slip > 0.7) {
-          v.addNitro(dt * 0.1);
+          v.addNitro(dt * 0.2);
           st.slipUntil = this.clock + 2.5;
           if (!st.slipShown) {
             st.slipShown = true;
@@ -760,7 +760,7 @@ export class Race {
         case 'land': {
           if (e.air > 0.55 && !P.finished && this.phase === 'racing') {
             this.stunts.add('air', Math.round(e.air * 650), e.air > 1.1 ? 'MASSIVE AIR' : 'BIG AIR', { big: e.air > 1.1 });
-            v.addNitro(0.25);
+            v.addNitro(0.4);
           }
           if (e.strength > 5) {
             this.rig.addTrauma(Math.min(0.6, e.strength * 0.03));
