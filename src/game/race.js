@@ -1,0 +1,1142 @@
+import * as THREE from 'three';
+import { buildWorld } from '../world/world-builder.js';
+import { globalUniforms } from '../world/materials.js';
+import { CarModel } from '../car/car-model.js';
+import { getCarDef, CARS } from '../car/car-defs.js';
+import { getCarAsset } from '../car/car-assets.js';
+import { randomCustom } from '../car/customization.js';
+import { Vehicle } from './vehicle.js';
+import { AIDriver, AI_NAMES, DIFFICULTY } from './ai.js';
+import { CameraRig } from './camera-rig.js';
+import { Effects } from './effects.js';
+import { StuntTracker } from './stunts.js';
+import { GhostRecorder, GhostPlayer } from './ghost.js';
+import { DEFAULT_FX } from '../core/postfx.js';
+import { clamp, damp, lerp, rng, hashString, wrap } from '../core/math.js';
+
+const TIER_COLORS = [null, [0.4, 1.6, 6.0], [6.0, 2.4, 0.4], [5.0, 0.6, 6.0]];
+const TIER_LABELS = ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'];
+
+const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _c = new THREE.Color();
+const _white = new THREE.Color(1, 1, 1);
+
+/**
+ * One race session: world, cars, rules, effects, camera and per-frame orchestration.
+ * cfg: { trackId, variant: {reverse, mirror, weather}, mode: 'race'|'timetrial'|'daily',
+ *        laps, difficulty, carId, custom, opponents, ghost }
+ */
+export class Race {
+  constructor(app, cfg) {
+    this.app = app;
+    this.cfg = { mode: 'race', laps: 3, difficulty: 'normal', opponents: 5, ...cfg };
+    this.handlers = {};
+    this.phase = 'loading';
+    this.time = 0;
+    this.clock = 0;
+    this.phaseTime = 0;
+    this.timeScale = 1;
+    this.timeScaleTarget = 1;
+    this.slowmo = 0;
+    this.paused = false;
+    this.fx = DEFAULT_FX();
+    this.flash = 0;
+    this.flashColor = [1, 1, 1];
+    this.impact = 0;
+    this.lightning = 0;
+    this.nextLightning = 6 + Math.random() * 8;
+    this.hud = {};
+    this.messages = [];
+    this._autoCtrl = { steer: 0, throttle: 0, brake: 0, drift: false };
+    this._noCtrl = { steer: 0, throttle: 0, brake: 0, drift: false };
+    this.perfectStart = null;
+    this.startPressTime = null;
+  }
+
+  on(evt, fn) {
+    (this.handlers[evt] || (this.handlers[evt] = [])).push(fn);
+  }
+
+  emit(evt, data) {
+    for (const fn of this.handlers[evt] || []) fn(data);
+  }
+
+  build() {
+    const app = this.app;
+    const cfg = this.cfg;
+    const q = app.renderer.preset;
+    this.world = buildWorld(app.renderer.renderer, cfg.trackId, cfg.variant || {}, q);
+    this.track = this.world.track;
+    this.scene = this.world.scene;
+    this.laps = cfg.laps;
+    this.camera = new THREE.PerspectiveCamera(62, app.renderer.aspect, 0.1, 6500);
+    this.rig = new CameraRig(this.camera, this.track);
+    this.rig.shakeScale = app.settings.shake ?? 1;
+    this.rig.setMode(app.settings.camera || 'chase');
+    this.effects = new Effects(this.scene, { particles: q.particles, rain: this.world.rain });
+    this.stunts = new StuntTracker((p) => this.emit('popup', p));
+    const rand = rng(hashString(this.track.key + (cfg.seed || '')));
+
+    // ---- racers
+    const def = getCarDef(cfg.carId);
+    this.player = this._makeRacer(def, cfg.custom, true, 'YOU', { number: 7 });
+    this.racers = [this.player];
+    this.ais = [];
+    if (cfg.mode !== 'timetrial') {
+      const diff = DIFFICULTY[cfg.difficulty] || DIFFICULTY.easy;
+      this.diff = diff;
+      const names = [...AI_NAMES].sort(() => rand() - 0.5);
+      for (let k = 0; k < cfg.opponents; k++) {
+        const aiDef = CARS[Math.floor(rand() * CARS.length)];
+        // spread the field: some rivals are clearly slower than others
+        const pace = lerp(diff.pace[0], diff.pace[1], (k + 0.5 + (rand() - 0.5) * 0.6) / cfg.opponents);
+        const r = this._makeRacer(aiDef, randomCustom(rand), false, names[k % names.length], {
+          pace,
+          aggression: rand(),
+          laneBias: (rand() - 0.5) * 2.4,
+          rubberUp: diff.rubberUp,
+          rubberDown: diff.rubberDown,
+          topSpeedMul: diff.topSpeed * lerp(0.97, 1.0, rand()),
+          mistakes: diff.mistakes,
+          nitro: diff.nitro,
+          line: diff.line,
+          number: 10 + Math.floor(rand() * 89),
+        });
+        this.racers.push(r);
+        this.ais.push(r);
+      }
+    }
+
+    // ---- grid: fastest rivals at the front; on easier levels the player starts mid-pack
+    const byPace = [...this.ais].sort((a, b) => b.ai.pace - a.ai.pace);
+    const ahead = Math.min(byPace.length, this.diff ? this.diff.ahead : 0);
+    const order = [...byPace.slice(0, ahead), this.player, ...byPace.slice(ahead)];
+    order.forEach((r, k) => {
+      const back = 14 + k * 8.5;
+      const d = this.ais.length ? (k % 2 === 0 ? -3.2 : 3.2) : 0;
+      r.progress = -back;
+      r.lapIdx = -1;
+      r.prevS = wrap(-back, this.track.length);
+      if (r.isPlayer) {
+        r.vehicle.placeAt(this.track.length - back, d, 0);
+        r.vehicle.frozen = true;
+        r.vehicle.nitro = 1;
+      } else {
+        r.ai.place(-back, d);
+        r.ai.frozen = true;
+      }
+      r.gridSlot = k;
+    });
+
+    // ---- ghost (time trial)
+    this.recorder = cfg.mode === 'timetrial' ? new GhostRecorder() : null;
+    this.ghost = null;
+    if (cfg.ghost) {
+      try {
+        this.ghost = new GhostPlayer(cfg.ghost);
+        this.ghostModel = new CarModel(def, cfg.custom, { envMap: this.world.envMap, hq: false, asset: getCarAsset(def.id) });
+        this.ghostModel.setGhost(0x40e8ff);
+        this.ghostModel.group.visible = false;
+        this.scene.add(this.ghostModel.group);
+      } catch (e) {
+        console.warn('ghost load failed', e);
+        this.ghost = null;
+      }
+    }
+
+    // ---- local light probe that tints the player car with nearby baked light
+    this.probe = new THREE.PointLight(0xffffff, 0, 16, 1.6);
+    this.scene.add(this.probe);
+    this.probeColor = new THREE.Color();
+    // ---- real lights placed on the street lamps / signs nearest the player: cars light up as they
+    // sweep underneath (the track itself uses baked light, so only cars and props react)
+    this.lampLights = [];
+    this.lampPool = [];
+    for (let k = 0; k < (q.carHQ ? 3 : 2); k++) {
+      const L = new THREE.PointLight(0xffffff, 0, 24, 2);
+      this.scene.add(L);
+      this.lampLights.push(L);
+    }
+
+    this._syncRacers(0);
+    this._updateModels(0.016);
+    this.rig.update(0.016, this.player.vehicle);
+    this.phase = 'ready';
+  }
+
+  _makeRacer(def, custom, isPlayer, name, opts) {
+    const q = this.app.renderer.preset;
+    const model = new CarModel(def, custom, { envMap: this.world.envMap, hq: isPlayer ? q.carHQ : false, number: opts.number, liveryRes: isPlayer ? Math.min(1024, q.liveryRes ?? 1024) : 512, asset: getCarAsset(def.id) });
+    this.scene.add(model.group);
+    const r = {
+      def,
+      model,
+      isPlayer,
+      name,
+      progress: 0,
+      prevS: 0,
+      lapIdx: -1,
+      lapStart: 0,
+      lapTimes: [],
+      bestLap: Infinity,
+      finished: false,
+      finishTime: 0,
+      place: 0,
+      color: model.custom.paint.color,
+      nm: new Map(),
+      slip: 0,
+      slipMsg: false,
+      s: 0,
+      d: 0,
+      v: 0,
+    };
+    if (isPlayer) r.vehicle = new Vehicle(this.track, def);
+    else r.ai = new AIDriver(this.track, def, { name, ...opts });
+    const tw = isPlayer ? 0.085 : 0.06;
+    r.trails = [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)];
+    if (isPlayer) {
+      r.skids = [0, 1, 2, 3].map(() => this.effects.skids.create(0.16, '#ffffff'));
+      r.skidSlot = 0;
+      r.wasDrifting = false;
+    }
+    return r;
+  }
+
+  start() {
+    this.phase = 'intro';
+    this.phaseTime = 0;
+    this.rig.startIntro(3.4);
+    this.emit('intro', { name: this.world.def.name, tagline: this.world.def.tagline });
+  }
+
+  skipIntro() {
+    if (this.phase !== 'intro') return;
+    this.rig.cine = null;
+    this.rig.blend = 1;
+    this._beginCountdown();
+  }
+
+  _beginCountdown() {
+    this.phase = 'countdown';
+    this.phaseTime = 0;
+    this.lastCount = 4;
+    this.rig.endCinematic(0.35);
+  }
+
+  _go() {
+    this.phase = 'racing';
+    this.phaseTime = 0;
+    this.time = 0;
+    for (const r of this.racers) {
+      r.lapStart = 0;
+      if (r.isPlayer) r.vehicle.frozen = false;
+      else {
+        // human-ish reaction time off the line (counted in game time, so pausing is safe)
+        r.ai.startDelay = 0.05 + Math.random() * 0.3;
+        r.ai.frozen = false;
+      }
+    }
+    this.emit('countdown', { value: 'GO' });
+    this.app.audio?.play('go');
+    // perfect start window: pressed nitro within [-0.3, +0.25] s of GO
+    if (this.startPressTime !== null && this.startPressTime > -0.32) this._perfectStart();
+  }
+
+  _perfectStart() {
+    if (this.perfectStart) return;
+    this.perfectStart = true;
+    const v = this.player.vehicle;
+    v.giveBoost(1.4, 'start');
+    this.stunts.add('perfectStart', 300, 'PERFECT START', { big: true });
+    this.flash = 0.08;
+    this.flashColor = [1.0, 0.75, 0.4];
+    this.rig.kick(10);
+    this.app.audio?.play('boost');
+    this.app.input.vibrate(40);
+  }
+
+  respawn() {
+    const v = this.player.vehicle;
+    const s = v.s - 6;
+    const d = clamp(v.d, -this.track.halfWidth * 0.4, this.track.halfWidth * 0.4);
+    v.placeAt(s, d, Math.min(30, v.topSpeed * 0.35));
+    this.player.prevS = v.s;
+    this.flash = 0.35;
+    this.flashColor = [0.02, 0.03, 0.06];
+    this.app.audio?.play('respawn');
+    this.stunts.breakCombo();
+  }
+
+  setPaused(p) {
+    this.paused = p;
+  }
+
+  // ------------------------------------------------------------------------------------
+  update(dtReal) {
+    if (this.paused || this.phase === 'loading') return;
+    const app = this.app;
+    const input = app.input;
+
+    // ---- time scale (slow motion moments)
+    if (this.slowmo > 0) {
+      this.slowmo -= dtReal;
+      if (this.slowmo <= 0) this.timeScaleTarget = 1;
+    }
+    this.timeScale = damp(this.timeScale, this.timeScaleTarget, this.timeScaleTarget < this.timeScale ? 16 : 4, dtReal);
+    const dt = dtReal * this.timeScale;
+    this.clock += dt;
+    this.phaseTime += dtReal;
+    globalUniforms.uTime.value = this.clock;
+
+    const P = this.player;
+    const v = P.vehicle;
+
+    // ---- phases
+    if (this.phase === 'intro') {
+      if (this.phaseTime > 3.4 || input.consume('nitro') || input.consume('pause')) this._beginCountdown();
+    } else if (this.phase === 'countdown') {
+      const remain = 3 - this.phaseTime;
+      const c = Math.ceil(remain);
+      if (c < this.lastCount && c > 0) {
+        this.lastCount = c;
+        this.emit('countdown', { value: c });
+        app.audio?.play('count');
+      }
+      if (input.consume('nitro')) {
+        this.startPressTime = -remain;
+        if (remain > 0.32) this.emit('popup', { kind: 'fail', label: 'TOO EARLY', points: 0, combo: 1 });
+      }
+      if (remain <= 0) this._go();
+    } else if (this.phase === 'racing' && !P.finished) {
+      this.time += dt;
+      if (this.phaseTime < 0.25 && input.consume('nitro') && !this.perfectStart) this._perfectStart();
+      else if (input.consume('nitro')) {
+        if (v.fireNitro()) this._onNitro();
+        else this.emit('popup', { kind: 'fail', label: 'NO NITRO', points: 0, combo: 1 });
+      }
+      if (input.consume('reset')) this.respawn();
+      // auto-recover when stuck or going the wrong way for too long
+      if ((v.speed < 2.5 && this.time > 4) || v.wrongWay > 3) {
+        this._stuck = (this._stuck || 0) + dtReal;
+        if (this._stuck > 2.5) {
+          this._stuck = 0;
+          this.respawn();
+        }
+      } else this._stuck = 0;
+    } else if (this.phase === 'finish' || this.phase === 'results') {
+      this.time += dt;
+      if (this.phase === 'finish' && this.phaseTime > 3.2) {
+        this.phase = 'results';
+        this.phaseTime = 0;
+        this.rig.startTV();
+        this.emit('results', this.getResults());
+      }
+    }
+    if (input.consume('camera')) {
+      const m = this.rig.cycleMode();
+      app.settings.camera = m;
+      app.saveSettings?.();
+      this.emit('camera', m);
+    }
+
+    // ---- player physics (fixed sub-steps)
+    let ctrl = input.state;
+    if (this.phase === 'intro' || this.phase === 'countdown' || this.phase === 'ready') ctrl = this._noCtrl;
+    if (P.finished) ctrl = v.autopilot(dt, this._autoCtrl, 0.82);
+    const steps = Math.min(10, Math.max(1, Math.ceil(dt / (1 / 120))));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) v.step(h, ctrl);
+
+    // ---- AI
+    const ctx = { racers: this.racers, player: P };
+    for (const r of this.ais) r.ai.update(dt, ctx);
+
+    this._syncRacers(dt);
+    this._collisions(dt);
+    this._interactions(dt);
+    this._handleEvents(dt, ctrl);
+    this._laps();
+    this._positions();
+    this.stunts.update(dt);
+
+    // drift scoring live
+    if (v.drift.active && !P.finished) {
+      const pts = this.stunts.driftTick(dt, v.speed, v.drift.slip);
+      this.hud.driftPoints = pts;
+    } else this.hud.driftPoints = 0;
+
+    // ghost
+    if (this.recorder && this.phase === 'racing' && !P.finished) this.recorder.record(this.time, v.position, v.quat);
+    if (this.ghost && this.ghostModel) {
+      const show = this.phase === 'racing' || this.phase === 'finish';
+      if (show) {
+        const alive = this.ghost.sample(this.time, this.ghostModel.group.position, this.ghostModel.group.quaternion);
+        this.ghostModel.group.visible = alive;
+        const dist = this.ghostModel.group.position.distanceTo(v.position);
+        this.ghostModel.ghostMat.uniforms.uOpacity.value = clamp((dist - 3) / 10, 0.15, 1);
+      } else this.ghostModel.group.visible = false;
+    }
+
+    this._updateModels(dt);
+    this._emitEffects(dt);
+
+    // ---- camera
+    this.rig.update(dt, v);
+    this.effects.update(dt, this.camera, v.velocity, clamp(v.speed / v.topSpeed, 0, 1.5) + v.boostLevel * 0.4);
+    this.world.update(dt, this.camera);
+    this.player.model.group.visible = !this.rig.hideCar;
+
+    this._updateProbe(dt);
+    this._updateLamps();
+    // start lights: one more red column every 0.6 s of the countdown, all out at GO
+    const SL = this.world.startLights;
+    if (SL) {
+      if (this.phase === 'countdown') {
+        SL.uLit.value = Math.min(5, Math.floor(this.phaseTime / 0.6) + 1);
+        SL.uGreen.value = 0;
+      } else {
+        SL.uLit.value = 0;
+        SL.uGreen.value = this.phase === 'racing' ? Math.max(0, 1 - this.phaseTime * 0.5) : 0;
+      }
+    }
+    this._updateFx(dtReal);
+    this._updateAudio(dt);
+    this._updateHud();
+  }
+
+  _syncRacers() {
+    const tr = this.track;
+    for (const r of this.racers) {
+      if (r.isPlayer) {
+        const v = r.vehicle;
+        r.progress += tr.deltaS(v.s, r.prevS);
+        r.prevS = v.s;
+        r.s = v.s;
+        r.d = v.d;
+        r.v = v.vf;
+      } else {
+        r.s = r.ai.s;
+        r.d = r.ai.d;
+        r.v = r.ai.v;
+        r.progress = r.ai.progress;
+      }
+    }
+  }
+
+  _collisions(dt) {
+    const tr = this.track;
+    const P = this.player;
+    const v = P.vehicle;
+    const LEN = 4.45;
+    const WID = 1.95;
+    const f = v.frame;
+    const hl = Math.hypot(f.rx, f.rz) || 1;
+    const rhx = f.rx / hl;
+    const rhz = f.rz / hl;
+    this._hitCooldown = Math.max(0, (this._hitCooldown || 0) - dt);
+    for (const r of this.ais) {
+      const a = r.ai;
+      const ds = tr.deltaS(a.s, v.s);
+      const dd = a.d - v.d;
+      if (Math.abs(ds) >= LEN || Math.abs(dd) >= WID) continue;
+      if (Math.abs(a.y - v.y) > 1.6) continue;
+      const penS = LEN - Math.abs(ds);
+      const penD = WID - Math.abs(dd);
+      let strength = 0;
+      const nm = this._nm(r);
+      nm.touched = true;
+      if (penD < penS * 0.75) {
+        // side swipe
+        const sgn = Math.sign(dd) || 1;
+        const push = penD * 0.5;
+        a.d += sgn * push;
+        v.x -= rhx * sgn * push;
+        v.z -= rhz * sgn * push;
+        const pvl = v.vx * rhx + v.vz * rhz;
+        const rel = pvl - a.vd;
+        if (rel * sgn > 0) {
+          v.vx -= rhx * rel * 0.85;
+          v.vz -= rhz * rel * 0.85;
+          a.vd += rel * 0.6;
+        }
+        a.vd += sgn * 1.5;
+        strength = Math.abs(rel) + 1.5;
+      } else {
+        const rel = v.vf - a.v;
+        if (ds > 0) {
+          // player hits the car ahead
+          v.x -= f.tx * penS * 0.6;
+          v.z -= f.tz * penS * 0.6;
+          if (rel > 0) {
+            const keep = (a.v + rel * 0.25) / Math.max(v.vf, 1);
+            v.vx *= keep;
+            v.vz *= keep;
+            a.v += rel * 0.55;
+            a.bump = 0.6;
+          }
+          strength = Math.max(0, rel);
+        } else {
+          // car behind hits the player
+          a.progress -= penS * 0.6;
+          a.s = wrap(a.s - penS * 0.6, tr.length);
+          if (rel < 0) {
+            v.vx += f.tx * -rel * 0.45;
+            v.vz += f.tz * -rel * 0.45;
+            a.v += rel * 0.6;
+          }
+          strength = Math.max(0, -rel);
+        }
+      }
+      if (strength > 2.5 && this._hitCooldown <= 0) {
+        this._hitCooldown = 0.25;
+        const px = (v.x + a.position.x) / 2;
+        const pz = (v.z + a.position.z) / 2;
+        const py = (v.y + a.y) / 2 + 0.55;
+        this.effects.burst(px, py, pz, v.velocity, Math.min(40, 8 + strength * 2), [6, 3.5, 1.4], 7, 0.55);
+        this.rig.addTrauma(Math.min(0.6, 0.12 + strength * 0.03));
+        this.impact = Math.min(1, this.impact + strength * 0.05);
+        this.app.audio?.play('hit', { strength });
+        this.app.input.vibrate(Math.min(80, 20 + strength * 4));
+        if (strength > 9) this.stunts.breakCombo();
+      }
+    }
+    // AI vs AI separation
+    for (let i = 0; i < this.ais.length; i++) {
+      for (let j = i + 1; j < this.ais.length; j++) {
+        const a = this.ais[i].ai;
+        const b = this.ais[j].ai;
+        const ds = tr.deltaS(b.s, a.s);
+        const dd = b.d - a.d;
+        if (Math.abs(ds) < LEN && Math.abs(dd) < WID) {
+          const pen = WID - Math.abs(dd);
+          const sgn = Math.sign(dd) || 1;
+          a.d -= sgn * pen * 0.5;
+          b.d += sgn * pen * 0.5;
+          if (ds > 0 && a.v > b.v) a.v = lerp(a.v, b.v, 0.5);
+          else if (ds < 0 && b.v > a.v) b.v = lerp(b.v, a.v, 0.5);
+        }
+      }
+    }
+  }
+
+  _nm(r) {
+    let st = this.player.nm.get(r);
+    if (!st) {
+      st = { prevDs: 0, minDD: 99, touched: false, slip: 0, slipShown: false, slipUntil: 0 };
+      this.player.nm.set(r, st);
+    }
+    return st;
+  }
+
+  _interactions(dt) {
+    if (this.phase !== 'racing' || this.player.finished) return;
+    const tr = this.track;
+    const v = this.player.vehicle;
+    let slipTarget = 0;
+    for (const r of this.ais) {
+      const a = r.ai;
+      const st = this._nm(r);
+      const ds = tr.deltaS(a.s, v.s);
+      const dd = Math.abs(a.d - v.d);
+      if (Math.abs(ds) < 7) st.minDD = Math.min(st.minDD, dd);
+      // passed this car?
+      if (st.prevDs > 0 && ds <= 0 && Math.abs(ds) < 10) {
+        if (!st.touched && st.minDD < 3.4 && v.vf - a.v > 3 && v.speed > 25) {
+          const razor = st.minDD < 2.45;
+          this.stunts.add('nearMiss', razor ? 450 : 220, razor ? 'RAZOR CLOSE' : 'NEAR MISS', { big: razor });
+          v.addNitro(razor ? 0.35 : 0.22);
+          this.rig.kick(razor ? 9 : 5);
+          this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d) });
+          this.app.input.vibrate(18);
+          if (razor && v.speed > 45 && (this._lastSlowmo ?? -99) < this.clock - 5) {
+            this._lastSlowmo = this.clock;
+            this.timeScaleTarget = 0.32;
+            this.slowmo = 0.38;
+          }
+        }
+        if (st.slipUntil > this.clock) {
+          this.stunts.add('slipstream', 250, 'SLINGSHOT');
+          st.slipUntil = 0;
+        }
+        st.minDD = 99;
+        st.touched = false;
+      }
+      if (Math.abs(ds) > 14) {
+        st.minDD = 99;
+        st.touched = false;
+      }
+      st.prevDs = ds;
+      // slipstream (drafting)
+      if (ds > 3.5 && ds < 34 && dd < 1.6 && v.speed > 30) {
+        st.slip = Math.min(1.5, st.slip + dt);
+        slipTarget = Math.max(slipTarget, clamp(st.slip / 0.7, 0, 1));
+        if (st.slip > 0.7) {
+          v.addNitro(dt * 0.1);
+          st.slipUntil = this.clock + 2.5;
+          if (!st.slipShown) {
+            st.slipShown = true;
+            this.emit('popup', { kind: 'info', label: 'SLIPSTREAM', points: 0, combo: 1 });
+          }
+        }
+      } else {
+        st.slip = Math.max(0, st.slip - dt * 2);
+        if (st.slip === 0) st.slipShown = false;
+      }
+    }
+    v.slipstream = damp(v.slipstream, slipTarget, 3, dt);
+  }
+
+  _onNitro() {
+    this.flash = Math.max(this.flash, 0.06);
+    this.flashColor = [1.0, 0.7, 0.35];
+    this.rig.kick(14);
+    this.rig.addTrauma(0.25);
+    this.app.audio?.play('nitro');
+    this.app.input.vibrate([30, 30, 50]);
+    const v = this.player.vehicle;
+    const m = this.player.model;
+    for (const e of m.exhaustPos) {
+      _v.copy(e).applyMatrix4(m.body.matrixWorld);
+      this.effects.burst(_v.x, _v.y, _v.z, v.velocity, 10, [0.8, 1.4, 3.2], 5, 0.4);
+    }
+  }
+
+  _handleEvents(dt, ctrl) {
+    const P = this.player;
+    const v = P.vehicle;
+    const m = P.model;
+    for (const e of v.events) {
+      switch (e.type) {
+        case 'nitro':
+          break;
+        case 'pad':
+          this.rig.kick(8);
+          this.app.audio?.play('pad');
+          this.app.input.vibrate(25);
+          break;
+        case 'driftStart':
+          break;
+        case 'driftTier':
+          this.app.audio?.play('tier', { tier: e.tier });
+          break;
+        case 'miniturbo': {
+          this.emit('popup', { kind: 'turbo', label: TIER_LABELS[e.tier], points: 0, combo: 1, tier: e.tier });
+          this.rig.kick(5 + e.tier * 3);
+          this.app.audio?.play('turbo', { tier: e.tier });
+          this.app.input.vibrate(20 + e.tier * 10);
+          const col = TIER_COLORS[e.tier];
+          for (const w of [m.wheels[2], m.wheels[3]]) {
+            w.pivot.getWorldPosition(_v);
+            this.effects.burst(_v.x, _v.y, _v.z, v.velocity, 10 + e.tier * 6, col, 6, 0.45);
+          }
+          break;
+        }
+        case 'driftEnd':
+          if (!P.finished) this.stunts.driftEnd(false);
+          break;
+        case 'driftFail':
+          this.stunts.driftEnd(true);
+          break;
+        case 'wall': {
+          const s = e.strength;
+          this.rig.addTrauma(Math.min(0.7, 0.1 + s * 0.035));
+          this.impact = Math.min(1, this.impact + s * 0.04);
+          if (s > 12) {
+            this.flash = Math.max(this.flash, 0.06);
+            this.flashColor = [0.8, 0.1, 0.05];
+          }
+          const n = Math.min(60, 10 + s * 2.5);
+          const side = e.side;
+          const f = v.frame;
+          const hl = Math.hypot(f.rx, f.rz) || 1;
+          this.effects.burst(e.x + (f.rx / hl) * side * 1.0, e.y, e.z + (f.rz / hl) * side * 1.0, v.velocity, n, [6, 3.2, 1.2], 9, 0.6);
+          this.app.audio?.play('crash', { strength: s });
+          this.app.input.vibrate(Math.min(100, 25 + s * 4));
+          if (s > 10) this.stunts.breakCombo();
+          break;
+        }
+        case 'land': {
+          if (e.air > 0.55 && !P.finished && this.phase === 'racing') {
+            this.stunts.add('air', Math.round(e.air * 650), e.air > 1.1 ? 'MASSIVE AIR' : 'BIG AIR', { big: e.air > 1.1 });
+            v.addNitro(0.25);
+          }
+          if (e.strength > 5) {
+            this.rig.addTrauma(Math.min(0.6, e.strength * 0.03));
+            for (const w of m.wheels) {
+              w.pivot.getWorldPosition(_v);
+              this.effects.burst(_v.x, _v.y - 0.3, _v.z, v.velocity, 6, [6, 3.4, 1.4], 5, 0.4);
+            }
+            this.app.audio?.play('land', { strength: e.strength });
+            this.app.input.vibrate(40);
+          }
+          if (this.timeScaleTarget < 1 && this._airSlowmo) {
+            this._airSlowmo = false;
+            this.timeScaleTarget = 1;
+          }
+          break;
+        }
+        case 'shift':
+          if (Math.random() < 0.22 && ctrl.throttle > 0.5 && e.gear > 3) {
+            m.triggerBackfire();
+            this.app.audio?.play('backfire');
+          }
+          this.app.audio?.shift?.();
+          break;
+        default:
+          break;
+      }
+    }
+    v.events.length = 0;
+    // big air slow motion
+    if (!v.grounded && v.airTime > 0.38 && !this._airSlowmo && this.phase === 'racing' && v.vy > -2) {
+      this._airSlowmo = true;
+      this.timeScaleTarget = 0.55;
+      this.slowmo = 0.7;
+    }
+    for (const r of this.ais) r.ai.events.length = 0;
+  }
+
+  _laps() {
+    const L = this.track.length;
+    for (const r of this.racers) {
+      if (r.finished) continue;
+      const idx = Math.floor(r.progress / L);
+      if (idx > r.lapIdx) {
+        if (r.lapIdx >= 0 || idx >= 1) {
+          if (r.lapIdx >= 0 && this.phase !== 'countdown') {
+            const lt = this.time - r.lapStart;
+            r.lapTimes.push(lt);
+            r.bestLap = Math.min(r.bestLap, lt);
+            r.lapStart = this.time;
+            if (r.isPlayer && idx < this.laps) {
+              const isBest = lt <= r.bestLap;
+              this.emit('lap', { lap: idx + 1, laps: this.laps, time: lt, best: isBest, final: idx + 1 === this.laps });
+              this.app.audio?.play('lap');
+            }
+          }
+        }
+        r.lapIdx = idx;
+        if (idx >= this.laps && this.phase !== 'countdown' && this.phase !== 'intro') this._finish(r);
+      }
+    }
+  }
+
+  _finish(r) {
+    r.finished = true;
+    r.finishTime = this.time;
+    if (r.isPlayer) {
+      this.phase = 'finish';
+      this.phaseTime = 0;
+      this.timeScaleTarget = 0.28;
+      this.slowmo = 1.4;
+      this.rig.startOrbit();
+      this.flash = 0.12;
+      this.flashColor = [1, 0.9, 0.75];
+      this.app.audio?.play('finish', { place: r.place });
+      this.app.input.vibrate([50, 40, 80]);
+      if (r.vehicle.drift.active) this.stunts.driftEnd(false);
+      this.emit('finish', { place: r.place, total: this.racers.length, time: r.finishTime });
+    }
+  }
+
+  _positions() {
+    const sorted = [...this.racers].sort((a, b) => {
+      if (a.finished && b.finished) return a.finishTime - b.finishTime;
+      if (a.finished) return -1;
+      if (b.finished) return 1;
+      return b.progress - a.progress;
+    });
+    const prev = this.player.place;
+    sorted.forEach((r, i) => (r.place = i + 1));
+    this.order = sorted;
+    if (this.phase === 'racing' && prev && this.player.place < prev && !this.player.finished) {
+      const gained = prev - this.player.place;
+      for (let k = 0; k < gained; k++) this.stunts.add('overtake', 100, 'OVERTAKE', { chain: false });
+    }
+  }
+
+  _updateModels(dt) {
+    const P = this.player;
+    const v = P.vehicle;
+    const m = P.model;
+    m.group.position.copy(v.position);
+    m.group.quaternion.copy(v.quat);
+    m.setBodyTilt(v.roll, v.pitch);
+    m.update(dt, { speed: v.vf, steer: this.app.input.state.steer * (P.finished ? 0 : 1), brake: v.braking, boost: v.boostLevel, drift: v.drift.active });
+    // light streaks sliding over the paint (stronger in tunnels / under lamps)
+    this._dist = (this._dist || 0) + v.speed * dt;
+    const lum = this.probe ? this.probe.intensity / 6 : 0.3;
+    const tun = v.frame.tunnel ? 1 : 0;
+    m.setStreaks(-this._dist * 0.3, 0.12 + Math.min(lum, 2) * 0.18 + tun * 0.3 + v.boostLevel * 0.15, _c.copy(this.probe ? this.probe.color : _c.setRGB(1, 1, 1)).lerp(_white, 0.45), v.fwd);
+    for (const r of this.ais) {
+      const a = r.ai;
+      r.model.setStreaks(-a.progress * 0.3, a.frame.tunnel ? 0.45 : 0.15, null, a.fwd);
+      r.model.group.position.copy(a.position);
+      r.model.group.quaternion.copy(a.quat);
+      r.model.setBodyTilt(clamp(-a.driftVis * 0.08, -0.05, 0.05), 0);
+      r.model.update(dt, { speed: a.v, steer: clamp(-a.vd * 0.15 + a.driftVis, -1, 1), brake: false, boost: a.boostLevel });
+    }
+  }
+
+  _emitEffects(dt) {
+    const fx = this.effects;
+    const time = fx.time;
+    const camPos = this.camera.position;
+    const wet = this.world.rain;
+    for (const r of this.racers) {
+      const m = r.model;
+      const isP = r.isPlayer;
+      const speed = isP ? r.vehicle.speed : r.ai.v;
+      const boost = isP ? r.vehicle.boostLevel : r.ai.boostLevel;
+      const near = m.group.position.distanceToSquared(camPos) < 160 * 160;
+      m.group.updateMatrixWorld();
+      // tail light trails
+      for (let k = 0; k < 2; k++) {
+        const tr = r.trails[k];
+        if (!tr) continue;
+        if (near) {
+          _v.copy(m.tailLightPos[k]).applyMatrix4(m.body.matrixWorld);
+          fx.trails.push(tr, _v.x, _v.y, _v.z, time);
+        } else tr.pts.length = 0;
+        tr.intensity = clamp((speed - 22) / 45, 0, 1) * (isP ? 1.0 : 0.8) + boost * 1.2;
+        tr.color.copy(m.trailColor).multiplyScalar(2.0);
+        tr.width = (isP ? 0.055 : 0.045) * (1 + boost * 0.9);
+      }
+      if (!near) continue;
+      const drifting = isP ? r.vehicle.drift.active && r.vehicle.grounded : Math.abs(r.ai.driftVis) > 0.18;
+      const vel = isP ? r.vehicle.velocity : r.ai.velocity;
+      // drift smoke from rear wheels (tinted neon by the underglow)
+      if (drifting && speed > 12) {
+        const ug = m.underglow.visible ? m.underglowMat.uniforms.uColor.value : _c.setRGB(0.6, 0.6, 0.7);
+        const amt = isP ? clamp(r.vehicle.drift.slip, 0.2, 1) : 0.5;
+        for (const w of [m.wheels[2], m.wheels[3]]) {
+          w.pivot.getWorldPosition(_v);
+          if (Math.random() < 0.85 * amt) {
+            fx.puff(
+              _v.x + (Math.random() - 0.5) * 0.4,
+              _v.y - 0.15,
+              _v.z + (Math.random() - 0.5) * 0.4,
+              vel.x * 0.25 + (Math.random() - 0.5) * 2,
+              0.6 + Math.random() * 0.8,
+              vel.z * 0.25 + (Math.random() - 0.5) * 2,
+              [lerp(0.55, ug.r * 0.35, 0.45), lerp(0.55, ug.g * 0.35, 0.45), lerp(0.6, ug.b * 0.35, 0.45)],
+              isP ? 0.32 : 0.22,
+              0.7,
+              isP ? 4.2 : 3.2,
+              1.5,
+            );
+          }
+          if (isP && r.vehicle.drift.tier > 0 && Math.random() < 0.6) {
+            const col = TIER_COLORS[r.vehicle.drift.tier];
+            fx.spark(_v.x, _v.y - 0.2, _v.z, vel.x * 0.8 + (Math.random() - 0.5) * 4, 1 + Math.random() * 3, vel.z * 0.8 + (Math.random() - 0.5) * 4, col, 0.35, 0.05, 0.03);
+          }
+        }
+      }
+      // neon skid light trails for the player (two slots per wheel so separate drifts never join)
+      if (isP && r.skids) {
+        const on = drifting && speed > 12;
+        if (on && !r.wasDrifting) {
+          r.skidSlot ^= 1;
+          r.skids[r.skidSlot * 2].pts.length = 0;
+          r.skids[r.skidSlot * 2 + 1].pts.length = 0;
+        }
+        r.wasDrifting = on;
+        if (on) {
+          const wheels = [m.wheels[2], m.wheels[3]];
+          const ug = m.underglow.visible ? m.underglowMat.uniforms.uColor.value : _c.setRGB(1.2, 1.2, 1.4);
+          _v2.set(1, 0, 0).applyQuaternion(m.group.quaternion);
+          for (let k = 0; k < 2; k++) {
+            const sk = r.skids[r.skidSlot * 2 + k];
+            wheels[k].pivot.getWorldPosition(_v);
+            fx.skids.push(sk, _v.x, _v.y - wheels[k].r + 0.05, _v.z, time, _v2.x, _v2.y, _v2.z);
+            sk.color.copy(ug).multiplyScalar(0.9);
+            sk.intensity = 1;
+          }
+        }
+      }
+      // wall scrape sparks
+      if (isP && r.vehicle.wallContact > 0.15) {
+        const v = r.vehicle;
+        const f = v.frame;
+        const hl = Math.hypot(f.rx, f.rz) || 1;
+        const side = v.wallSide || 1;
+        const n = Math.ceil(v.wallContact * 4);
+        for (let i = 0; i < n; i++) {
+          fx.spark(
+            v.x + (f.rx / hl) * side * 1.05 + (Math.random() - 0.5) * 1.5 * f.tx,
+            v.y + 0.35 + Math.random() * 0.3,
+            v.z + (f.rz / hl) * side * 1.05 + (Math.random() - 0.5) * 1.5 * f.tz,
+            vel.x * 0.75 + (Math.random() - 0.5) * 5,
+            Math.random() * 4,
+            vel.z * 0.75 + (Math.random() - 0.5) * 5,
+            [6, 3.0, 1.0],
+            0.45,
+            0.05,
+            0.05,
+          );
+        }
+      }
+      // boost exhaust sparks
+      if (boost > 0.3 && Math.random() < (isP ? 0.6 : 0.25)) {
+        const e = m.exhaustPos[Math.floor(Math.random() * m.exhaustPos.length)];
+        _v.copy(e).applyMatrix4(m.body.matrixWorld);
+        fx.spark(_v.x, _v.y, _v.z, vel.x * 0.85 + (Math.random() - 0.5) * 3, (Math.random() - 0.3) * 2, vel.z * 0.85 + (Math.random() - 0.5) * 3, [0.6, 1.0, 2.4], 0.2, 0.04, 0.03);
+      }
+      // rain spray
+      if (wet && speed > 18 && Math.random() < 0.9) {
+        for (const w of [m.wheels[2], m.wheels[3]]) {
+          w.pivot.getWorldPosition(_v);
+          fx.puff(_v.x, _v.y - 0.1, _v.z, vel.x * 0.6, 0.8 + Math.random(), vel.z * 0.6, [0.6, 0.65, 0.75], 0.09 * clamp(speed / 60, 0.3, 1.2), 0.6, 3.2, 0.7);
+        }
+      }
+    }
+  }
+
+  _updateLamps() {
+    const lights = this.lampLights;
+    if (!lights || !lights.length) return;
+    const v = this.player.vehicle;
+    const baker = this.world.baker;
+    const n = this.world.track.n;
+    const k = Math.ceil(28 / this.world.track.ds);
+    const pool = this.lampPool;
+    let count = 0;
+    const scan = (bucket) => {
+      for (let q = 0; q < bucket.length; q++) {
+        const L = bucket[q];
+        const dx = L.x - v.x;
+        const dy = L.y - v.y;
+        const dz = L.z - v.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= L.r2) continue;
+        // rank by how much light actually reaches the car
+        const w = Math.max(L.r, L.g, L.b) / Math.max(d2, 4);
+        let e = pool[count];
+        if (!e) pool[count] = e = { L: null, w: 0 };
+        e.L = L;
+        e.w = w;
+        count++;
+      }
+    };
+    // baked lamps/signs plus dynamic-only lights (tunnel luminaires)
+    for (let j = v.frame.i - k; j <= v.frame.i + k; j++) {
+      const jj = ((j % n) + n) % n;
+      if (baker.buckets[jj]) scan(baker.buckets[jj]);
+      if (baker.dyn && baker.dyn[jj]) scan(baker.dyn[jj]);
+    }
+    // partial selection of the strongest few
+    for (let a = 0; a < Math.min(lights.length, count); a++) {
+      let best = a;
+      for (let b = a + 1; b < count; b++) if (pool[b].w > pool[best].w) best = b;
+      const t = pool[a];
+      pool[a] = pool[best];
+      pool[best] = t;
+    }
+    for (let q = 0; q < lights.length; q++) {
+      const light = lights[q];
+      if (q >= count) {
+        light.intensity = 0;
+        continue;
+      }
+      const L = pool[q].L;
+      const m = Math.max(L.r, L.g, L.b, 1e-3);
+      light.color.setRGB(L.r / m, L.g / m, L.b / m);
+      light.intensity = m * 170;
+      light.distance = Math.sqrt(L.r2) * 1.1;
+      light.position.set(L.x, L.y, L.z);
+    }
+  }
+
+  _updateProbe(dt) {
+    const v = this.player.vehicle;
+    this.world.lightAt(v.frame.i, v.x, v.y, v.z, _c);
+    const lum = _c.r * 0.3 + _c.g * 0.59 + _c.b * 0.11;
+    this.probeColor.r = damp(this.probeColor.r, _c.r, 6, dt);
+    this.probeColor.g = damp(this.probeColor.g, _c.g, 6, dt);
+    this.probeColor.b = damp(this.probeColor.b, _c.b, 6, dt);
+    const m = Math.max(this.probeColor.r, this.probeColor.g, this.probeColor.b, 0.001);
+    this.probe.color.setRGB(this.probeColor.r / m, this.probeColor.g / m, this.probeColor.b / m);
+    this.probe.intensity = damp(this.probe.intensity, clamp(lum, 0, 2.5) * 6, 6, dt);
+    this.probe.position.copy(v.position).addScaledVector(v.up, 3.2);
+  }
+
+  _updateFx(dtReal) {
+    const v = this.player.vehicle;
+    const fx = this.fx;
+    const st = this.app.settings;
+    const sp = clamp(v.speed / v.topSpeed, 0, 1.4);
+    const boost = v.boostLevel;
+    const pal = this.world.palette;
+    this.flash = Math.max(0, this.flash - dtReal * 2.2);
+    this.impact = Math.max(0, this.impact - dtReal * 2.5);
+    // lightning in the rain
+    if (this.world.rain) {
+      this.nextLightning -= dtReal;
+      if (this.nextLightning <= 0) {
+        this.nextLightning = 18 + Math.random() * 20;
+        this.lightning = 1;
+        setTimeout(() => this.app.audio?.play('thunder'), 300 + Math.random() * 900);
+      }
+      this.lightning = Math.max(0, this.lightning - dtReal * 3.5);
+    }
+    const blurMul = st.motionBlur ?? 1;
+    const inTunnel = v.frame.tunnel;
+    fx.blur = ((0.003 + 0.027 * sp * sp) * (inTunnel ? 1.15 : 1) + boost * 0.035) * blurMul * (1 - this.rig.hideCar * 0.3);
+    fx.ca = (0.0012 + boost * 0.0075 + this.impact * 0.012 + (this.timeScale < 0.8 ? 0.004 : 0)) * (st.chromatic ?? 1);
+    fx.speedLines = Math.max(0, boost - 0.3) * 0.35 * (st.speedLines ?? 1);
+    fx.vignette = 0.38 + boost * 0.22 + (1 - this.timeScale) * 0.25;
+    const lf = this.lightning > 0 && !this.app.settings.reduceFlashes ? Math.max(0, Math.sin(this.lightning * 30)) * this.lightning * 0.12 : 0;
+    fx.flash = Math.max(this.flash, lf);
+    fx.flashColor = lf > this.flash ? [0.8, 0.85, 1.0] : this.flashColor;
+    fx.reflect = (this.world.rain ? 0.62 : 0.3) + (inTunnel ? 0.18 : 0);
+    fx.bloomStrength = 0.34 + boost * 0.06;
+    fx.exposure = (pal.exposure ?? 1) * (1 + boost * 0.06);
+    fx.tint = pal.tint || [1, 1, 1];
+    fx.desat = clamp((1 - this.timeScale) * 0.5, 0, 0.45);
+    fx.anamorphic = this.app.renderer.preset.anamorphic ? 0.1 + boost * 0.08 : 0;
+    fx.droplets = this.world.rain && !inTunnel && this.rig.mode !== 'bumper' ? 0.35 + sp * 0.35 : 0;
+    fx.saturation = 1.0;
+    fx.grain = 0.02;
+    // radial blur centre = focus of expansion of the camera's motion
+    const cam = this.camera;
+    if (v.speed > 4) {
+      _v.copy(v.velocity).normalize().multiplyScalar(400).add(cam.position);
+    } else {
+      cam.getWorldDirection(_v).multiplyScalar(400).add(cam.position);
+    }
+    _v.project(cam);
+    fx.center[0] = clamp(_v.x * 0.5 + 0.5, 0.22, 0.78);
+    fx.center[1] = clamp(_v.y * 0.5 + 0.5, 0.22, 0.78);
+    cam.getWorldDirection(_v2);
+    _v2.y = 0;
+    _v2.normalize().multiplyScalar(1000).add(cam.position);
+    _v2.project(cam);
+    fx.horizon = clamp(_v2.y * 0.5 + 0.5, 0.2, 0.95);
+  }
+
+  _updateAudio(dt) {
+    const a = this.app.audio;
+    if (!a) return;
+    const v = this.player.vehicle;
+    let nearest = null;
+    let nd = 1e9;
+    for (const r of this.ais) {
+      const d = r.model.group.position.distanceTo(this.camera.position);
+      if (d < nd) {
+        nd = d;
+        nearest = r;
+      }
+    }
+    a.updateRace({
+      rpm: v.rpm,
+      throttle: this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25,
+      speed: v.speed,
+      topSpeed: v.topSpeed,
+      boost: v.boostLevel,
+      drift: v.drift.active ? clamp(v.drift.slip, 0, 1) : 0,
+      scrape: v.wallContact,
+      tunnel: v.frame.tunnel ? 1 : 0,
+      airborne: !v.grounded,
+      timeScale: this.timeScale,
+      opponentDist: nd,
+      opponentSpeed: nearest ? nearest.ai.v : 0,
+      relSpeed: nearest ? v.speed - nearest.ai.v : 0,
+      wet: this.world.rain,
+      dt,
+    });
+  }
+
+  _updateHud() {
+    const P = this.player;
+    const v = P.vehicle;
+    const h = this.hud;
+    h.phase = this.phase;
+    h.place = P.place;
+    h.total = this.racers.length;
+    h.lap = clamp(P.lapIdx + 1, 1, this.laps);
+    h.laps = this.laps;
+    h.time = this.time;
+    h.lapTime = this.phase === 'racing' ? this.time - P.lapStart : 0;
+    h.bestLap = P.bestLap;
+    h.speed = v.speed;
+    h.gear = v.gear;
+    h.rpm = v.rpm;
+    h.nitro = v.nitro;
+    h.nitroMax = v.nitroMax;
+    h.boost = v.boostLevel;
+    h.driftTier = v.drift.active ? v.drift.tier : -1;
+    h.driftTime = v.drift.active ? v.drift.time : 0;
+    h.combo = this.stunts.combo;
+    h.comboTimer = this.stunts.comboTimer / this.stunts.comboWindow;
+    h.style = this.stunts.total;
+    h.wrongWay = v.wrongWay > 1 && this.phase === 'racing';
+    h.slipstream = v.slipstream;
+    h.timeScale = this.timeScale;
+    h.mode = this.cfg.mode;
+  }
+
+  /** Minimap data: track polyline + cars. */
+  minimapData() {
+    return {
+      track: this.track,
+      cars: this.racers.map((r) => ({
+        x: r.isPlayer ? r.vehicle.x : r.ai.position.x,
+        z: r.isPlayer ? r.vehicle.z : r.ai.position.z,
+        player: r.isPlayer,
+        color: r.color,
+      })),
+      ghost: this.ghostModel && this.ghostModel.group.visible ? { x: this.ghostModel.group.position.x, z: this.ghostModel.group.position.z } : null,
+    };
+  }
+
+  getResults() {
+    const L = this.track.length;
+    const totalDist = this.laps * L;
+    const P = this.player;
+    const rows = this.order.map((r) => {
+      let time = r.finished ? r.finishTime : null;
+      if (!r.finished) {
+        // estimate from remaining distance and average speed
+        const avg = Math.max(10, (r.progress + 14) / Math.max(1, this.time));
+        time = this.time + Math.max(0, totalDist - r.progress) / avg;
+      }
+      return { name: r.name, place: r.place, time, estimated: !r.finished, isPlayer: r.isPlayer, car: r.def.name, color: r.color, bestLap: r.bestLap };
+    });
+    return {
+      mode: this.cfg.mode,
+      trackId: this.cfg.trackId,
+      trackKey: this.track.key,
+      trackName: this.world.def.name,
+      variant: this.cfg.variant,
+      laps: this.laps,
+      place: P.place,
+      total: this.racers.length,
+      time: P.finishTime,
+      bestLap: P.bestLap,
+      lapTimes: P.lapTimes,
+      style: this.stunts.total,
+      counts: { ...this.stunts.counts },
+      best: { ...this.stunts.best },
+      rows,
+      ghost: this.recorder ? this.recorder.encode() : null,
+    };
+  }
+
+  resize(aspect) {
+    this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+  }
+
+  render() {
+    this.app.renderer.render(this.scene, this.camera, this.fx, this.clock);
+  }
+
+  dispose() {
+    this.effects.dispose();
+    for (const r of this.racers) r.model.dispose();
+    if (this.ghostModel) this.ghostModel.dispose();
+    this.world.dispose();
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "cars": [
+    {
+      "id": "volt",
+      "file": "volt.glb",
+      "factory": true,
+      "v": "3e2d831bc7",
+      "gz": true
+    },
+    {
+      "id": "razor",
+      "file": "razor.glb",
+      "factory": true,
+      "v": "e3829a4c97",
+      "gz": true
+    },
+    {
+      "id": "specter",
+      "file": "specter.glb",
+      "factory": true,
+      "v": "9f167a265a",
+      "gz": true
+    }
+  ]
+}
