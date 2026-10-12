@@ -5,7 +5,8 @@ import { CARS, getCarDef } from '../car/car-defs.js';
 import { CATEGORIES, findItem, PAINTS, resolveCustom } from '../car/customization.js';
 import { getDaily, msUntilTomorrow } from '../game/daily.js';
 import { hasOwnWheels } from '../car/car-assets.js';
-import { formatTime, formatNumber } from '../core/math.js';
+import { formatTime, formatNumber, clamp } from '../core/math.js';
+import { DIFFICULTY } from '../game/ai.js';
 import { controlsCells } from './controls-help.js';
 import districtShot from '../assets/tracks/district.jpg';
 import lumenShot from '../assets/tracks/lumen.jpg';
@@ -264,7 +265,7 @@ export class UI {
     if (!els.length) return;
     const cur = document.activeElement;
     if (!els.includes(cur) || !cur.classList.contains('nav-focus')) {
-      const start = els.includes(cur) ? cur : els.find((e) => e.classList.contains('menu-item')) || els.find((e) => e.classList.contains('primary')) || els[0];
+      const start = els.includes(cur) ? cur : els.find((e) => 'navFirst' in e.dataset) || els.find((e) => e.classList.contains('menu-item')) || els.find((e) => e.classList.contains('primary')) || els[0];
       this._setNavFocus(start);
       return;
     }
@@ -481,21 +482,46 @@ export class UI {
     const S = app.storage;
     const car = getCarDef(S.data.car);
     const daily = getDaily();
-    const dailyDone = S.data.daily.date === daily.key && S.data.daily.completed;
+    const ds = S.data.daily;
+    const dailyDone = ds.date === daily.key && ds.completed;
     const st = S.data.stats;
-    const item = (i, action, icon, title, sub, badge = '', cls = '') => `
-      <button class="menu-item ${cls}" data-action="${action}" style="--i:${i}">
+    const item = (i, action, icon, title, sub, badge = '', extra = '') => `
+      <button class="menu-item" data-action="${action}" style="--i:${i}">
         <span class="mi-icon">${ICONS[icon]}</span>
         <span class="mi-text"><span class="mi-title">${title}${badge}</span><span class="mi-sub">${sub}</span></span>
-        <span class="mi-go">${ICONS.chevron}</span>
+        ${extra || `<span class="mi-go">${ICONS.chevron}</span>`}
       </button>`;
-    const career = st.races
-      ? `<div class="career anim-up" style="--d:480">
+    // one click back into the last event you set up
+    const ls = S.data.lastSetup;
+    const qTrack = SETUP_TRACKS.find((t) => t.id === ls.trackId) || SETUP_TRACKS[0];
+    const shot = TRACK_SHOTS[qTrack.id];
+    const weather = { auto: 'AUTO WEATHER', clear: 'CLEAR', rain: 'RAIN' }[ls.weather] || 'AUTO WEATHER';
+    const rivals = (DIFFICULTY[ls.difficulty] || DIFFICULTY.easy).label;
+    const quick = `
+      <button class="quick-race" data-action="quick" data-nav-first>
+        ${shot ? `<img class="qr-shot" src="${shot.src}" alt="" draggable="false" style="object-position:${shot.focus}">` : ''}
+        <span class="qr-text">
+          <span class="qr-eyebrow">QUICK RACE</span>
+          <span class="qr-name">${qTrack.name}</span>
+          <span class="qr-meta">${ls.laps} ${ls.laps === 1 ? 'LAP' : 'LAPS'} · ${rivals} RIVALS · ${weather}</span>
+        </span>
+        <span class="qr-go">${ICONS.play}</span>
+      </button>`;
+    const dailyReward = `<span class="mi-reward">${dailyDone ? '' : `<b>${ICONS.coin}${formatNumber(daily.reward)}</b>`}${ds.streak ? `<em>${ICONS.flame}${ds.streak}</em>` : ''}</span>`;
+    // what to save up for next (or the career so far once every car is yours)
+    const next = CARS.filter((c) => !S.ownsCar(c.id)).sort((a, b) => a.price - b.price)[0];
+    const progress = next
+      ? `<div class="next-car anim-up" style="--d:420">
+          <span class="nc-label">NEXT CAR</span>
+          <span class="nc-name">${next.name}</span>
+          <span class="nc-bar"><i style="--p:${clamp(S.credits / next.price, 0, 1)}"></i></span>
+          <span class="nc-sub ${S.credits >= next.price ? 'ready' : ''}">${S.credits >= next.price ? 'READY TO BUY IN THE GARAGE' : `${formatNumber(next.price - S.credits)} CR TO GO`}</span>
+        </div>`
+      : `<div class="career anim-up" style="--d:480">
           <div><b>${st.races}</b><span>RACES</span></div>
           <div><b>${st.wins}</b><span>WINS</span></div>
           <div><b>${st.podiums}</b><span>PODIUMS</span></div>
-        </div>`
-      : `<div class="drag-hint anim-up" style="--d:600">${ICONS.left}<span>DRAG TO ROTATE</span>${ICONS.right}</div>`;
+        </div>`;
     const root = el(`
       <div class="screen menu-screen">
         <header class="topbar anim-down">
@@ -507,15 +533,15 @@ export class UI {
         </header>
         <main class="menu-main">
           <nav class="menu-list">
-            ${item(0, 'race', 'flag', 'RACE', `${TRACKS.length} tracks · 5 rivals`, '', 'hero')}
-            ${item(1, 'timetrial', 'stopwatch', 'TIME TRIAL', 'Race your own ghost')}
-            ${item(2, 'daily', 'calendar', 'DAILY', daily.objective.label, dailyDone ? `<span class="pill good">${ICONS.check}DONE</span>` : '<span class="pill">NEW</span>')}
-            ${item(3, 'garage', 'car', 'GARAGE', 'Cars & customization')}
-            ${item(4, 'settings', 'settings', 'SETTINGS', 'Graphics · audio · controls')}
+            ${quick}
+            ${item(1, 'race', 'flag', 'RACE', `Pick a track · ${TRACKS.length} to choose from`)}
+            ${item(2, 'timetrial', 'stopwatch', 'TIME TRIAL', 'Race your own ghost')}
+            ${item(3, 'daily', 'calendar', 'DAILY', daily.objective.label, dailyDone ? `<span class="pill good">${ICONS.check}DONE</span>` : '<span class="pill">NEW</span>', dailyReward)}
+            ${item(4, 'garage', 'car', 'GARAGE', 'Cars & customization')}
           </nav>
         </main>
         <footer class="menu-footer">
-          ${career}
+          ${progress}
           <div class="car-card anim-r" style="--d:300">
             <div class="eyebrow">${car.class}</div>
             <div class="car-name">${car.name}</div>
@@ -526,6 +552,14 @@ export class UI {
         </footer>
       </div>`);
     delegate(root, {
+      quick: () =>
+        app.startRace({
+          mode: 'race',
+          trackId: qTrack.id,
+          variant: { reverse: false, mirror: false, weather: ls.weather || 'auto' },
+          laps: ls.laps,
+          difficulty: ls.difficulty,
+        }),
       race: () => app.openSetup('race'),
       timetrial: () => app.openSetup('timetrial'),
       daily: () => app.openDaily(),

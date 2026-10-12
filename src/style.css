@@ -1027,27 +1027,184 @@ output {
   color: var(--ink);
 }
 
-.menu-item.hero {
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+/* quick race: straight back into the last event you set up, on its track's picture */
+.quick-race {
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.8rem;
+  min-height: 6.6rem;
+  margin-bottom: 0.2rem;
+  padding: 0.75rem 0.85rem 0.75rem 0.95rem;
+  border: 1px solid rgba(255, 138, 42, 0.5);
+  border-radius: var(--radius);
+  background: #0b0c10;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow);
+  transition:
+    transform 0.35s var(--ease),
+    border-color 0.25s;
+  animation: slideIn 0.6s var(--ease) backwards;
+  animation-delay: 60ms;
 }
 
-.menu-item.hero .mi-title {
-  font-size: 1.9rem;
+.qr-shot {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.85) saturate(0.95);
+  transform: scale(1.02);
+  transition:
+    transform 0.7s var(--ease),
+    filter 0.3s;
+  pointer-events: none;
 }
 
-.menu-item.hero .mi-icon {
-  width: 2.7rem;
-  height: 2.7rem;
+.quick-race::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(5, 6, 8, 0.86) 0%, rgba(5, 6, 8, 0.55) 52%, rgba(5, 6, 8, 0.06) 100%),
+    linear-gradient(0deg, rgba(5, 6, 8, 0.5), rgba(5, 6, 8, 0) 60%);
+  pointer-events: none;
+}
+
+.quick-race::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 3px;
+  background: var(--amber);
+}
+
+.quick-race:hover,
+.quick-race:focus-visible,
+.quick-race.nav-focus {
+  transform: translateX(0.45rem);
+  border-color: var(--amber);
+  outline: none;
+}
+
+.quick-race:hover .qr-shot,
+.quick-race:focus-visible .qr-shot,
+.quick-race.nav-focus .qr-shot {
+  filter: none;
+  transform: scale(1.07);
+}
+
+.quick-race:active {
+  transform: translateX(0.45rem) scale(0.985);
+}
+
+.qr-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.qr-eyebrow {
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--amber);
+}
+
+.qr-name {
+  margin-top: 0.22rem;
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
+}
+
+.qr-meta {
+  margin-top: 0.32rem;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qr-go {
+  width: 2.9rem;
+  height: 2.9rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
   background: var(--amber);
   color: #170b02;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 0.3s var(--ease),
+    background 0.2s;
 }
 
-.menu-item.hero:hover .mi-icon,
-.menu-item.hero:focus-visible .mi-icon,
-.menu-item.hero.nav-focus .mi-icon {
-  color: #170b02;
+.qr-go svg {
+  width: 44%;
+  height: 44%;
+  margin-left: 8%;
+}
+
+.quick-race:hover .qr-go,
+.quick-race:focus-visible .qr-go,
+.quick-race.nav-focus .qr-go {
+  transform: scale(1.08);
   background: var(--amber-hi);
+}
+
+/* the daily's reward and your streak, on the right of its row */
+.mi-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mi-reward b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  color: var(--gold);
+}
+
+.mi-reward em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-style: normal;
+  color: var(--amber);
+}
+
+.mi-reward svg {
+  width: 1.05em;
+  height: 1.05em;
 }
 
 .menu-item.compact .mi-title {
@@ -1090,6 +1247,62 @@ output {
   font-size: 0.62rem;
   letter-spacing: 0.26em;
   color: var(--ink-3);
+}
+
+/* footer: the next car to save up for */
+.next-car {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: baseline;
+  column-gap: 0.7rem;
+  row-gap: 0.32rem;
+  min-width: 13rem;
+  padding-left: 0.2rem;
+}
+
+.nc-label {
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.26em;
+  color: var(--ink-3);
+}
+
+.nc-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+
+.nc-bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  position: relative;
+}
+
+.nc-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--p) * 100%);
+  background: var(--gold);
+  animation: growX 0.9s var(--ease) 0.5s backwards;
+  transform-origin: left;
+}
+
+.nc-sub {
+  grid-column: 1 / -1;
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-2);
+}
+
+.nc-sub.ready {
+  color: var(--gold);
 }
 
 .drag-hint {
@@ -3993,20 +4206,20 @@ kbd.k-pill {
     padding-top: 0.42rem;
     padding-bottom: 0.42rem;
   }
-  .menu-item.hero {
-    padding-top: 0.55rem;
-    padding-bottom: 0.55rem;
+  .quick-race {
+    min-height: 5rem;
+    padding: 0.5rem 0.7rem 0.55rem 0.8rem;
   }
-  .menu-item.hero .mi-title {
-    font-size: 1.65rem;
+  .qr-name {
+    font-size: 1.4rem;
+  }
+  .qr-go {
+    width: 2.4rem;
+    height: 2.4rem;
   }
   .mi-icon {
     width: 2rem;
     height: 2rem;
-  }
-  .menu-item.hero .mi-icon {
-    width: 2.35rem;
-    height: 2.35rem;
   }
   .mi-title {
     font-size: 1.25rem;
@@ -4184,8 +4397,12 @@ kbd.k-pill {
   }
   .career,
   .drag-hint,
-  .mini-stats {
+  .mini-stats,
+  .nc-sub {
     display: none;
+  }
+  .quick-race {
+    min-height: 4.3rem;
   }
   .res-stats {
     display: none;
@@ -4209,7 +4426,8 @@ kbd.k-pill {
     width: 100%;
   }
   .career,
-  .drag-hint {
+  .drag-hint,
+  .next-car {
     display: none;
   }
   .car-card {
