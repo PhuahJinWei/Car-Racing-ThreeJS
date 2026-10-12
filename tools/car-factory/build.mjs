@@ -17,10 +17,11 @@ import { buildSpecter } from './designs/specter.js';
 import { buildTouge } from './designs/touge.js';
 import { buildMarshal } from './designs/marshal.js';
 import { buildBrawler } from './designs/brawler.js';
+import { buildRonin } from './designs/ronin.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../../public/models/cars');
-const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, touge: buildTouge, marshal: buildMarshal, brawler: buildBrawler };
+const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, touge: buildTouge, marshal: buildMarshal, brawler: buildBrawler, ronin: buildRonin };
 
 // triangle targets: full detail (player car, garage), a light version for distant opponents, and
 // a mid version that stands in for full detail on phones (medium / low quality). The mid version
