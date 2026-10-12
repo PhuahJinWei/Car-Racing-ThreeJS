@@ -194,8 +194,10 @@ export class AIDriver {
     if (err && err.type === 'wide') targetD = err.side * (W - 1.3);
     if (err && err.type === 'wobble') targetD += Math.sin(this.time * 5 + err.phase) * 1.4;
     targetD = clamp(targetD, -W + 1.15, W - 1.15);
+    // a car only moves sideways while it rolls forward: on the grid it holds its slot
+    const vdMax = this.frozen ? 0 : Math.min(7.5, this.v * 0.6);
     const dErr = targetD - this.d;
-    this.vd = damp(this.vd, clamp(dErr * 1.7, -7.5, 7.5), 3.2, dt);
+    this.vd = damp(this.vd, clamp(dErr * 1.7, -vdMax, vdMax), 3.2, dt);
     this.d += this.vd * dt;
     const lim = W - 0.95;
     if (Math.abs(this.d) > lim) {
