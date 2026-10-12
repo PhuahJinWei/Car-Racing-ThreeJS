@@ -2282,19 +2282,44 @@ output {
   min-width: 15rem;
 }
 
-.key-row {
-  display: flex;
+/* controls list (pause card, race HUD card): key caps + labels in aligned columns */
+.ctl-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  font-weight: 600;
-  font-size: 0.82rem;
-  color: var(--ink-2);
+  gap: 0.45rem 0.9rem;
 }
 
-.keys-k {
+.ctl-grid.two {
+  grid-template-columns: auto auto auto auto;
+  gap: 0.34rem 0.6rem;
+}
+
+.ctl-grid.two .ctl-lbl:nth-child(4n + 2) {
+  margin-right: 0.9rem;
+}
+
+.ctl-keys {
   display: flex;
   gap: 0.2rem;
+}
+
+.ctl-lbl {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kl-note {
+  margin-top: 0.5rem;
+  font-weight: 600;
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-3);
+  text-transform: uppercase;
 }
 
 kbd {
@@ -2313,6 +2338,18 @@ kbd {
   box-shadow:
     inset 0 -2px 0 rgba(0, 0, 0, 0.4),
     inset 0 0 0 1px var(--hair-2);
+}
+
+kbd.k-face {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+kbd.k-pill {
+  border-radius: 999px;
+  padding: 0 0.5rem;
 }
 
 .overlay.pause-overlay.settings-overlay {
@@ -2586,6 +2623,7 @@ kbd {
 }
 
 .hud .icon-btn {
+  position: relative;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(8, 9, 12, 0.5);
@@ -3187,6 +3225,142 @@ kbd {
 .skip-hint svg {
   width: 1rem;
   height: 1rem;
+}
+
+/* controls prompts for keyboard / controller players: a card at the start of each race that
+   folds into an "H - CONTROLS" pill, plus key badges on the HUD buttons and nitro bars */
+.key-legend {
+  position: absolute;
+  left: calc(var(--sl) + 1rem);
+  bottom: calc(var(--sb) + 1rem);
+  display: none;
+  text-shadow: none;
+}
+
+.hud.hints .key-legend {
+  display: block;
+}
+
+.hud.has-touch .key-legend {
+  display: none;
+}
+
+.kl-panel {
+  padding: 0.6rem 0.8rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(8, 9, 12, 0.66);
+  border: 1px solid var(--hair);
+  opacity: 0;
+  transform: translateY(0.6rem);
+  transition:
+    opacity 0.35s ease,
+    transform 0.45s var(--ease);
+  pointer-events: none;
+}
+
+.hud.kl-open .kl-panel {
+  opacity: 1;
+  transform: none;
+}
+
+.kl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: 0.28em;
+  color: var(--ink-3);
+}
+
+.kl-hide {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  letter-spacing: 0.18em;
+}
+
+.key-legend kbd {
+  min-width: 1.4rem;
+  height: 1.32rem;
+  padding: 0 0.3rem;
+  font-size: 0.62rem;
+}
+
+.key-legend kbd.k-face {
+  width: 1.36rem;
+  min-width: 1.36rem;
+  padding: 0;
+}
+
+.key-legend .ctl-lbl {
+  font-size: 0.7rem;
+}
+
+.kl-pill {
+  appearance: none;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--hair-2);
+  background: rgba(8, 9, 12, 0.55);
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-2);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.3s;
+}
+
+.hud.kl-open .kl-pill {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud.pad .kl-hide,
+.hud.pad .kl-note,
+.hud.pad .kl-pill {
+  display: none;
+}
+
+.hud.hints.kl-open:not(.has-touch) .intro-card {
+  bottom: calc(var(--sb) + max(20%, 10.5rem));
+}
+
+.kb-badge {
+  display: none;
+  position: absolute;
+  right: -0.35rem;
+  bottom: -0.35rem;
+  padding: 0.14rem 0.3rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.6rem;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: rgba(8, 9, 12, 0.9);
+  border: 1px solid var(--hair-2);
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.hud.hints .kb-badge {
+  display: block;
+}
+
+.gauge .nitro-key {
+  right: auto;
+  bottom: 0.15rem;
+  left: calc(50% - 5.2rem);
 }
 
 .fps {

@@ -1,4 +1,5 @@
-import { el, $, ICONS } from './dom.js';
+import { el, $, $$, ICONS } from './dom.js';
+import { controlsCells } from './controls-help.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
 
 const SUFFIX = (n) => (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH');
@@ -24,8 +25,8 @@ export class HUD {
         <div class="hud-tr">
           <canvas class="minimap" width="200" height="200"></canvas>
           <div class="btns">
-            <button class="icon-btn" data-a="pause" aria-label="Pause">${ICONS.pause}</button>
-            <button class="icon-btn" data-a="camera" aria-label="Camera">${ICONS.camera}</button>
+            <button class="icon-btn" data-a="pause" aria-label="Pause">${ICONS.pause}<span class="kb-badge" data-kb="ESC" data-pad="MENU"></span></button>
+            <button class="icon-btn" data-a="camera" aria-label="Camera">${ICONS.camera}<span class="kb-badge" data-kb="C" data-pad="Y"></span></button>
           </div>
         </div>
         <div class="combo"><div class="x">x1</div><div class="meter"><i></i></div><div class="style">STYLE 0</div></div>
@@ -39,6 +40,15 @@ export class HUD {
           <div class="g-center"><div class="num">0</div><div class="unit">KM/H</div></div>
           <div class="g-gear">1</div>
           <div class="nitro-bars"><i><b></b></i><i><b></b></i><i><b></b></i></div>
+          <span class="kb-badge nitro-key" data-kb="SHIFT" data-pad="A"></span>
+        </div>
+        <div class="key-legend">
+          <div class="kl-panel">
+            <div class="kl-head"><span>CONTROLS</span><span class="kl-hide"><kbd>H</kbd>HIDE</span></div>
+            <div class="ctl-grid two"></div>
+            <div class="kl-note">Arrow keys work too</div>
+          </div>
+          <button class="kl-pill" data-a="legend" aria-label="Show controls"><kbd>H</kbd>CONTROLS</button>
         </div>
         <div class="fps"></div>
       </div>`);
@@ -69,6 +79,8 @@ export class HUD {
       nitro: Array.from(this.root.querySelectorAll('.nitro-bars i')),
       fps: $(this.root, '.fps'),
       map: $(this.root, '.minimap'),
+      klGrid: $(this.root, '.key-legend .ctl-grid'),
+      badges: $$(this.root, '.kb-badge'),
     };
     this.$.unit.textContent = app.settings.units === 'mph' ? 'MPH' : 'KM/H';
     this.root.addEventListener('pointerdown', (e) => {
@@ -77,7 +89,15 @@ export class HUD {
       e.preventDefault();
       if (b.dataset.a === 'pause') app.pause();
       if (b.dataset.a === 'camera') app.input.press('camera');
+      if (b.dataset.a === 'legend') this._legendOpen = true;
     });
+    // H shows / hides the controls card (it opens by itself for the start of every race)
+    this._legendOpen = null;
+    this._onKey = (e) => {
+      if (e.code !== 'KeyH' || e.repeat) return;
+      this._legendOpen = !this.root.classList.contains('kl-open');
+    };
+    window.addEventListener('keydown', this._onKey);
     this.cache = {};
     this._buildMap();
     this._fpsT = 0;
@@ -408,6 +428,23 @@ export class HUD {
       this._standT = 0;
       this._drawStandings();
     }
+    // controls prompts for keyboard / controller players (not on touch screens)
+    const dev = this.app.input.device;
+    const hints = this.app.settings.keyHints === false || dev === 'touch' || dev === 'tilt' ? 'off' : dev === 'gamepad' ? 'gamepad' : 'keyboard';
+    if (this.cache.hints !== hints) {
+      this.cache.hints = hints;
+      this.root.classList.toggle('hints', hints !== 'off');
+      this.root.classList.toggle('pad', hints === 'gamepad');
+      if (hints !== 'off') {
+        $.klGrid.innerHTML = controlsCells(hints, 2);
+        for (const b of $.badges) b.textContent = hints === 'gamepad' ? b.dataset.pad : b.dataset.kb;
+      }
+    }
+    const open = this._legendOpen ?? (h.phase === 'intro' || h.phase === 'countdown' || (h.phase === 'racing' && (h.time || 0) < 10));
+    if (this.cache.klOpen !== open) {
+      this.cache.klOpen = open;
+      this.root.classList.toggle('kl-open', open);
+    }
     // fps
     if (this.app.settings.showFps) {
       this._fpsT += dt;
@@ -422,6 +459,7 @@ export class HUD {
   }
 
   dispose() {
+    window.removeEventListener('keydown', this._onKey);
     this.root.remove();
   }
 }

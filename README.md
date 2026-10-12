@@ -79,6 +79,7 @@ npm run preview
 | Camera | C | camera button | Y |
 | Reset car | R | automatic when stuck | Back |
 | Pause | Esc or P | pause button | Start |
+| Show / hide the controls card | H | - | - |
 | Menus | arrow keys, Enter, Esc to go back | tap | D-pad or left stick, A to select, B to go back |
 
 **Tips:**

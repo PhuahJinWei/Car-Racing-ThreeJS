@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   autoAccel: true,
   tiltSensitivity: 1,
   showFps: false,
+  keyHints: true,
   reduceFlashes: false,
 };
 

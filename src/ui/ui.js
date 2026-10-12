@@ -6,6 +6,7 @@ import { CATEGORIES, findItem, PAINTS, resolveCustom } from '../car/customizatio
 import { getDaily, msUntilTomorrow } from '../game/daily.js';
 import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber } from '../core/math.js';
+import { controlsCells } from './controls-help.js';
 
 const THEME_LABEL = { tunnel: 'EXPRESSWAY', city: 'STREET', stadium: 'CIRCUIT' };
 const MODE_LABEL = { race: 'RACE', timetrial: 'TIME TRIAL', daily: 'DAILY CHALLENGE' };
@@ -878,6 +879,7 @@ export class UI {
         name: 'CONTROLS',
         icon: 'gamepad',
         html: () =>
+          row('KEY HINTS', 'Keyboard and controller prompts in races. Press H to show or hide the controls card.', sw('keyHints')) +
           row('TOUCH STEERING', 'Steering pads, or tilt your device to steer.', segS('controls', [['buttons', 'PADS'], ['tilt', 'TILT']])) +
           row('AUTO ACCELERATE', 'Touch: the throttle is held for you.', sw('autoAccel')) +
           row('TILT SENSITIVITY', '', range('tiltSensitivity', 0.5, 2, 0.05, (v) => `${Number(v).toFixed(2)}×`)) +
@@ -1069,7 +1071,8 @@ export class UI {
     const app = this.app;
     const race = app.race;
     const h = race?.hud || {};
-    const kb = !app.input.isTouchDevice();
+    const pad = app.input.device === 'gamepad';
+    const kb = pad || !app.input.isTouchDevice();
     const tt = h.mode === 'timetrial';
     const pm = (i, action, icon, label, sfx = '') => `
       <button class="menu-item compact" data-action="${action}" style="--i:${i}" ${sfx ? `data-sfx="${sfx}"` : ''}>
@@ -1077,7 +1080,6 @@ export class UI {
         <span class="mi-text"><span class="mi-title">${label}</span></span>
         <span class="mi-go">${ICONS.chevron}</span>
       </button>`;
-    const key = (keys, label) => `<div class="key-row"><span class="keys-k">${keys.map((k) => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span></div>`;
     const o = el(`
       <div class="overlay pause-overlay">
         <div class="pause-side">
@@ -1098,13 +1100,9 @@ export class UI {
         ${
           kb
             ? `<div class="keys glass anim-r" style="--d:140">
-                <div class="eyebrow">KEYBOARD</div>
-                ${key(['W', 'A', 'S', 'D'], 'Drive (or arrow keys)')}
-                ${key(['SPACE'], 'Drift · brake')}
-                ${key(['SHIFT'], 'Nitro')}
-                ${key(['C'], 'Camera')}
-                ${key(['R'], 'Reset car')}
-                ${key(['ESC'], 'Pause')}
+                <div class="eyebrow">${pad ? 'CONTROLLER' : 'KEYBOARD'}</div>
+                <div class="ctl-grid">${controlsCells(pad ? 'gamepad' : 'keyboard')}</div>
+                ${pad ? '' : '<div class="kl-note">Arrow keys work too · H shows the controls in a race</div>'}
               </div>`
             : ''
         }
