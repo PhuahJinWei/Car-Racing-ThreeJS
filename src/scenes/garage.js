@@ -9,7 +9,7 @@ import { damp, clamp } from '../core/math.js';
 const VIEWS = {
   title: { yaw: 0.9, pitch: 0.08, dist: 8.2, target: [0, 0.55, 0], offset: 0, fov: 34, auto: 0.12 },
   menu: { yaw: 0.65, pitch: 0.16, dist: 8.6, target: [0, 0.6, 0], offset: -0.2, fov: 34, auto: 0.08 },
-  garage: { yaw: 0.75, pitch: 0.17, dist: 9.2, target: [0, 0.5, 0], offset: -0.18, offsetY: 0.11, offsetYP: -0.03, fov: 34, auto: 0.0 },
+  garage: { yaw: 0.75, pitch: 0.17, dist: 9.2, target: [0, 0.5, 0], offset: -0.18, offsetY: 0.11, offsetYP: 0.04, fov: 34, auto: 0.0 },
   setup: { yaw: -2.3, pitch: 0.1, dist: 9.4, target: [0, 0.6, 0], offset: 0.22, fov: 32, auto: 0.05 },
 };
 
@@ -266,7 +266,7 @@ export class Garage {
     const tv = Math.tan((fov * Math.PI) / 360);
     const th = tv * aspect;
     const uw = portrait ? 0.9 : 0.66;
-    const uh = portrait ? 0.36 : 0.6;
+    const uh = portrait ? 0.44 : 0.6;
     let hx = s.r;
     let hy = s.r;
     let near = 0;

@@ -192,6 +192,27 @@ svg {
   border-radius: 2px;
 }
 
+/* a sideways scroller without a scrollbar: its ends fade out where there's more (see edgeFade) */
+.fade-x {
+  --fl: 0px;
+  --fr: 0px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
+}
+
+.fade-x::-webkit-scrollbar {
+  display: none;
+}
+
+.fade-x.fl {
+  --fl: 2.4rem;
+}
+
+.fade-x.fr {
+  --fr: 2.4rem;
+}
+
 /* ------------------------------------------------------------------ type */
 .eyebrow {
   font-weight: 700;
@@ -1700,6 +1721,7 @@ output {
   width: min(17.5rem, 36vw);
   max-height: 100%;
   overflow-y: auto;
+  scrollbar-width: none;
   padding: 0.85rem 1rem 0.95rem;
   display: flex;
   flex-direction: column;
@@ -1856,22 +1878,32 @@ output {
   min-width: 0;
 }
 
-.dock-tabs {
+/* the groups (icon + name), the open group's tabs as pills, and the reset button */
+.dock-head {
   display: flex;
-  gap: 0.2rem;
-  padding-bottom: 1px;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
-.dock-tabs button {
+.dock-groups {
+  display: flex;
+  gap: 0.2rem;
+  flex: none;
+}
+
+.dock-groups button {
   appearance: none;
   border: 0;
   cursor: pointer;
   pointer-events: auto;
-  flex: none;
   background: none;
   color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
   font-weight: 700;
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   letter-spacing: calc(0.16em * var(--track));
   padding: 0.45rem 0.75rem;
   border-radius: 5px;
@@ -1882,16 +1914,27 @@ output {
     background 0.2s;
 }
 
-.dock-tabs button:hover {
+.dock-groups button svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: none;
+  transition: color 0.2s;
+}
+
+.dock-groups button:hover {
   color: var(--ink);
 }
 
-.dock-tabs button.on {
+.dock-groups button.on {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.09);
 }
 
-.dock-tabs button.on::after {
+.dock-groups button.on svg {
+  color: var(--amber);
+}
+
+.dock-groups button.on::after {
   content: '';
   position: absolute;
   left: 0.75rem;
@@ -1899,6 +1942,58 @@ output {
   bottom: 0.15rem;
   height: 2px;
   background: var(--amber);
+}
+
+.dock-subs {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.15rem 0 0.15rem 0.6rem;
+  border-left: 1px solid var(--hair);
+}
+
+.dock-subs button {
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+  flex: none;
+  border: 1px solid var(--hair-2);
+  background: none;
+  color: var(--ink-2);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: calc(0.14em * var(--track));
+  padding: 0.32rem 0.75rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.dock-subs button:hover {
+  color: var(--ink);
+  border-color: var(--hair-3);
+}
+
+.dock-subs button.on {
+  color: #0d0f13;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.dock-head .reset-look {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 7px;
+}
+
+.dock-head .reset-look[disabled] {
+  opacity: 0.32;
+  pointer-events: none;
 }
 
 .dock-row {
@@ -1913,14 +2008,14 @@ output {
   gap: 0.4rem;
   flex: 1;
   min-width: 0;
-  padding: 1px 1px 3px;
+  padding: 4px 3px;
 }
 
 .items-empty {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  min-height: 4.6rem;
+  min-height: 5.4rem;
   padding: 0 0.6rem;
   font-weight: 600;
   font-size: 0.9rem;
@@ -1933,21 +2028,23 @@ output {
   color: var(--ink-3);
 }
 
+/* an item: its swatch, name and price or state. Equipped wears an amber outline and tick, the one
+   on preview a bright ring round its swatch; one not bought yet has a dimmed swatch and a price chip */
 .item {
   appearance: none;
   border: 1px solid var(--hair);
   cursor: pointer;
   pointer-events: auto;
   flex: 0 0 auto;
-  width: 5.3rem;
+  width: 5.6rem;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.04);
   border-radius: 6px;
-  padding: 0.5rem 0.3rem 0.4rem;
+  padding: 0.55rem 0.3rem 0.45rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.32rem;
   position: relative;
   transition:
     background 0.2s,
@@ -1965,8 +2062,8 @@ output {
 }
 
 .item .sw {
-  width: 2.3rem;
-  height: 2.3rem;
+  width: 2.8rem;
+  height: 2.8rem;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -1976,6 +2073,9 @@ output {
     0 3px 8px rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: hidden;
+  transition:
+    filter 0.2s,
+    box-shadow 0.2s;
 }
 
 .item .sw.gloss {
@@ -2012,6 +2112,14 @@ output {
   height: 92%;
 }
 
+.item.locked .sw {
+  filter: saturate(0.6) brightness(0.62);
+}
+
+.item.locked:hover .sw {
+  filter: saturate(0.85) brightness(0.85);
+}
+
 .item .nm {
   font-weight: 700;
   font-size: 0.72rem;
@@ -2029,10 +2137,25 @@ output {
   align-items: center;
   gap: 0.25em;
   font-weight: 700;
-  font-size: 0.68rem;
-  letter-spacing: calc(0.06em * var(--track));
-  color: var(--gold);
+  font-size: 0.62rem;
+  letter-spacing: calc(0.16em * var(--track));
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.item .pr.eq {
+  color: var(--amber);
+}
+
+.item .pr.chip {
+  color: var(--gold);
+  font-size: 0.66rem;
+  letter-spacing: calc(0.06em * var(--track));
+  padding: 0 0.5em 0 0.4em;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 200, 71, 0.22);
 }
 
 .item .pr svg {
@@ -2041,27 +2164,30 @@ output {
   color: var(--ink-3);
 }
 
-.item .pr.own {
-  color: var(--ink-3);
-  letter-spacing: calc(0.16em * var(--track));
-  font-size: 0.62rem;
-}
-
-.item .pr.eq {
-  color: var(--amber);
-  letter-spacing: calc(0.16em * var(--track));
-  font-size: 0.62rem;
-}
-
 .item.equipped {
-  border-color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--amber);
+  background: rgba(255, 138, 42, 0.07);
 }
 
 .item.selected {
-  border-color: var(--amber);
-  box-shadow: inset 0 0 0 1px var(--amber);
-  background: rgba(255, 138, 42, 0.1);
+  border-color: var(--hair-3);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.item.selected .sw,
+.item.selected:hover .sw {
+  filter: none;
+  box-shadow:
+    0 0 0 2px #0c0d11,
+    0 0 0 3.5px #fff,
+    0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+.item.selected .sw.glow {
+  box-shadow:
+    0 0 0 2px #0c0d11,
+    0 0 0 3.5px #fff,
+    0 0 14px var(--c);
 }
 
 .item .tick {
@@ -2082,72 +2208,84 @@ output {
   height: 70%;
 }
 
-.buy-box {
+/* the item in focus: its name, and its price and buy button or that it's equipped */
+.sel-panel {
   flex: 0 0 auto;
   width: 11.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.45rem;
-  padding-left: 0.7rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 0.15rem;
+  padding-left: 0.75rem;
   border-left: 1px solid var(--hair);
 }
 
-.buy-box .info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+.sel-panel > * {
+  animation: fadeUp 0.3s var(--ease) backwards;
 }
 
-.buy-box .info b {
+.sel-cat {
   font-weight: 700;
-  font-size: 1rem;
-  letter-spacing: calc(0.06em * var(--track));
+  font-size: 0.62rem;
+  letter-spacing: calc(0.24em * var(--track));
+  color: var(--ink-3);
+}
+
+.sel-panel.active .sel-cat {
+  color: var(--amber);
+}
+
+.sel-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  letter-spacing: calc(0.05em * var(--track));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.buy-box .price {
+.sel-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+  animation-delay: 0.04s;
+}
+
+.sel-foot .btn {
+  align-self: stretch;
+}
+
+.sel-panel .price {
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
   font-weight: 700;
   font-size: 0.86rem;
   color: var(--gold);
+  font-variant-numeric: tabular-nums;
 }
 
-.buy-box .price svg {
+.sel-panel .price svg {
   width: 1.1em;
   height: 1.1em;
 }
 
-.buy-box .hint {
-  font-weight: 600;
-  font-size: 0.8rem;
-  line-height: 1.25;
-  color: var(--ink-3);
-}
-
-/* back to the car's stock look */
-.buy-box .reset-look {
-  align-self: flex-start;
-  margin-top: 0.45rem;
+.sel-eq {
   display: inline-flex;
   align-items: center;
-  gap: 0.45em;
-  font-size: 0.72rem;
-  padding: 0.5em 0.9em;
-  white-space: nowrap;
+  gap: 0.4em;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: calc(0.18em * var(--track));
+  color: var(--amber);
 }
 
-.buy-box .reset-look svg {
-  width: 1.1em;
-  height: 1.1em;
-}
-
-.buy-box.active {
-  animation: fadeUp 0.35s var(--ease);
+.sel-eq svg {
+  width: 1.05em;
+  height: 1.05em;
 }
 
 /* ------------------------------------------------------------------ settings */
@@ -4454,13 +4592,16 @@ kbd.k-pill {
     gap: 0.3rem;
   }
   .item {
-    width: 4.9rem;
+    width: 5.1rem;
     padding: 0.4rem 0.25rem 0.32rem;
     gap: 0.22rem;
   }
   .item .sw {
-    width: 2rem;
-    height: 2rem;
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+  .dock-groups button {
+    padding: 0.38rem 0.6rem;
   }
   .settings-body {
     grid-template-columns: 10.5rem minmax(0, 1fr);
@@ -4580,6 +4721,32 @@ kbd.k-pill {
 }
 
 /* portrait (phones held upright; races ask to rotate) */
+/* short or narrow screens: the car's stats two by two */
+@media (orientation: portrait), (max-height: 520px) and (orientation: landscape) {
+  .car-info .stats {
+    grid-area: stats;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem 0.4rem;
+    margin: 0;
+  }
+  .car-info .stat {
+    display: contents;
+    font-size: 0.56rem;
+    letter-spacing: calc(0.1em * var(--track));
+  }
+  .car-info .stat:nth-child(even) > span:first-child {
+    margin-left: 0.45rem;
+  }
+  .car-info .stat .bar {
+    height: 3px;
+  }
+  .car-info .stat b {
+    font-size: 0.74rem;
+  }
+}
+
 @media (orientation: portrait) {
   .menu-screen {
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -4628,23 +4795,114 @@ kbd.k-pill {
   .garage-body {
     align-items: flex-start;
   }
+  /* the car panel packed small: name, class and arrows on one row, the stats two by two with the
+     car's button beside them */
   .car-info {
     width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name cls . arrows'
+      'load load load load'
+      'stats stats stats act';
+    align-items: center;
+    gap: 0.5rem 0.6rem;
+    padding: 0.6rem 0.75rem 0.7rem 0.85rem;
   }
+  .ci-top,
+  .ci-name-row {
+    display: contents;
+  }
+  .ci-count,
   .car-info .blurb {
     display: none;
   }
+  .ci-top .ci-cls {
+    grid-area: cls;
+    font-size: 0.6rem;
+  }
+  .ci-name-row .car-name {
+    grid-area: name;
+    font-size: 1.5rem;
+  }
+  .ci-arrows {
+    grid-area: arrows;
+  }
+  .ci-loading {
+    grid-area: load;
+  }
+  .car-action {
+    grid-area: act;
+  }
+  .car-action .btn {
+    width: auto;
+    font-size: 0.74rem;
+    padding: 0.75em 1em;
+    white-space: nowrap;
+  }
+  .car-action .status {
+    height: 2.3rem;
+    padding: 0 0.9rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  /* the groups share the dock's width, their tabs drop to a row of their own */
+  .dock-head {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+  .dock-groups {
+    flex: 1;
+    min-width: 0;
+  }
+  .dock-groups button {
+    flex: 1;
+    justify-content: center;
+    gap: 0.35em;
+    padding: 0.45rem 0.25rem;
+    font-size: 0.7rem;
+    letter-spacing: calc(0.1em * var(--track));
+  }
+  .dock-groups button.on::after {
+    left: 0.5rem;
+    right: 0.5rem;
+  }
+  .dock-subs {
+    order: 3;
+    flex: 1 0 100%;
+    padding: 0;
+    border-left: 0;
+  }
   .dock-row {
     flex-direction: column;
+    gap: 0.45rem;
   }
-  .buy-box {
+  .item {
+    width: 5.2rem;
+  }
+  .sel-panel {
     width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'cat foot'
+      'name foot';
+    column-gap: 0.8rem;
     padding: 0.5rem 0 0;
     border-left: 0;
     border-top: 1px solid var(--hair);
+  }
+  .sel-cat {
+    grid-area: cat;
+  }
+  .sel-name {
+    grid-area: name;
+  }
+  .sel-foot {
+    grid-area: foot;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0;
   }
   .settings-body {
     grid-template-columns: 1fr;

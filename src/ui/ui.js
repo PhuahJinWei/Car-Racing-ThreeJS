@@ -1,4 +1,4 @@
-import { el, $, $$, delegate, fitText, ICONS } from './dom.js';
+import { el, $, $$, delegate, edgeFade, fitText, ICONS } from './dom.js';
 import { TRACKS, getTrackDef, BOOST_PADS_ON } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
@@ -127,6 +127,15 @@ const RIM_SPOKES = {
 
 // the garage camera's shot for each customization tab (see SHOTS in scenes/garage.js)
 const SHOT_FOR = { number: 'door', tint: 'glass', rims: 'wheel', rimColor: 'wheel', underglow: 'low', trail: 'rear' };
+
+// the garage dock's groups of customization tabs
+const GROUPS = [
+  { key: 'body', icon: 'car', cats: ['paint', 'finish', 'livery', 'accent', 'number'] },
+  { key: 'glass', icon: 'glass', cats: ['tint'] },
+  { key: 'wheels', icon: 'wheel', cats: ['rims', 'rimColor'] },
+  { key: 'lights', icon: 'lamp', cats: ['underglow', 'trail'] },
+];
+const groupOf = (cat) => GROUPS.find((g) => g.cats.includes(cat));
 
 const LIVERY_ART = {
   lv_none: () => '',
@@ -714,6 +723,7 @@ export class UI {
     const S = app.storage;
     let carIdx = Math.max(0, CARS.findIndex((c) => c.id === S.data.car));
     let cat = 'paint';
+    const lastCat = {}; // the tab last open in each group
     let pending = null; // { cat, item } preview awaiting purchase
     const root = el(`
       <div class="screen garage-screen">
@@ -735,10 +745,14 @@ export class UI {
           </section>
         </div>
         <section class="dock glass anim-up" style="--d:160">
-          <div class="dock-tabs hscroll">${CATEGORIES.map((c) => `<button data-action="tab" data-cat="${c.key}">${t(`cat.${c.key}`)}</button>`).join('')}</div>
+          <div class="dock-head">
+            <div class="dock-groups">${GROUPS.map((g) => `<button data-action="group" data-group="${g.key}">${ICONS[g.icon]}<span>${t(`garage.group.${g.key}`)}</span></button>`).join('')}</div>
+            <div class="dock-subs hscroll fade-x"></div>
+            <button class="icon-btn sm reset-look" data-action="resetlook" aria-label="${t('garage.reset')}" title="${t('garage.reset')}">${ICONS.restart}</button>
+          </div>
           <div class="dock-row">
-            <div class="items hscroll"></div>
-            <div class="buy-box"><div class="info"></div><button class="btn primary small" data-action="buy">${t('garage.buy')}</button></div>
+            <div class="items hscroll fade-x"></div>
+            <div class="sel-panel"></div>
           </div>
         </section>
       </div>`);
@@ -755,10 +769,12 @@ export class UI {
     // long names (SPECTER LMP, Magenta Streak...) step down in size to fit: measured once on
     // show after every redraw, and again when the window changes size
     let fitFrame = 0;
+    const fades = [];
     const fitNames = () => {
       fitFrame = 0;
       fitText($(root, '.ci-name-row .car-name'));
       for (const n of $$(root, '.items .nm')) fitText(n, 0.8);
+      for (const f of fades) f();
     };
     const fitSoon = () => {
       if (!fitFrame) fitFrame = requestAnimationFrame(fitNames);
@@ -784,14 +800,24 @@ export class UI {
       fitSoon();
     };
 
+    // imported models keep their own paint scheme and wheels
+    const hidden = (k) => (k === 'livery' || k === 'number' || k === 'rims') && hasOwnWheels(car().id);
+    const shown = (g) => g.cats.filter((k) => !hidden(k));
+
     const renderItems = () => {
-      // imported models keep their own paint scheme and wheels
-      const hidden = (k) => (k === 'livery' || k === 'number' || k === 'rims') && hasOwnWheels(car().id);
       if (hidden(cat)) cat = 'paint';
-      for (const b of $$(root, '.dock-tabs button')) {
-        b.classList.toggle('on', b.dataset.cat === cat);
-        b.style.display = hidden(b.dataset.cat) ? 'none' : '';
+      const group = groupOf(cat);
+      lastCat[group.key] = cat;
+      for (const b of $$(root, '.dock-groups button')) {
+        const g = GROUPS.find((x) => x.key === b.dataset.group);
+        b.classList.toggle('on', g === group);
+        b.style.display = shown(g).length ? '' : 'none';
       }
+      // the open group's tabs, as pills
+      const subs = $(root, '.dock-subs');
+      subs.innerHTML = shown(group)
+        .map((k) => `<button class="${k === cat ? 'on' : ''}" data-action="tab" data-cat="${k}">${t(`cat.${k}`)}</button>`)
+        .join('');
       const box = $(root, '.items');
       if (!owned()) {
         box.innerHTML = `<div class="items-empty">${ICONS.lock}<span>${t('garage.buyToCustomize', { car: car().name })}</span></div>`;
@@ -807,7 +833,7 @@ export class UI {
           const isEq = eq === it.id;
           const sel = pending && pending.item.id === it.id && pending.cat === cat;
           const cls = ['item', own ? '' : 'locked', isEq ? 'equipped' : '', sel ? 'selected' : ''].join(' ');
-          const tag = own ? (isEq ? `<span class="pr eq">${t('garage.equipped')}</span>` : `<span class="pr own">${t('garage.owned')}</span>`) : `<span class="pr">${ICONS.lock}${formatNumber(it.price)}</span>`;
+          const tag = own ? (isEq ? `<span class="pr eq">${t('garage.equipped')}</span>` : `<span class="pr own">${t('garage.owned')}</span>`) : `<span class="pr chip">${ICONS.lock}${formatNumber(it.price)}</span>`;
           return `<button class="${cls}" data-action="item" data-id="${it.id}">${isEq ? `<span class="tick">${ICONS.check}</span>` : ''}${swatchFor(cat, it, look)}<span class="nm">${itemName(it)}</span>${tag}</button>`;
         })
         .join('');
@@ -822,22 +848,22 @@ export class UI {
       return Object.keys(stock).every((k) => now[k].id === stock[k].id);
     };
 
+    // the item in focus - the one on preview, or the tab's equipped one - with its price and buy
+    // button; and the reset button in the dock's header
     const renderBuyBar = () => {
-      const box = $(root, '.buy-box');
-      const info = $(box, '.info');
-      const btn = $(box, '[data-action="buy"]');
+      const box = $(root, '.sel-panel');
+      const reset = $(root, '.reset-look');
+      box.style.display = reset.style.display = owned() ? '' : 'none';
+      if (!owned()) return;
+      reset.disabled = isStock();
       box.classList.toggle('active', !!pending);
-      box.style.display = owned() ? '' : 'none';
+      const item = pending ? pending.item : resolveCustom(equippedCustom())[cat];
+      let foot;
       if (pending) {
-        const short = pending.item.price - S.credits;
-        info.innerHTML = `<b>${itemName(pending.item)}</b><span class="price">${ICONS.coin}${formatNumber(pending.item.price)} CR</span>`;
-        btn.style.display = '';
-        btn.disabled = short > 0;
-        btn.textContent = short > 0 ? t('garage.need', { n: formatNumber(short) }) : t('garage.buyEquip');
-      } else {
-        info.innerHTML = `<span class="hint">${t('garage.hint')}</span><button class="btn ghost small reset-look" data-action="resetlook" ${isStock() ? 'disabled' : ''}>${ICONS.restart}${t('garage.reset')}</button>`;
-        btn.style.display = 'none';
-      }
+        const short = item.price - S.credits;
+        foot = `<span class="price">${ICONS.coin}${formatNumber(item.price)} CR</span><button class="btn primary small" data-action="buy" ${short > 0 ? 'disabled' : ''}>${short > 0 ? t('garage.need', { n: formatNumber(short) }) : t('garage.buyEquip')}</button>`;
+      } else foot = `<span class="sel-eq">${ICONS.check}${t('garage.equipped')}</span>`;
+      box.innerHTML = `<span class="sel-cat">${pending ? t('garage.preview') : t(`cat.${cat}`)}</span><b class="sel-name">${itemName(item)}</b><div class="sel-foot">${foot}</div>`;
     };
 
     const previewCustom = () => app.garage.setCustom(previewing());
@@ -858,6 +884,18 @@ export class UI {
     const scrollToSelected = () => {
       const n = $(root, '.item.selected, .item.equipped');
       if (n) n.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    };
+
+    const openTab = (k) => {
+      cat = k;
+      app.garage.setShot(SHOT_FOR[cat] || 'hero');
+      pending = null;
+      previewCustom();
+      renderItems();
+      renderBuyBar();
+      $(root, '.items').scrollLeft = 0;
+      $(root, `.dock-subs [data-cat="${cat}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      scrollToSelected();
     };
 
     delegate(root, {
@@ -890,16 +928,15 @@ export class UI {
         renderCar();
         this.toast(t('garage.carSelected', { car: car().name }));
       },
+      // a group opens on the tab last open in it
+      group: (b) => {
+        const g = GROUPS.find((x) => x.key === b.dataset.group);
+        if (g === groupOf(cat)) return;
+        const k = lastCat[g.key];
+        openTab(k && !hidden(k) ? k : shown(g)[0]);
+      },
       tab: (b) => {
-        cat = b.dataset.cat;
-        app.garage.setShot(SHOT_FOR[cat] || 'hero');
-        pending = null;
-        previewCustom();
-        renderItems();
-        renderBuyBar();
-        $(root, '.items').scrollLeft = 0;
-        b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-        scrollToSelected();
+        if (b.dataset.cat !== cat) openTab(b.dataset.cat);
       },
       item: (b) => {
         if (!owned()) return;
@@ -912,6 +949,7 @@ export class UI {
         previewCustom();
         renderItems();
         renderBuyBar();
+        $(root, `.item[data-id="${item.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
       },
       // back to the car's stock look (everything bought stays owned; the stock items come with the car)
       resetlook: () => {
@@ -942,6 +980,7 @@ export class UI {
         } else app.audio?.play('error');
       },
     });
+    fades.push(edgeFade($(root, '.items')), edgeFade($(root, '.dock-subs')));
     showCar();
     requestAnimationFrame(scrollToSelected);
     return {
