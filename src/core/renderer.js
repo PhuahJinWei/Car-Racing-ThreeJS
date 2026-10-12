@@ -11,7 +11,6 @@ export const QUALITY_PRESETS = {
     blurTaps: 4,
     anamorphic: false,
     reflections: true,
-    droplets: false,
     particles: 0.5,
     decorDensity: 0.6,
     cones: false,
@@ -27,7 +26,6 @@ export const QUALITY_PRESETS = {
     blurTaps: 6,
     anamorphic: false,
     reflections: true,
-    droplets: true,
     particles: 0.75,
     decorDensity: 0.85,
     cones: true,
@@ -43,7 +41,6 @@ export const QUALITY_PRESETS = {
     blurTaps: 8,
     anamorphic: true,
     reflections: true,
-    droplets: true,
     particles: 1,
     decorDensity: 1,
     cones: true,
@@ -109,7 +106,6 @@ export class Renderer {
       blurTaps: p.blurTaps,
       anamorphic: p.anamorphic,
       reflections: p.reflections,
-      droplets: p.droplets,
     });
   }
 

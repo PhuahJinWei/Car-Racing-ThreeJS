@@ -3,6 +3,8 @@ import * as THREE from 'three';
 // Custom, mobile-friendly post-processing pipeline:
 //   scene -> HDR target (alpha channel = 1 - road reflectivity)
 //   bloom: threshold + dual-filter down/up chain
+//   reflections (quarter size): what stands above the road, smeared upward into streaks of
+//              three lengths, and for every column the foot of the first thing above the road
 //   composite: radial speed blur + spectral chromatic aberration + screen-space wet reflections
 //              + bloom + anamorphic streaks + grading + ACES tone map + speed lines + vignette + grain
 
@@ -33,6 +35,83 @@ void main() {
   soft = soft * soft / (4.0 * uKnee + 1e-4);
   float contrib = max(soft, br - uThreshold) / max(br, 1e-4);
   gl_FragColor = vec4(c * contrib, 1.0);
+}`;
+
+// What the wet road can mirror, straight from the scene to quarter size: everything standing
+// above it (an 8 x 4 block, softened sideways), the dimmest left out so the road stays dark.
+// The road itself (alpha < 1: it is reflective) never reflects itself. Alpha: how much of the
+// texel's own 4 x 4 block is not road.
+const REFL_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tInput;
+uniform vec2 uTexel;
+uniform float uLo;
+uniform float uHi;
+varying vec2 vUv;
+vec4 tap(float x, float y) {
+  vec4 s = texture2D(tInput, vUv + uTexel * vec2(x, y));
+  float solid = smoothstep(0.9, 0.99, s.a);
+  return vec4(s.rgb * solid, solid);
+}
+void main() {
+  vec4 inner = tap(-1.0, -1.0) + tap(1.0, -1.0) + tap(-1.0, 1.0) + tap(1.0, 1.0);
+  vec4 outer = tap(-3.0, -1.0) + tap(3.0, -1.0) + tap(-3.0, 1.0) + tap(3.0, 1.0);
+  vec3 c = (inner.rgb + outer.rgb) * 0.125;
+  float solid = inner.a * 0.25;
+  if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
+  c = clamp(c, vec3(0.0), vec3(24.0));
+  float br = max(c.r, max(c.g, c.b));
+  gl_FragColor = vec4(c * smoothstep(uLo, uHi, br), solid);
+}`;
+
+// Where the first thing standing above the road is, per column. R: v of the nearest texel at
+// or above this one that is not road; G: its foot, placed inside the texels by how much of
+// them is road. Start: look 8 texels up (else point 8 up); then each pass follows the pointer
+// four times, so the reach grows 4x a pass, until it lands on something or leaves the screen.
+const BASE_INIT_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tInput;
+uniform float uStep;
+varying vec2 vUv;
+void main() {
+  float s[9];
+  for (int k = 0; k < 9; k++) s[k] = texture2D(tInput, vec2(vUv.x, vUv.y + float(k - 1) * uStep)).a;
+  vec2 b = vec2(vUv.y + 8.0 * uStep);
+  for (int k = 7; k >= 0; k--) {
+    if (s[k + 1] > 0.5) {
+      float y = vUv.y + float(k) * uStep;
+      float below = s[k] > 0.5 ? 0.0 : s[k];
+      b = vec2(y, y + (0.5 - s[k + 1] - below) * uStep);
+    }
+  }
+  gl_FragColor = vec4(b, 0.0, 1.0);
+}`;
+
+const BASE_JUMP_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tInput;
+varying vec2 vUv;
+void main() {
+  vec4 b = texture2D(tInput, vUv);
+  for (int k = 0; k < 3; k++) {
+    if (b.r < 1.0) b = texture2D(tInput, vec2(vUv.x, b.r));
+  }
+  gl_FragColor = b;
+}`;
+
+// One-sided vertical box: the average of the input over [y, y + 4 steps). Three passes with
+// steps of 1, 4 and 16 texels give streaks 4, 16 and 64 texels long, reaching only upward.
+const STREAK_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tInput;
+uniform float uStep;
+varying vec2 vUv;
+void main() {
+  vec3 s = texture2D(tInput, vUv).rgb;
+  s += texture2D(tInput, vUv + vec2(0.0, uStep)).rgb;
+  s += texture2D(tInput, vUv + vec2(0.0, 2.0 * uStep)).rgb;
+  s += texture2D(tInput, vUv + vec2(0.0, 3.0 * uStep)).rgb;
+  gl_FragColor = vec4(s * 0.25, 1.0);
 }`;
 
 const DOWN_FRAG = /* glsl */ `
@@ -75,8 +154,15 @@ precision highp float;
 ${defines}
 uniform sampler2D tScene;
 uniform sampler2D tBloom;
-uniform sampler2D tBloomMid;
 uniform sampler2D tBloomSmall;
+uniform sampler2D tRefl1;
+uniform sampler2D tRefl2;
+uniform sampler2D tRefl3;
+uniform sampler2D tBase;
+uniform float uBaseW;
+uniform vec3 uReflLen;
+uniform float uReflGain;
+uniform float uReflBlur;
 uniform float uTime;
 uniform float uAspect;
 uniform vec2 uCenter;
@@ -98,7 +184,6 @@ uniform float uAnamorphic;
 uniform vec3 uAnamorphicColor;
 uniform float uGrain;
 uniform float uDesat;
-uniform float uDroplets;
 varying vec2 vUv;
 
 float hash12(vec2 p) {
@@ -124,22 +209,6 @@ vec3 toSRGB(vec3 c) {
 
 void main() {
   vec2 uv = vUv;
-
-  #ifdef DROPLETS
-  if (uDroplets > 0.0) {
-    // Cheap rain-on-lens: drifting refraction blobs
-    vec2 g = uv * vec2(uAspect, 1.0) * 9.0;
-    g.y += uTime * 0.35;
-    vec2 cell = floor(g);
-    vec2 f = fract(g) - 0.5;
-    float r = hash12(cell);
-    vec2 off = vec2(hash12(cell + 7.1), hash12(cell + 3.7)) - 0.5;
-    vec2 d = f - off * 0.6;
-    float rad = 0.12 + 0.18 * r;
-    float m = smoothstep(rad, rad * 0.6, length(d)) * step(0.55, r);
-    uv += d * m * 0.06 * uDroplets;
-  }
-  #endif
 
   vec2 dir = uv - uCenter;
   vec2 dirA = dir * vec2(uAspect, 1.0);
@@ -172,22 +241,29 @@ void main() {
   #ifdef REFLECTIONS
   float reflMask = clamp(1.0 - center.a, 0.0, 1.0);
   if (reflMask > 0.01 && uReflect > 0.0) {
-    vec3 r = vec3(0.0);
-    float j = noise * 0.012;
-    // Short upward streaks: lights sitting just above this road pixel (tail lights, lamps, wall strips)
-    r += texture2D(tBloomMid, uv + vec2(0.0, 0.012 + j)).rgb * 1.0;
-    r += texture2D(tBloomMid, uv + vec2(0.0, 0.032 + j)).rgb * 0.8;
-    r += texture2D(tBloomMid, uv + vec2(0.0, 0.060 + j)).rgb * 0.55;
-    r += texture2D(tBloomMid, uv + vec2(0.0, 0.095 + j)).rgb * 0.35;
-    // Mirror about the horizon: distant / overhead lights
-    float my = 2.0 * uHorizon - uv.y;
-    float mw = smoothstep(1.0, 0.8, my);
-    if (mw > 0.0) {
-      r += texture2D(tBloomMid, vec2(uv.x, my + j)).rgb * 0.9 * mw;
-      r += texture2D(tBloomMid, vec2(uv.x, my + 0.03 + j)).rgb * 0.5 * mw;
-    }
+    // Seen in a flat road, anything standing upright on it is mirrored about its foot - on
+    // screen too: a point the road pixel at v reflects shows at 2 * foot - v. So find the foot
+    // of the first thing above this pixel, look at its mirror point, and blur that upward and
+    // downward the more the further it is: wet asphalt stretches reflections into streaks.
+    // Between two quarter-size columns the feet blend along a sloping edge (a kerb, a
+    // barrier); where they belong to different things the nearer column wins.
+    float bx = uv.x * uBaseW - 0.5;
+    float b0 = floor(bx);
+    float bt = bx - b0;
+    float fa = texture2D(tBase, vec2((b0 + 0.5) / uBaseW, uv.y)).g;
+    float fb = texture2D(tBase, vec2((b0 + 1.5) / uBaseW, uv.y)).g;
+    float foot = abs(fa - fb) < 0.03 ? mix(fa, fb, bt) : (bt < 0.5 ? fa : fb);
+    float my = 2.0 * foot - uv.y;
+    float L = max(uReflLen.x, (my - uv.y) * uReflBlur);
+    vec2 p = vec2(uv.x, my - 0.5 * L);
+    float a12 = clamp((L - uReflLen.x) / (uReflLen.y - uReflLen.x), 0.0, 1.0);
+    float a23 = clamp((L - uReflLen.y) / (uReflLen.z - uReflLen.y), 0.0, 1.0);
+    vec3 r = L < uReflLen.y ? mix(texture2D(tRefl1, p).rgb, texture2D(tRefl2, p).rgb, a12)
+                            : mix(texture2D(tRefl2, p).rgb, texture2D(tRefl3, p).rgb, a23);
+    // nothing to mirror once the mirror point leaves the top of the screen
+    r *= 1.0 - smoothstep(0.92, 1.0, my - 0.25 * L);
     float fres = mix(0.45, 1.25, smoothstep(0.45, 0.0, abs(uHorizon - uv.y)));
-    col += r * reflMask * uReflect * fres;
+    col += r * uReflGain * reflMask * uReflect * fres;
   }
   #endif
 
@@ -247,12 +323,17 @@ export const DEFAULT_FX = () => ({
   tint: [1, 1, 1],
   lift: [0.0, 0.0, 0.0],
   reflect: 0,
+  // what the road mirrors fades in between these brightnesses (so the dimmest walls leave it
+  // dark); gain: mirror strength; blur: how far a reflection streaks per unit of height
+  reflectLo: 0.08,
+  reflectHi: 0.5,
+  reflectGain: 1,
+  reflectBlur: 0.35,
   horizon: 0.55,
   anamorphic: 0.0,
   anamorphicColor: [0.75, 0.82, 1.0],
   grain: 0.02,
   desat: 0,
-  droplets: 0,
 });
 
 export class PostFX {
@@ -267,7 +348,6 @@ export class PostFX {
       blurTaps: 8,
       anamorphic: true,
       reflections: true,
-      droplets: true,
     };
     const gl = renderer.getContext();
     const ext = renderer.extensions;
@@ -299,9 +379,22 @@ export class PostFX {
     this.upMat.blendEquation = THREE.AddEquation;
     this.upMat.blendSrc = THREE.OneFactor;
     this.upMat.blendDst = THREE.OneFactor;
+    this.reflMat = this._mat(REFL_FRAG, {
+      tInput: { value: null },
+      uTexel: { value: new THREE.Vector2() },
+      uLo: { value: 0.08 },
+      uHi: { value: 0.5 },
+    });
+    this.streakMat = this._mat(STREAK_FRAG, { tInput: { value: null }, uStep: { value: 0 } });
+    this.baseInitMat = this._mat(BASE_INIT_FRAG, { tInput: { value: null }, uStep: { value: 0 } });
+    this.baseJumpMat = this._mat(BASE_JUMP_FRAG, { tInput: { value: null } });
 
     this.sceneRT = null;
     this.mips = [];
+    // reflection source, then its 4-, 16- and 64-texel upward streaks (quarter size), and two
+    // buffers to find the foot of what stands above the road in
+    this.refl = [];
+    this.base = [];
     this.compositeMat = null;
     this._buildComposite();
   }
@@ -322,13 +415,19 @@ export class PostFX {
     let defines = `#define BLUR_TAPS ${q.blurTaps}\n`;
     if (q.anamorphic) defines += '#define ANAMORPHIC\n';
     if (q.reflections) defines += '#define REFLECTIONS\n';
-    if (q.droplets) defines += '#define DROPLETS\n';
     const old = this.compositeMat;
     this.compositeMat = this._mat(compositeFrag(defines), {
       tScene: { value: null },
       tBloom: { value: null },
-      tBloomMid: { value: null },
       tBloomSmall: { value: null },
+      tRefl1: { value: null },
+      tRefl2: { value: null },
+      tRefl3: { value: null },
+      tBase: { value: null },
+      uBaseW: { value: 1 },
+      uReflLen: { value: new THREE.Vector3(0.02, 0.08, 0.32) },
+      uReflGain: { value: 1 },
+      uReflBlur: { value: 0.35 },
       uTime: { value: 0 },
       uAspect: { value: 1 },
       uCenter: { value: new THREE.Vector2(0.5, 0.5) },
@@ -350,7 +449,6 @@ export class PostFX {
       uAnamorphicColor: { value: new THREE.Color(0.45, 0.65, 1.4) },
       uGrain: { value: 0.02 },
       uDesat: { value: 0 },
-      uDroplets: { value: 0 },
     });
     if (old) old.dispose();
   }
@@ -359,10 +457,10 @@ export class PostFX {
     const prev = this.quality;
     this.quality = { ...prev, ...q };
     const n = this.quality;
-    if (n.blurTaps !== prev.blurTaps || n.anamorphic !== prev.anamorphic || n.reflections !== prev.reflections || n.droplets !== prev.droplets) {
+    if (n.blurTaps !== prev.blurTaps || n.anamorphic !== prev.anamorphic || n.reflections !== prev.reflections) {
       this._buildComposite();
     }
-    if (n.samples !== prev.samples || n.bloomLevels !== prev.bloomLevels || n.renderScale !== prev.renderScale || !this.sceneRT) {
+    if (n.samples !== prev.samples || n.bloomLevels !== prev.bloomLevels || n.renderScale !== prev.renderScale || n.reflections !== prev.reflections || !this.sceneRT) {
       this._allocTargets();
     }
   }
@@ -391,22 +489,32 @@ export class PostFX {
     });
     for (const m of this.mips) m.dispose();
     this.mips = [];
+    const target = (w, h, filter = THREE.LinearFilter, type = this.texType) =>
+      new THREE.WebGLRenderTarget(w, h, {
+        type,
+        format: THREE.RGBAFormat,
+        depthBuffer: false,
+        stencilBuffer: false,
+        minFilter: filter,
+        magFilter: filter,
+        generateMipmaps: false,
+      });
     let mw = sw;
     let mh = sh;
     for (let i = 0; i < q.bloomLevels; i++) {
       mw = Math.max(1, Math.floor(mw / 2));
       mh = Math.max(1, Math.floor(mh / 2));
-      this.mips.push(
-        new THREE.WebGLRenderTarget(mw, mh, {
-          type: this.texType,
-          format: THREE.RGBAFormat,
-          depthBuffer: false,
-          stencilBuffer: false,
-          minFilter: THREE.LinearFilter,
-          magFilter: THREE.LinearFilter,
-          generateMipmaps: false,
-        }),
-      );
+      this.mips.push(target(mw, mh));
+    }
+    for (const t of [...this.refl, ...this.base]) t.dispose();
+    this.refl = [];
+    this.base = [];
+    if (q.reflections) {
+      const rw = Math.max(1, Math.floor(sw / 4));
+      const rh = Math.max(1, Math.floor(sh / 4));
+      for (let i = 0; i < 4; i++) this.refl.push(target(rw, rh));
+      // screen heights, read back exactly (nearest), in half float where the GPU can render it
+      for (let i = 0; i < 2; i++) this.base.push(target(rw, rh, THREE.NearestFilter));
     }
   }
 
@@ -451,11 +559,48 @@ export class PostFX {
       this._pass(this.upMat, mips[i - 1], false);
     }
 
-    // 3. composite to screen
+    // 3. what the wet road reflects: the things above it, smeared upward, and where they stand
+    const refl = this.refl;
     const c = this.compositeMat.uniforms;
+    if (refl.length && p.reflect > 0) {
+      const rf = this.reflMat.uniforms;
+      rf.tInput.value = this.sceneRT.texture;
+      rf.uTexel.value.set(1 / this.sceneRT.width, 1 / this.sceneRT.height);
+      rf.uLo.value = this.hdr ? p.reflectLo : Math.min(0.3, p.reflectLo);
+      rf.uHi.value = this.hdr ? p.reflectHi : Math.min(0.8, p.reflectHi);
+      this._pass(this.reflMat, refl[0]);
+      const su = this.streakMat.uniforms;
+      const h = refl[0].height;
+      for (let i = 1; i < 4; i++) {
+        su.tInput.value = refl[i - 1].texture;
+        su.uStep.value = 4 ** (i - 1) / h;
+        this._pass(this.streakMat, refl[i]);
+      }
+      c.uReflLen.value.set(4 / h, 16 / h, 64 / h);
+      // the foot of what stands above the road: look 8 texels up, then jump until done
+      const base = this.base;
+      const bi = this.baseInitMat.uniforms;
+      bi.tInput.value = refl[0].texture;
+      bi.uStep.value = 1 / h;
+      this._pass(this.baseInitMat, base[0]);
+      const bj = this.baseJumpMat.uniforms;
+      let k = 0;
+      for (let reach = 8; reach < h; reach *= 4, k ^= 1) {
+        bj.tInput.value = base[k].texture;
+        this._pass(this.baseJumpMat, base[k ^ 1]);
+      }
+      c.tBase.value = base[k].texture;
+      c.uBaseW.value = base[k].width;
+    }
+    c.tRefl1.value = refl[1]?.texture ?? null;
+    c.tRefl2.value = refl[2]?.texture ?? null;
+    c.tRefl3.value = refl[3]?.texture ?? null;
+    c.uReflGain.value = p.reflectGain;
+    c.uReflBlur.value = p.reflectBlur;
+
+    // 4. composite to screen
     c.tScene.value = this.sceneRT.texture;
     c.tBloom.value = mips[0].texture;
-    c.tBloomMid.value = mips[Math.min(1, mips.length - 1)].texture;
     c.tBloomSmall.value = mips[Math.min(3, mips.length - 1)].texture;
     c.uTime.value = time;
     c.uAspect.value = this.width / this.height;
@@ -478,7 +623,6 @@ export class PostFX {
     c.uAnamorphicColor.value.setRGB(p.anamorphicColor[0], p.anamorphicColor[1], p.anamorphicColor[2]);
     c.uGrain.value = p.grain;
     c.uDesat.value = p.desat;
-    c.uDroplets.value = p.droplets;
     this.quad.material = this.compositeMat;
     r.setRenderTarget(null);
     r.clear(true, true, false);
@@ -490,9 +634,14 @@ export class PostFX {
   dispose() {
     if (this.sceneRT) this.sceneRT.dispose();
     for (const m of this.mips) m.dispose();
+    for (const t of [...this.refl, ...this.base]) t.dispose();
     this.prefilterMat.dispose();
     this.downMat.dispose();
     this.upMat.dispose();
+    this.reflMat.dispose();
+    this.streakMat.dispose();
+    this.baseInitMat.dispose();
+    this.baseJumpMat.dispose();
     this.compositeMat.dispose();
   }
 }

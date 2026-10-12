@@ -71,6 +71,33 @@ export function aimLampLights(world, i, x, y, z, lights) {
 }
 
 /**
+ * The lamps that light the most of the space within `reach` metres of (x, y, z) (track index
+ * i), strongest first, written to `out` (its length is the most it takes). Returns how many.
+ */
+export function pickLamps(world, i, x, y, z, reach, out) {
+  let count = 0;
+  eachLamp(world, i, world.baker.maxRadius + reach, (L) => {
+    const dx = L.x - x;
+    const dy = L.y - y;
+    const dz = L.z - z;
+    const e = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz) - reach * 0.5, 0) ** 2 / L.r2;
+    if (e >= 1) return;
+    const w = Math.max(L.r, L.g, L.b) * (1 - e) * (1 - e);
+    if (count === out.length && w <= _w[count - 1]) return;
+    let k = count < out.length ? count++ : count - 1;
+    while (k > 0 && _w[k - 1] < w) {
+      out[k] = out[k - 1];
+      _w[k] = _w[k - 1];
+      k--;
+    }
+    out[k] = L;
+    _w[k] = w;
+  });
+  return count;
+}
+const _w = [];
+
+/**
  * Road shadow for a car model at (x, y, z) (track index i) from the two strongest lamps nearby:
  * each casts the footprint away from itself, as dark as its share of the light there. A lamp
  * straight overhead leaves the shadow right underneath. air: height above the road.

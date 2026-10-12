@@ -226,7 +226,8 @@ export class AudioEngine {
     e.screech.f.frequency.setTargetAtTime(1800 + Math.sin(t * 9) * 140 + sp * 300, t, 0.03);
     e.scrape.g.gain.setTargetAtTime(clamp(p.scrape, 0, 1) * 0.2 * (0.6 + Math.random() * 0.4), t, 0.03);
     e.roar.g.gain.setTargetAtTime(p.boost * 0.32, t, 0.08);
-    e.rain.g.gain.setTargetAtTime(p.wet ? 0.035 + sp * 0.03 : 0, t, 0.3);
+    // p.wet: 0 dry or sheltered .. 1 out in the rain
+    e.rain.g.gain.setTargetAtTime(+p.wet * (0.035 + sp * 0.03), t, 0.3);
     e.verbSend.gain.setTargetAtTime(p.tunnel ? 0.55 : 0.04, t, 0.25);
     // opponent pass-by
     const near = clamp(1 - p.opponentDist / 70, 0, 1);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { additive, alphaBlend, globalUniforms } from '../world/materials.js';
+import { additive, alphaBlend, globalUniforms, HEADLIGHTS_GLSL } from '../world/materials.js';
 
 // ---------------------------------------------------------------------------------------
 // CPU-simulated, GPU-billboarded particles (one draw call per system)
@@ -331,9 +331,21 @@ class TrailSystem {
 }
 
 // ---------------------------------------------------------------------------------------
-// GPU streak field for rain - zero CPU cost per particle
+// Rain: a GPU streak field around the camera - zero CPU cost per drop. At night rain only
+// shows where light catches it, so each drop is lit by the headlights and the street lamps
+// nearest the player; none falls under a tunnel roof or an overpass.
 // ---------------------------------------------------------------------------------------
-function streakField(count, opts) {
+export const RAIN_LAMPS = 6;
+const RAIN_FALL = 17; // m/s
+const RAIN_WIND = [2.2, 0.9]; // m/s: a slight slant
+const RAIN_BOX = [40, 16, 40];
+// the box sits ahead of the camera and above it, where the drops can be seen (not under the road)
+const RAIN_AHEAD = 8;
+const RAIN_UP = 5;
+const RAIN_RANGE = 9; // full strength out to here, gone at twice this
+const RAIN_LAMP_GAIN = 1.2;
+
+function rainField(count) {
   const geo = new THREE.InstancedBufferGeometry();
   const base = new THREE.PlaneGeometry(1, 1);
   base.translate(0, 0.5, 0);
@@ -344,57 +356,92 @@ function streakField(count, opts) {
   for (let i = 0; i < count * 4; i++) seeds[i] = Math.random();
   geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
   geo.instanceCount = count;
+  const G = globalUniforms;
   const mat = additive(
     new THREE.ShaderMaterial({
       uniforms: {
         uCam: { value: new THREE.Vector3() },
+        uCenter: { value: new THREE.Vector3() },
         uOffset: { value: new THREE.Vector3() },
         uDir: { value: new THREE.Vector3(0, -1, 0) },
         uLen: { value: 1 },
-        uBox: { value: new THREE.Vector3(opts.box[0], opts.box[1], opts.box[2]) },
-        uAlpha: { value: 0 },
-        uColor: { value: new THREE.Color(opts.color) },
-        uWidth: { value: opts.width },
-        uCamFwd: { value: new THREE.Vector3(0, 0, -1) },
-        uCenterFade: { value: opts.centerFade ?? 0 },
+        uBox: { value: new THREE.Vector3(...RAIN_BOX) },
+        uWidth: { value: 0.012 },
+        uPixel: { value: 0.0016 },
+        uRange: { value: RAIN_RANGE },
+        uAlpha: { value: 1 },
+        uTint: { value: new THREE.Color(0.82, 0.88, 1.0) },
+        uBase: { value: new THREE.Color(0.05, 0.055, 0.07) },
+        uHeadGain: { value: 0.6 },
+        uLampPos: { value: Array.from({ length: RAIN_LAMPS }, () => new THREE.Vector3()) },
+        uLampCol: { value: Array.from({ length: RAIN_LAMPS }, () => new THREE.Vector4(0, 0, 0, 1)) },
+        uCover: G.uCover,
+        uCoverRect: G.uCoverRect,
+        uHeadPos: G.uHeadPos,
+        uHeadFwd: G.uHeadFwd,
+        uHeadUp: G.uHeadUp,
+        uHeadParams: G.uHeadParams,
+        uHeadColor: G.uHeadColor,
       },
       vertexShader: /* glsl */ `
+        #define RAIN_LAMPS ${RAIN_LAMPS}
         attribute vec4 aSeed;
         uniform vec3 uCam;
+        uniform vec3 uCenter;
         uniform vec3 uOffset;
         uniform vec3 uDir;
         uniform float uLen;
         uniform vec3 uBox;
         uniform float uWidth;
-        uniform vec3 uCamFwd;
-        uniform float uCenterFade;
-        varying float vA;
+        uniform float uPixel;
+        uniform float uRange;
+        uniform vec3 uBase;
+        uniform float uHeadGain;
+        uniform vec3 uLampPos[RAIN_LAMPS];
+        uniform vec4 uLampCol[RAIN_LAMPS];
+        uniform sampler2D uCover;
+        uniform vec4 uCoverRect;
+        varying vec3 vCol;
         varying vec2 vUv;
+        ${HEADLIGHTS_GLSL}
         void main() {
           vUv = uv;
-          vec3 p = mod(aSeed.xyz * uBox - uOffset, uBox) - uBox * 0.5;
-          vec3 wp = uCam + p;
+          vec3 wp = uCenter + mod(aSeed.xyz * uBox - uOffset, uBox) - uBox * 0.5;
           float len = uLen * (0.6 + 0.8 * aSeed.w);
           vec3 dir = normalize(uDir);
-          vec3 toCam = normalize(uCam - wp);
-          vec3 side = normalize(cross(dir, toCam));
-          vec3 pos = wp + dir * position.y * len + side * position.x * uWidth;
-          float dist = length(p);
-          vA = smoothstep(uBox.x * 0.5, uBox.x * 0.2, dist) * smoothstep(0.5, 2.5, dist);
-          if (uCenterFade > 0.0) {
-            float c = dot(normalize(p), uCamFwd);
-            vA *= 1.0 - smoothstep(0.86, 0.97, c) * uCenterFade;
+          vec3 toCam = uCam - wp;
+          float dist = max(length(toCam), 1e-3);
+          toCam /= dist;
+          vec3 cr = cross(dir, toCam);
+          vec3 side = cr / max(length(cr), 1e-4);
+          // at least about a pixel wide, or distant drops break up into dashes; widened ones dim
+          float w = max(uWidth, dist * uPixel);
+          vec3 pos = wp + dir * position.y * len + side * position.x * w;
+          float a = smoothstep(uRange * 2.0, uRange, dist) * smoothstep(1.5, 4.0, dist) * sqrt(uWidth / w);
+          // none under a tunnel roof or an overpass
+          vec2 cv = texture2D(uCover, (pos.xz - uCoverRect.xy) * uCoverRect.zw).rg;
+          a *= 1.0 - cv.y * (1.0 - smoothstep(cv.x - 0.5, cv.x + 0.5, pos.y));
+          // lit by the lamps nearby (street lights mostly below them) and the headlights
+          vec3 light = uBase;
+          for (int k = 0; k < RAIN_LAMPS; k++) {
+            vec3 d = uLampPos[k] - pos;
+            float d2 = dot(d, d);
+            float f = max(1.0 - d2 * uLampCol[k].w, 0.0);
+            float below = 0.35 + 0.65 * smoothstep(-0.2, 0.6, d.y * inversesqrt(d2 + 1e-3));
+            light += uLampCol[k].rgb * (f * f * below);
           }
+          light += headlights(pos, toCam, 1.0) * uHeadGain;
+          vCol = light * a;
           gl_Position = projectionMatrix * viewMatrix * vec4(pos, 1.0);
         }`,
       fragmentShader: /* glsl */ `
         uniform float uAlpha;
-        uniform vec3 uColor;
-        varying float vA;
+        uniform vec3 uTint;
+        varying vec3 vCol;
         varying vec2 vUv;
         void main() {
-          float a = vA * uAlpha * (1.0 - abs(vUv.x - 0.5) * 2.0) * smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.6, vUv.y);
-          gl_FragColor = vec4(uColor * a, a);
+          float a = uAlpha * (1.0 - abs(vUv.x - 0.5) * 2.0) * smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.6, vUv.y);
+          gl_FragColor = vec4(uTint * vCol * a, 1.0);
         }`,
     }),
   );
@@ -418,11 +465,31 @@ export class Effects {
     scene.add(this.sparks.mesh, this.smoke.mesh, this.trails.mesh, this.skids.mesh);
     this.rain = null;
     if (opts.rain) {
-      this.rain = streakField(Math.round(1400 * q), { box: [44, 26, 44], color: '#9fb8d8', width: 0.012 });
+      this.rain = rainField(Math.round(4000 * q));
       scene.add(this.rain);
       this.rainTravel = new THREE.Vector3();
+      this.rainCamVel = new THREE.Vector3();
+      this.rainCam = null;
+      // where the visible rain is (ahead of the camera): light it from the lamps around here
+      this.rainFocus = new THREE.Vector3();
     }
     this.time = 0;
+  }
+
+  /** Light the rain with LightBaker lamps (strongest first, `count` of them used). */
+  lightRain(lamps, count) {
+    if (!this.rain) return;
+    const u = this.rain.material.uniforms;
+    for (let k = 0; k < RAIN_LAMPS; k++) {
+      const col = u.uLampCol.value[k];
+      const L = k < count ? lamps[k] : null;
+      if (!L) {
+        col.set(0, 0, 0, 1);
+        continue;
+      }
+      u.uLampPos.value[k].set(L.x, L.y, L.z);
+      col.set(L.r * RAIN_LAMP_GAIN, L.g * RAIN_LAMP_GAIN, L.b * RAIN_LAMP_GAIN, 1 / L.r2);
+    }
   }
 
   spark(x, y, z, vx, vy, vz, color = [6, 3.2, 1.2], life = 0.5, size = 0.06, stretch = 0.045) {
@@ -505,7 +572,8 @@ export class Effects {
     this.smoke.emit(x, y, z, vx, vy, vz, life * (0.8 + Math.random() * 0.4), size0, size1, color[0], color[1], color[2], alpha, 0, 1.8, -0.6);
   }
 
-  update(dt, camera, camVel, speedFactor) {
+  /** viewHeight: height of the render target in pixels (keeps distant drops a pixel wide). */
+  update(dt, camera, viewHeight = 720) {
     this.time += dt;
     this.sparks.update(dt);
     this.smoke.update(dt);
@@ -513,14 +581,33 @@ export class Effects {
     this.skids.update(camera, this.time);
     if (this.rain) {
       const r = this.rain.material.uniforms;
-      const fall = _rainVel.set(0, -22, 0);
-      this.rainTravel.addScaledVector(fall, -dt).addScaledVector(camVel, dt);
+      const fall = _rainVel.set(RAIN_WIND[0], -RAIN_FALL, RAIN_WIND[1]);
+      // follow the camera itself (not the car), so the drops stay put in the world as it swings
+      if (!this.rainCam) this.rainCam = camera.position.clone();
+      _d.subVectors(camera.position, this.rainCam);
+      this.rainCam.copy(camera.position);
+      if (_d.lengthSq() < 30 * 30) {
+        this.rainTravel.add(_d);
+        if (dt > 0) this.rainCamVel.lerp(_d.divideScalar(dt), Math.min(1, dt * 12));
+      }
+      this.rainTravel.addScaledVector(fall, -dt);
+      // the field repeats every box, so wrapping keeps the numbers small without moving a drop
+      this.rainTravel.set(this.rainTravel.x % RAIN_BOX[0], this.rainTravel.y % RAIN_BOX[1], this.rainTravel.z % RAIN_BOX[2]);
+      camera.getWorldDirection(_fwd);
+      _fwd.y = 0;
+      if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
+      _fwd.normalize().multiplyScalar(RAIN_AHEAD);
+      this.rainFocus.copy(camera.position).add(_fwd);
+      _fwd.y = RAIN_UP;
       r.uCam.value.copy(camera.position);
-      r.uOffset.value.copy(this.rainTravel);
-      const rel = _rel.copy(fall).sub(camVel);
+      r.uCenter.value.copy(camera.position).add(_fwd);
+      r.uOffset.value.copy(this.rainTravel).add(_fwd);
+      const rel = _rel.copy(fall).sub(this.rainCamVel);
       r.uDir.value.copy(rel).normalize();
-      r.uLen.value = 0.35 + rel.length() * 0.028;
-      r.uAlpha.value = 0.55;
+      r.uLen.value = 0.25 + rel.length() * 0.016;
+      // a drop's light is smeared over its streak: longer at speed, so fainter
+      r.uAlpha.value = Math.min(1, Math.max(0.3, 0.6 / r.uLen.value));
+      r.uPixel.value = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / Math.max(viewHeight, 1);
     }
   }
 
@@ -543,3 +630,5 @@ export class Effects {
 
 const _rainVel = new THREE.Vector3();
 const _rel = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const _fwd = new THREE.Vector3();

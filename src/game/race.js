@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildWorld } from '../world/world-builder.js';
 import { globalUniforms, MAX_HEADLIGHTS } from '../world/materials.js';
-import { aimLampLights, castCarShadow } from '../world/car-light.js';
+import { aimLampLights, castCarShadow, pickLamps } from '../world/car-light.js';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef, CARS } from '../car/car-defs.js';
 import { getCarAsset } from '../car/car-assets.js';
@@ -9,7 +9,7 @@ import { randomCustom } from '../car/customization.js';
 import { Vehicle } from './vehicle.js';
 import { AIDriver, AI_NAMES, DIFFICULTY } from './ai.js';
 import { CameraRig } from './camera-rig.js';
-import { Effects } from './effects.js';
+import { Effects, RAIN_LAMPS } from './effects.js';
 import { StuntTracker } from './stunts.js';
 import { GhostRecorder, GhostPlayer } from './ghost.js';
 import { DEFAULT_FX } from '../core/postfx.js';
@@ -57,6 +57,8 @@ export class Race {
     this.impact = 0;
     this.lightning = 0;
     this.nextLightning = 6 + Math.random() * 8;
+    // how far the camera is under a roof (tunnel, overpass): 0 out in the rain .. 1 sheltered
+    this.shelter = 0;
     this.hud = {};
     this.messages = [];
     this._autoCtrl = { steer: 0, throttle: 0, brake: 0, drift: false };
@@ -168,6 +170,10 @@ export class Race {
       this.scene.add(L);
       this.lampLights.push(L);
     }
+    // the lamps that light the falling rain, and the sky light a lightning flash adds to
+    this.rainLamps = new Array(RAIN_LAMPS).fill(null);
+    this.baseAmbient = globalUniforms.uAmbient.value.clone();
+    this.baseHemi = this.world.env.hemi.intensity;
 
     this._syncRacers(0);
     this._updateModels(0.016);
@@ -407,12 +413,13 @@ export class Race {
 
     // ---- camera
     this.rig.update(dt, v);
-    this.effects.update(dt, this.camera, v.velocity, clamp(v.speed / v.topSpeed, 0, 1.5) + v.boostLevel * 0.4);
+    this.effects.update(dt, this.camera, this.app.renderer.post.sceneRT?.height);
     this.world.update(dt, this.camera);
     this.player.model.group.visible = !this.rig.hideCar;
 
     this._updateProbe(dt);
     this._updateLamps();
+    this._updateRain(dtReal);
     this._updateHeadlights();
     // start lights: one more red column every 0.6 s of the countdown, all out at GO
     const SL = this.world.startLights;
@@ -1031,8 +1038,9 @@ export class Race {
         _v.copy(e).applyMatrix4(m.body.matrixWorld);
         fx.spark(_v.x, _v.y, _v.z, vel.x * 0.85 + (Math.random() - 0.5) * 3, (Math.random() - 0.3) * 2, vel.z * 0.85 + (Math.random() - 0.5) * 3, [0.6, 1.0, 2.4], 0.2, 0.04, 0.03);
       }
-      // rain spray
-      if (wet && speed > 18 && Math.random() < 0.9) {
+      // rain spray (not off the dry road under a roof)
+      const gp = m.group.position;
+      if (wet && speed > 18 && Math.random() < 0.9 && !this.world.cover.covers(gp.x, gp.y + 1, gp.z)) {
         for (const w of [m.wheels[2], m.wheels[3]]) {
           w.pivot.getWorldPosition(_v);
           fx.puff(_v.x, _v.y - 0.1, _v.z, vel.x * 0.6, 0.8 + Math.random(), vel.z * 0.6, [0.6, 0.65, 0.75], 0.09 * clamp(speed / 60, 0.3, 1.2), 0.6, 3.2, 0.7);
@@ -1045,6 +1053,16 @@ export class Race {
     if (!this.lampLights || !this.lampLights.length) return;
     const v = this.player.vehicle;
     aimLampLights(this.world, v.frame.i, v.x, v.y, v.z, this.lampLights);
+  }
+
+  /** The lamps that light the rain ahead of the camera, and whether the camera is under a roof. */
+  _updateRain(dtReal) {
+    if (!this.world.rain) return;
+    const v = this.player.vehicle;
+    const f = this.effects.rainFocus;
+    this.effects.lightRain(this.rainLamps, pickLamps(this.world, v.frame.i, f.x, f.y, f.z, 16, this.rainLamps));
+    const cam = this.camera.position;
+    this.shelter = damp(this.shelter, this.world.cover.covers(cam.x, cam.y, cam.z) ? 1 : 0, 3, dtReal);
   }
 
   _castShadow(model, i, x, y, z, air) {
@@ -1105,32 +1123,42 @@ export class Race {
     const pal = this.world.palette;
     this.flash = Math.max(0, this.flash - dtReal * 2.2);
     this.impact = Math.max(0, this.impact - dtReal * 2.5);
-    // lightning in the rain
+    // lightning in the rain: a few strokes light the cloud deck from inside, and the street
+    // catches the cold light from the sky (little of it under a roof)
+    let bolt = 0;
     if (this.world.rain) {
       this.nextLightning -= dtReal;
       if (this.nextLightning <= 0) {
         this.nextLightning = 18 + Math.random() * 20;
         this.lightning = 1;
+        const a = Math.random() * Math.PI * 2;
+        globalUniforms.uFlashDir.value.set(Math.cos(a), Math.sin(a));
         setTimeout(() => this.app.audio?.play('thunder'), 300 + Math.random() * 900);
       }
-      this.lightning = Math.max(0, this.lightning - dtReal * 3.5);
+      this.lightning = Math.max(0, this.lightning - dtReal * 2.5);
+      if (!st.reduceFlashes) bolt = this.lightning * (0.25 + 0.75 * Math.max(0, Math.sin(this.lightning * 30)));
     }
+    globalUniforms.uFlash.value = bolt * 1.1;
+    const skyLight = bolt * (1 - this.shelter * 0.85);
+    globalUniforms.uAmbient.value.copy(this.baseAmbient).add(_c.setRGB(0.62, 0.66, 0.85).multiplyScalar(skyLight * 0.5));
+    this.world.env.moon.intensity = this.world.env.moonIntensity + skyLight * 2.5;
+    this.world.env.hemi.intensity = this.baseHemi + skyLight;
     const blurMul = st.motionBlur ?? 1;
     const inTunnel = v.frame.tunnel;
     fx.blur = ((0.003 + 0.027 * sp * sp) * (inTunnel ? 1.15 : 1) + boost * 0.035) * blurMul * (1 - this.rig.hideCar * 0.3);
     fx.ca = (0.0012 + boost * 0.0075 + this.impact * 0.012 + (this.timeScale < 0.8 ? 0.004 : 0)) * (st.chromatic ?? 1);
     fx.speedLines = Math.max(0, boost - 0.3) * 0.35 * (st.speedLines ?? 1);
     fx.vignette = 0.38 + boost * 0.22 + (1 - this.timeScale) * 0.25;
-    const lf = this.lightning > 0 && !this.app.settings.reduceFlashes ? Math.max(0, Math.sin(this.lightning * 30)) * this.lightning * 0.12 : 0;
-    fx.flash = Math.max(this.flash, lf);
-    fx.flashColor = lf > this.flash ? [0.8, 0.85, 1.0] : this.flashColor;
+    fx.flash = this.flash;
+    fx.flashColor = this.flashColor;
     fx.reflect = (this.world.rain ? 0.62 : 0.3) + (inTunnel ? 0.18 : 0);
-    fx.bloomStrength = 0.34 + boost * 0.06;
+    // wet air spreads every light into a slightly wider halo
+    fx.bloomThreshold = this.world.rain ? 1.3 : 1.5;
+    fx.bloomStrength = 0.34 + boost * 0.06 + (this.world.rain ? 0.04 : 0);
     fx.exposure = (pal.exposure ?? 1) * (1 + boost * 0.06);
     fx.tint = pal.tint || [1, 1, 1];
     fx.desat = clamp((1 - this.timeScale) * 0.5, 0, 0.45);
     fx.anamorphic = this.app.renderer.preset.anamorphic ? 0.1 + boost * 0.08 : 0;
-    fx.droplets = this.world.rain && !inTunnel && this.rig.mode !== 'bumper' ? 0.35 + sp * 0.35 : 0;
     fx.saturation = 1.0;
     fx.grain = 0.02;
     // radial blur centre = focus of expansion of the camera's motion
@@ -1177,7 +1205,8 @@ export class Race {
       opponentDist: nd,
       opponentSpeed: nearest ? nearest.ai.v : 0,
       relSpeed: nearest ? v.speed - nearest.ai.v : 0,
-      wet: this.world.rain,
+      // how loud the rain is: none under a roof
+      wet: this.world.rain ? 1 - this.shelter : 0,
       dt,
     });
   }
@@ -1269,6 +1298,8 @@ export class Race {
 
   dispose() {
     for (const p of globalUniforms.uHeadParams.value) p.x = 0;
+    globalUniforms.uFlash.value = 0;
+    globalUniforms.uAmbient.value.copy(this.baseAmbient);
     this.effects.dispose();
     for (const r of this.racers) r.model.dispose();
     if (this.ghostModel) this.ghostModel.dispose();

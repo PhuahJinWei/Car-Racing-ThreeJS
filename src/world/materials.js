@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { openSkyTexture } from './cover-map.js';
 
 /** How many cars' headlights light the world at once (the player and the rivals nearest the camera). */
 export const MAX_HEADLIGHTS = 4;
@@ -20,7 +21,22 @@ export const globalUniforms = {
   uHeadUp: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3(0, 1, 0)) },
   uHeadParams: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector4()) },
   uHeadColor: { value: new THREE.Color(0.93, 0.96, 1.0) },
+  // what keeps the rain off (tunnel roofs, overpasses): a CoverMap texture over the world's
+  // ground plan, placed by (min x, min z, 1 / size x, 1 / size z)
+  uCover: { value: openSkyTexture() },
+  uCoverRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+  // lightning: how brightly the cloud deck is lit (0 = dark) and the direction of the strike
+  uFlash: { value: 0 },
+  uFlashDir: { value: new THREE.Vector2(1, 0) },
 };
+
+/** Point the shared cover uniforms at a world's CoverMap (null: open sky everywhere). */
+export function setCover(cover) {
+  globalUniforms.uCover.value = cover?.texture ?? OPEN_SKY;
+  if (cover) globalUniforms.uCoverRect.value.copy(cover.rect);
+  else globalUniforms.uCoverRect.value.set(0, 0, 1, 1);
+}
+const OPEN_SKY = globalUniforms.uCover.value;
 
 export function hdr(hex, intensity = 1) {
   const c = new THREE.Color(hex);
@@ -83,7 +99,7 @@ float vnoise(vec2 p) {
 // horizon (light pools on the road, a bright band low on the walls), fading with distance.
 // road = 1 for asphalt, which scatters light back toward the cars even at grazing angles;
 // other surfaces have to face the lamps.
-const HEADLIGHTS_GLSL = /* glsl */ `
+export const HEADLIGHTS_GLSL = /* glsl */ `
 #define MAX_HEAD ${MAX_HEADLIGHTS}
 uniform vec3 uHeadPos[MAX_HEAD];
 uniform vec3 uHeadFwd[MAX_HEAD];
@@ -177,6 +193,8 @@ export function createRoadMaterial(opts) {
     fragmentShader: /* glsl */ `
       uniform float uTime;
       uniform float uWet;
+      uniform sampler2D uCover;
+      uniform vec4 uCoverRect;
       uniform vec3 uAmbient;
       uniform float uHalfWidth;
       uniform float uLength;
@@ -285,9 +303,13 @@ export function createRoadMaterial(opts) {
         markCol = mark > 0.0 ? markCol / max(mark, 1e-3) : markCol;
         markCol = clamp(markCol, 0.0, 1.0);
 
-        // Wetness and puddles
-        float puddle = smoothstep(0.52, 0.78, vnoise(vWorld.xz * 0.07) * 0.65 + vnoise(vWorld.xz * 0.31) * 0.35);
-        albedo *= mix(1.0, 0.5, uWet);
+        // Wetness and puddles. Under a tunnel roof or an overpass the road is only damp from the
+        // water the cars carry in.
+        vec2 cover = texture2D(uCover, (vWorld.xz - uCoverRect.xy) * uCoverRect.zw).rg;
+        float dry = cover.y * step(vWorld.y + 1.0, cover.x);
+        float wet = uWet * (1.0 - 0.65 * dry);
+        float puddle = smoothstep(0.52, 0.78, vnoise(vWorld.xz * 0.07) * 0.65 + vnoise(vWorld.xz * 0.31) * 0.35) * (1.0 - dry);
+        albedo *= mix(1.0, 0.5, wet);
         vec3 surf = mix(albedo, markCol * 0.65, mark);
         vec3 head = headlights(vWorld, vec3(0.0, 1.0, 0.0), 1.0);
         vec3 light = vLight + uAmbient * 0.6 + head;
@@ -299,9 +321,9 @@ export function createRoadMaterial(opts) {
         // Grazing-angle sheen
         float ndv = clamp(vViewDir.y, 0.0, 1.0);
         float fres = pow(clamp(1.0 - ndv, 0.0, 1.0), 4.0);
-        col += uSheen * fres * (0.3 + uWet * 0.7);
+        col += uSheen * fres * (0.3 + wet * 0.7);
 
-        float refl = mix(0.22, 0.6, uWet) + puddle * 0.38 * uWet;
+        float refl = mix(0.22, 0.6, wet) + puddle * 0.38 * wet;
         refl *= 1.0 - mark * 0.6;
         refl *= 1.0 - fogFactor(0.8);
 
@@ -538,7 +560,8 @@ export function createTunnelMaterial(opts = {}) {
 
 // ---------------------------------------------------------------------------------------
 // Night sky: near-black zenith, city light pollution glowing on the horizon and on the
-// underside of low clouds, a few faint stars where the clouds break.
+// underside of low clouds, a few faint stars where the clouds break. In rain (overcast) one
+// low, unbroken deck lit from below by the city, which lightning lights up from inside.
 // ---------------------------------------------------------------------------------------
 export function createSkyMaterial(p) {
   return new THREE.ShaderMaterial({
@@ -549,6 +572,9 @@ export function createSkyMaterial(p) {
       uGlow: { value: new THREE.Color(p.skyGlow) },
       uStars: { value: p.stars ?? 0.2 },
       uClouds: { value: p.clouds ?? 0.5 },
+      uOvercast: { value: p.overcast ?? 0 },
+      uFlash: globalUniforms.uFlash,
+      uFlashDir: globalUniforms.uFlashDir,
     },
     side: THREE.BackSide,
     depthWrite: false,
@@ -567,6 +593,9 @@ export function createSkyMaterial(p) {
       uniform vec3 uGlow;
       uniform float uStars;
       uniform float uClouds;
+      uniform float uOvercast;
+      uniform float uFlash;
+      uniform vec2 uFlashDir;
       varying vec3 vDir;
       ${NOISE_GLSL}
       void main() {
@@ -580,9 +609,17 @@ export function createSkyMaterial(p) {
           vec2 q = d.xz / (h + 0.12) * 1.4;
           float n = vnoise(q + uTime * 0.004) * 0.55 + vnoise(q * 2.3 - uTime * 0.006) * 0.3 + vnoise(q * 5.1) * 0.15;
           float c = smoothstep(0.42, 0.8, n) * uClouds * smoothstep(0.0, 0.07, h);
+          c = mix(c, (0.72 + 0.28 * smoothstep(0.3, 0.75, n)) * smoothstep(0.0, 0.04, h), uOvercast);
           vec3 cloudCol = uHorizon * 0.5 + uGlow * (0.25 + 0.9 * exp(-h * 3.5));
+          // a rain deck mixes every light in the city: brighter, and greyer than the glow
+          cloudCol = mix(cloudCol, vec3(dot(cloudCol, vec3(0.3, 0.5, 0.2))), uOvercast * 0.65) * (1.0 + uOvercast * 0.7);
           col = mix(col, cloudCol, c);
           starMask = 1.0 - c;
+          if (uFlash > 0.0) {
+            // lightning inside the deck: the clouds light up, most toward the strike
+            float toward = max(dot(normalize(d.xz + 1e-4), uFlashDir), 0.0);
+            col += vec3(0.62, 0.64, 0.82) * uFlash * (0.2 + 0.8 * toward * toward) * (0.3 + 0.7 * c) * (0.5 + n);
+          }
         } else {
           col = mix(col, uHorizon * 0.35, clamp(-h * 5.0, 0.0, 1.0));
         }

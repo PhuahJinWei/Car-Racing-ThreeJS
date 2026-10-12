@@ -7,7 +7,8 @@ import { buildLamps, buildChevrons, buildGantries, buildSignGantries, buildTerra
 import { buildCity } from './decor-city.js';
 import { buildStadium } from './decor-stadium.js';
 import { createEnvironment, createEnvMap } from './environment.js';
-import { globalUniforms } from './materials.js';
+import { globalUniforms, setCover } from './materials.js';
+import { CoverMap } from './cover-map.js';
 import { rng, hashString } from '../core/math.js';
 
 /**
@@ -31,6 +32,7 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     fogMul: rain ? 1.25 : 1,
     stars: rain ? 0 : 1,
     clouds: rain ? 1.6 : 1,
+    overcast: rain ? 1 : 0,
     skyline: true,
     skylineHeight: def.theme === 'stadium' ? 0.25 : 0.55,
     skylineDensity: def.theme === 'stadium' ? 0.5 : 1,
@@ -94,6 +96,8 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
   root.add(decor);
   let crowdMat = null;
   const notTunnel = (i) => !track.tunnelFlags[i];
+  // what keeps the rain off: tunnel roofs (below) and overpasses (registered by the city)
+  const cover = new CoverMap(track.bounds);
 
   if (def.theme === 'tunnel') {
     // towers rising from the city far below, alongside the elevated expressway
@@ -119,7 +123,7 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     ground.position.set((track.bounds.minX + track.bounds.maxX) / 2, groundY, (track.bounds.minZ + track.bounds.maxZ) / 2);
     decor.add(ground);
   } else if (def.theme === 'city') {
-    const city = buildCity(track, baker, palette, rand, { density, overpasses: 4, filter: notTunnel });
+    const city = buildCity(track, baker, palette, rand, { density, overpasses: 4, filter: notTunnel, cover });
     decor.add(city);
     const lamps = buildLamps(track, baker, { spacing: 30, filter: notTunnel, paired: true, color: palette.lamp, intensity: 0.8, radius: 20, offset: 2.4, height: 8.5, arm: 2.4 });
     if (lamps) decor.add(lamps);
@@ -162,6 +166,19 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
   // props that were built before every light existed get their light now
   baker.flushDeferred();
 
+  if (style.tunnel) {
+    // the tunnel tube: its walls stand just outside the road edge, the roof peaks at the apex
+    const half = W + 1.3 + 0.5;
+    const top = (style.tunnel.apex ?? 6.8) + 0.4;
+    for (let i = 0; i < track.n; i++) {
+      if (!track.tunnelFlags[i]) continue;
+      const l = Math.hypot(track.tx[i], track.tz[i]) || 1;
+      cover.addRect(track.px[i], track.pz[i], track.tx[i] / l, track.tz[i] / l, track.ds * 0.75, half, track.py[i] + top);
+    }
+  }
+  cover.build();
+  setCover(cover);
+
   const envRT = createEnvMap(renderer, palette, { softbox: def.theme === 'stadium' ? 3.0 : 2.4 });
   scene.environment = envRT.texture;
 
@@ -184,6 +201,7 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     baker,
     groundY,
     rain,
+    cover,
     crowdMat,
     surfaces,
     lightAt,
@@ -204,6 +222,8 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
       });
       envRT.dispose();
       env.dispose();
+      if (globalUniforms.uCover.value === cover.texture) setCover(null);
+      cover.dispose();
     },
   };
 }

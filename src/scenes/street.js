@@ -35,7 +35,6 @@ const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _c = new THREE.Color();
 const _m = new THREE.Matrix4();
-const _zero = new THREE.Vector3();
 
 /** Place `obj` on the track at distance s, lateral offset d, facing along the track. */
 function placeOnTrack(track, frame, s, d, obj) {
@@ -207,7 +206,7 @@ export class MenuStreet {
         this.effects.puff(_v.x, _v.y, _v.z, (Math.random() - 0.5) * 0.3, 0.25, (Math.random() - 0.5) * 0.3, [0.55, 0.56, 0.6], 0.05, 0.12, 0.9, 1.8);
       }
     }
-    this.effects.update(dt, this.camera, _zero, 0);
+    this.effects.update(dt, this.camera);
     this.world.update(dt, this.camera);
   }
 

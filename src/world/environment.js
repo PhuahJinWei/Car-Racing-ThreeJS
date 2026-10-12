@@ -85,7 +85,15 @@ export function createEnvironment(scene, palette, opts = {}) {
   globalUniforms.uAmbient.value.set(palette.ambient);
   globalUniforms.uSkyGlow.value.set(palette.skyGlow);
 
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), createSkyMaterial({ ...palette, stars: (palette.stars ?? 0.2) * (opts.stars ?? 1), clouds: Math.min(1, (palette.clouds ?? 0.5) * (opts.clouds ?? 1)) }));
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(3000, 32, 16),
+    createSkyMaterial({
+      ...palette,
+      stars: (palette.stars ?? 0.2) * (opts.stars ?? 1),
+      clouds: Math.min(1, (palette.clouds ?? 0.5) * (opts.clouds ?? 1)),
+      overcast: opts.overcast ?? 0,
+    }),
+  );
   sky.frustumCulled = false;
   sky.renderOrder = 1000;
   sky.material.fog = false;
@@ -115,6 +123,7 @@ export function createEnvironment(scene, palette, opts = {}) {
     skyline,
     hemi,
     moon,
+    moonIntensity: moon.intensity,
     update(camera) {
       sky.position.copy(camera.position);
       if (skyline) {

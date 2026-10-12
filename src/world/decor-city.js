@@ -393,6 +393,9 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
       }
       for (const g of soffit) soffitAll.push(g.applyMatrix4(mtx).toNonIndexed());
       baker.addPoint(f.x, f.y + H - 1.5, f.z, palette.lamp2 ?? '#ffcf8a', 0.8, 20, j);
+      // the deck keeps the rain off the road underneath
+      const tl = Math.hypot(track.tx[j], track.tz[j]) || 1;
+      opts.cover?.addRect(f.x, f.z, track.tx[j] / tl, track.tz[j] / tl, 6, span / 2, f.y + H + 0.65);
     }
     if (concrete.length) {
       const geo = baker.deferBake(mergeGeometries(concrete));
