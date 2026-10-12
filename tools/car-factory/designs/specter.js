@@ -1,7 +1,7 @@
-// SPECTER LMP - Le Mans prototype. A low nose keel between two rounded front fender pods, a
-// narrow bubble canopy, deep side pods, a shark fin running into a full-width wing with tall end
-// plates, louvred fenders, LED light blades front and rear: slanted headlight slits that turn
-// down the pod edges, with brake-cooling intakes below them.
+// SPECTER LMP - Le Mans hypercar. A full-width front with a raised hood between muscular front
+// fenders, slim headlights at the fender corners, a central intake with an aero blade, brake
+// ducts and a louvred hood vent; a narrow bubble canopy, deep side pods, a shark fin running into
+// a full-width wing with tall end plates, louvred fenders and LED light blades at the rear.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdBox, sdRoundBox, sdCylZ } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
@@ -13,11 +13,11 @@ export function buildSpecter() {
     rear: { z: -1.45, y: 0.36, x: 0.84, r: 0.36, w: 0.34 },
   };
   const GAP = 0.04;
-  // headlights (front view, u = |x|, v = y): a slit rising toward the outside of each pod nose,
-  // joined at its outer end by a groove that carries the LED light blade down the pod's edge
-  const SLANT = Math.atan(0.1);
-  const HEAD = { cu: 0.795, cv: 0.587, hw: 0.131, hh: 0.036, cos: Math.cos(SLANT), sin: Math.sin(SLANT) };
-  const BLADE = [0.905, 0.59, 0.893, 0.3];
+  // headlights (front view, u = |x|, v = y): a slim slit across the top of each fender front,
+  // rising toward the outside, with a short hook where the LED eyelid turns down at the corner
+  const SLANT = Math.atan(0.08);
+  const HEAD = { cu: 0.765, cv: 0.5082, hw: 0.166, hh: 0.032, cos: Math.cos(SLANT), sin: Math.sin(SLANT) };
+  const HOOK = [0.918, 0.52, 0.912, 0.445];
   const segDist = (px, py, ax, ay, bx, by) => {
     const bax = bx - ax;
     const bay = by - ay;
@@ -29,13 +29,15 @@ export function buildSpecter() {
   // rear fenders and engine cover
   const bodySide = new Profile2D(
     [
-      [2.47, 0.11, 1],
-      [2.49, 0.19],
-      [2.45, 0.27],
-      [2.25, 0.33],
-      [1.9, 0.385],
-      [1.55, 0.44],
-      [1.2, 0.52],
+      [2.465, 0.11, 1],
+      [2.5, 0.19],
+      [2.505, 0.28],
+      [2.475, 0.355],
+      [2.39, 0.41],
+      [2.2, 0.445],
+      [1.9, 0.47],
+      [1.55, 0.485],
+      [1.2, 0.5],
       [0.85, 0.6],
       [0.4, 0.665],
       [-0.4, 0.705],
@@ -53,11 +55,15 @@ export function buildSpecter() {
   );
   const bodyPlan = new Profile2D(
     mirrorU([
-      [0, 2.48],
-      [0.24, 2.455],
-      [0.35, 2.28],
-      [0.42, 1.9],
-      [0.5, 1.55],
+      [0, 2.495],
+      [0.3, 2.485],
+      [0.55, 2.46],
+      [0.75, 2.415],
+      [0.88, 2.35],
+      [0.95, 2.255],
+      [0.975, 2.1],
+      [0.965, 1.85],
+      [0.8, 1.52],
       [0.6, 1.2],
       [0.86, 0.9, 1],
       [0.94, 0.75],
@@ -72,39 +78,45 @@ export function buildSpecter() {
     ]),
     { band: 0.2 },
   );
-  // front fender pods (rounded, one over each front wheel)
+  // front fenders: rise out of the full-width front, crisp leading edge carrying the headlights
   const podSide = new Profile2D(
     [
-      [2.4, 0.18, 1],
-      [2.445, 0.36],
-      [2.41, 0.55],
-      [2.28, 0.68],
-      [2.05, 0.77],
-      [1.75, 0.825],
-      [1.45, 0.845],
-      [1.1, 0.82],
-      [0.82, 0.74],
-      [0.62, 0.58],
-      [0.58, 0.3, 1],
-      [0.7, 0.16, 1],
+      [2.37, 0.2, 1],
+      [2.41, 0.33],
+      [2.405, 0.5],
+      [2.37, 0.585],
+      [2.27, 0.64],
+      [2.05, 0.715],
+      [1.75, 0.785],
+      [1.45, 0.81],
+      [1.15, 0.795],
+      [0.85, 0.73],
+      [0.64, 0.58],
+      [0.6, 0.3, 1],
+      [0.72, 0.16, 1],
     ],
     { band: 0.2 },
   );
   const podPlan = new Profile2D(
     [
-      [0.58, 2.25],
-      [0.72, 2.42],
-      [0.88, 2.43],
-      [0.99, 2.3],
-      [1.025, 1.9],
+      [0.555, 2.27],
+      [0.6, 2.365],
+      [0.76, 2.405],
+      [0.9, 2.37],
+      [0.975, 2.27],
+      [1.015, 2.0],
+      [1.03, 1.6],
       [1.03, 1.3],
       [1.0, 0.8],
       [0.9, 0.62],
       [0.66, 0.7],
-      [0.58, 1.3],
+      [0.555, 1.3],
     ],
     { band: 0.2 },
   );
+  // fenders narrow toward the top (tumblehome outside, sloping into the hood inside)
+  const FENDER_X = 0.79;
+  const fenderK = (y) => 1 - Math.max(0, y - 0.45) * 0.5;
   // bubble canopy
   const cabSide = new Profile2D(
     [
@@ -206,8 +218,9 @@ export function buildSpecter() {
     let dBody = smax(bS, bP, 0.04);
     let pod = 1;
     if (z > 0.4 && ax > 0.35) {
-      pod = smax(podSide.sample(z, y), podPlan.sample(ax, z), 0.1);
-      dBody = smin(dBody, pod, 0.08);
+      const k = fenderK(y);
+      pod = smax(podSide.sample(z, y), podPlan.sample(FENDER_X + (ax - FENDER_X) / k, z) * k, 0.1);
+      dBody = smin(dBody, pod, 0.04 + 0.08 * smoothstep(2.42, 2.1, z));
     }
     const tilt = Math.max(0, y - 0.7) * 0.55;
     const cP = cabPlan.sample(ax + tilt, z);
@@ -234,9 +247,9 @@ export function buildSpecter() {
     acc.set(sh, MAT.paint);
 
     // ---------------------------------------------------------------- add-ons
-    // full-width front splitter tying the keel and the pods together
+    // carbon splitter lip just proud of the bumper
     if (z > 1.85 && y < 0.2) {
-      acc.add(sdRoundBox(x, y - 0.115, z - 2.22, 0.98, 0.013, 0.33, 0.01), MAT.carbon, 0.02);
+      acc.add(Math.max(bP - 0.045, Math.abs(y - 0.105) - 0.012, 1.86 - z), MAT.carbon, 0.015);
     }
     // shark fin
     if (ax < 0.05 && y > 0.7 && z < -0.6 && z > -2.45) {
@@ -256,7 +269,7 @@ export function buildSpecter() {
     // mirrors on the fender pods
     if (z > 0.6 && z < 1.0 && y > 0.7 && y < 1.0 && ax > 0.6) {
       acc.add(sdRoundBox(ax - 0.84, y - 0.9, z - 0.84, 0.075, 0.035, 0.045, 0.028), MAT.carbon, 0.004);
-      acc.add(sdRoundBox(ax - 0.82, y - 0.83, z - 0.86, 0.008, 0.06, 0.03, 0.006), MAT.carbon, 0.01);
+      acc.add(sdRoundBox(ax - 0.82, y - 0.8, z - 0.86, 0.008, 0.09, 0.03, 0.006), MAT.carbon, 0.01);
     }
 
     // ---------------------------------------------------------------- cuts
@@ -274,19 +287,32 @@ export function buildSpecter() {
       reg = Math.max(sideWin.sample(z, y), cS - cP + 0.01, onCab);
       acc.cut(pocket(reg, sh, 0.045, po), MAT.trim, 0.003);
     }
-    // pod noses: a slim slanted headlight slit across the top that turns down the outer edge
-    // into a tall LED light blade, and a brake-cooling intake below it
-    if (z > 2.1 && y > 0.2 && y < 0.7 && ax > 0.6 && ax < 1.0) {
+    // fender fronts: slim headlight slit with a short hook at the corner, brake duct below it
+    if (z > 2.1 && y > 0.14 && y < 0.62 && ax > 0.55 && ax < 1.0) {
       const lu = ax - HEAD.cu;
       const lv = y - HEAD.cv;
       const su = lu * HEAD.cos + lv * HEAD.sin;
       const sv = lv * HEAD.cos - lu * HEAD.sin;
-      const slit = sdRoundBox(su, sv, 0, HEAD.hw, HEAD.hh, 1, 0.022);
-      const blade = segDist(ax, y, BLADE[0], BLADE[1], BLADE[2], BLADE[3]) - 0.017;
-      const lamp = smin(slit, blade, 0.02);
-      acc.cut(pocket(lamp, sh, 0.026, po), po.wall ? MAT.trim : MAT.head, 0.003);
-      const duct = sdRoundBox(ax - 0.7675, y - 0.318, 0, 0.0875, 0.0825, 1, 0.03);
-      acc.cut(pocket(duct, sh, 0.1, po), po.wall ? MAT.trim : MAT.grille, 0.005);
+      const slit = sdRoundBox(su, sv, 0, HEAD.hw, HEAD.hh, 1, 0.02);
+      const hook = segDist(ax, y, HOOK[0], HOOK[1], HOOK[2], HOOK[3]) - 0.015;
+      acc.cut(pocket(smin(slit, hook, 0.015), sh, 0.026, po), po.wall ? MAT.trim : MAT.head, 0.003);
+      const duct = sdRoundBox(ax - 0.77, y - 0.245, 0, 0.15, 0.075, 1, 0.03);
+      acc.cut(pocket(duct, sh, 0.12, po), po.wall ? MAT.trim : MAT.grille, 0.005);
+      const inner = Math.max(sh + 0.012, -(sh + 0.11));
+      for (const xf of [0.72, 0.82]) acc.add(Math.max(duct, Math.abs(ax - xf) - 0.006, inner), MAT.carbon, 0.003);
+    }
+    // central intake, split by a body-colour aero blade
+    if (z > 2.2 && y < 0.36 && ax < 0.56) {
+      const mouth = sdRoundBox(x, y - 0.235, 0, 0.44 - (y - 0.16) * 0.25, 0.075, 1, 0.03);
+      acc.cut(pocket(mouth, sh, 0.14, po), po.wall ? MAT.trim : MAT.grille, 0.006);
+      const inner = Math.max(sh + 0.014, -(sh + 0.12));
+      acc.add(Math.max(mouth, Math.abs(y - 0.25) - 0.0075, inner), MAT.paint, 0.004);
+    }
+    // louvred vent on the hood
+    if (z > 1.8 && z < 2.2 && ax < 0.34 && y > 0.3) {
+      const vent = sdRoundBox(x, 0, z - 2.0, 0.27, 1, 0.14, 0.05);
+      acc.cut(pocket(vent, sh, 0.05, po), po.wall ? MAT.trim : MAT.grille, 0.004);
+      for (const zs of [1.93, 2.0, 2.07]) acc.add(Math.max(vent, Math.abs(z - zs) - 0.007, sh + 0.004, -(sh + 0.045)), MAT.carbon, 0.002);
     }
     // louvres on top of the fender pods
     if (pod < 0.05 && z > 0.8 && z < 1.5 && y > 0.6) {
@@ -301,11 +327,6 @@ export function buildSpecter() {
     if (z > 0.6 && z < 1.3 && y < 0.6 && ax > 0.5) {
       const reg = sdRoundBox(ax - 0.78, y - 0.36, 0, 0.15, 0.15, 1, 0.05);
       acc.cut(pocket(reg, bP, 0.3, po), po.wall ? MAT.trim : MAT.grille, 0.008);
-    }
-    // nose intake under the keel
-    if (z > 2.1 && y < 0.34 && ax < 0.4) {
-      const reg = sdRoundBox(x, y - 0.235, 0, 0.26, 0.045, 1, 0.02);
-      acc.cut(pocket(reg, bP, 0.15, po), po.wall ? MAT.trim : MAT.grille, 0.005);
     }
     // rear: full-width light bar, corner blades, open mesh panel with the exhausts
     if (z < -2.0 && y > 0.4 && y < 0.86) {
@@ -333,7 +354,7 @@ export function buildSpecter() {
     if (acc.m === MAT.paint) {
       if (y < 0.118) acc.m = MAT.trim;
       else if (y < 0.24 && ax > 0.4 && z < 0.95 && z > -1.1) acc.m = MAT.carbon; // side pod sills
-      else if (y < 0.2 && z > 1.8) acc.m = MAT.carbon;
+      else if (y < 0.15 && z > 1.8) acc.m = MAT.carbon;
       else if (z < -1.7 && y < 0.46 && bS > bP - 0.005) acc.m = MAT.carbon;
     }
     out.m = acc.m;
@@ -347,31 +368,30 @@ export function buildSpecter() {
     { kind: 'panel', mat: MAT.window, view: VIEW.top, outline: WINDSHIELD, depth: 0.006, rings: 8 },
   ];
   for (const sx of [1, -1]) {
-    // LED eyelid along the top of the headlight slit, turning down the pod edge as the light blade
+    // LED eyelid along the top of the headlight slit, hooking down at the outer corner
     decals.push({
       kind: 'ribbon',
       mat: MAT.drl,
       view: VIEW.front,
       path: [
-        [0.685, 0.598],
-        [0.78, 0.6075],
-        [0.86, 0.6155],
-        [0.893, 0.608],
-        [0.9035, 0.575],
-        [0.901, 0.47],
-        [0.8965, 0.37],
-        [0.894, 0.318],
+        [0.625, 0.516],
+        [0.75, 0.526],
+        [0.87, 0.5356],
+        [0.902, 0.531],
+        [0.915, 0.51],
+        [0.9135, 0.47],
+        [0.9125, 0.452],
       ].map(([u, v]) => [u * sx, v]),
       width: 0.011,
       depth: 0.008,
     });
     // two projector lenses in chrome bezels below the eyelid
     for (const [u, v] of [
-      [0.725, 0.572],
-      [0.8, 0.5795],
+      [0.68, 0.4934],
+      [0.77, 0.5006],
     ]) {
-      decals.push({ kind: 'disc', mat: MAT.chrome, view: VIEW.front, center: [u * sx, v], radius: 0.022, depth: 0.019, segments: 32 });
-      decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [u * sx, v], radius: 0.0165, depth: 0.016, segments: 32 });
+      decals.push({ kind: 'disc', mat: MAT.chrome, view: VIEW.front, center: [u * sx, v], radius: 0.019, depth: 0.019, segments: 32 });
+      decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [u * sx, v], radius: 0.0145, depth: 0.016, segments: 32 });
     }
     decals.push({
       kind: 'ribbon',
@@ -413,7 +433,7 @@ export function buildSpecter() {
         ],
         top: [
           [[-0.62, -0.95], [0.62, -0.95]],
-          [[-0.45, 1.3], [0.45, 1.3]],
+          [[-0.5, 1.3], [0.5, 1.3]],
         ],
       },
       livery: { door: [-0.35, 0.43], shoulder: 0.58, cabin: { x: 0.56, z0: -1.9, z1: 1.25 } },
@@ -422,8 +442,8 @@ export function buildSpecter() {
         [-0.85, 0.785, -2.47],
       ],
       headLights: [
-        [0.7625, 0.576, 2.39],
-        [-0.7625, 0.576, 2.39],
+        [0.725, 0.497, 2.39],
+        [-0.725, 0.497, 2.39],
       ],
       exhausts: [
         [0.12, 0.6, -2.5],
