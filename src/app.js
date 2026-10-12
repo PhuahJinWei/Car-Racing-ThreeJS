@@ -14,7 +14,7 @@ import { clamp } from './core/math.js';
 import { setLanguage, t } from './core/i18n.js';
 import { DIFFICULTY } from './game/ai.js';
 import { CARS, getCarDef } from './car/car-defs.js';
-import { loadManifest, ensureCarAssets, getCarAsset, previewModelFile, setCarDetail } from './car/car-assets.js';
+import { loadManifest, ensureCarAssets, getCarAsset, previewModelFile, setCarDetail, trimCarAssets } from './car/car-assets.js';
 import { setReduceFlashes } from './car/car-model.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -210,6 +210,8 @@ export class App {
       this.toMenu();
       return;
     }
+    // every car in the race is built now: models from earlier that nothing uses can go
+    trimCarAssets();
     progress(0.65);
     await nextFrame();
     await this._warmUp(race, progress);

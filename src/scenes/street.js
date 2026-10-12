@@ -4,7 +4,7 @@ import { aimLampLights, castCarShadow } from '../world/car-light.js';
 import { globalUniforms, MAX_HEADLIGHTS } from '../world/materials.js';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef, CARS } from '../car/car-defs.js';
-import { getCarAsset, ensureCarAssets } from '../car/car-assets.js';
+import { getCarAsset, ensureCarAssets, trimCarAssets } from '../car/car-assets.js';
 import { randomCustom } from '../car/customization.js';
 import { Effects } from '../game/effects.js';
 import { DEFAULT_FX } from '../core/postfx.js';
@@ -30,6 +30,7 @@ const VIEWS = {
 const HEAD_POWER = 1.2; // parked: dipped lights, softer than on the move
 const HEAD_POWER_PASSER = 1.6;
 const HEAD_RANGE = 60;
+const MAX_PASSERS = 3; // kinds of car kept ready to drive past
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -185,6 +186,7 @@ export class MenuStreet {
     this.car.group.updateMatrixWorld(true);
     const a = this.anchor.position;
     castCarShadow(this.world, this.car, this.spotI, a.x, a.y, a.z, 0);
+    trimCarAssets();
   }
 
   setView(name) {
@@ -343,17 +345,31 @@ export class MenuStreet {
     let ps = this.passers.find((p) => p.def.id === def.id);
     const rnd = Math.random;
     if (!ps) {
+      // a few kinds of passer at most (each keeps its car's model loaded): the one used longest ago
+      // makes way, handing over its light trails
+      let trails = null;
+      if (this.passers.length >= MAX_PASSERS) {
+        const old = this.passers.shift();
+        this.root.remove(old.model.group);
+        old.model.dispose();
+        trails = old.trails;
+        for (const t of trails) this.effects.trails.reset(t);
+        trimCarAssets();
+      }
       const model = new CarModel(def, randomCustom(rnd, def), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id) });
       this.root.add(model.group);
       const tw = 0.06;
-      ps = { def, model, frame: {}, trails: [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)] };
+      ps = { def, model, frame: {}, trails: trails || [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)] };
       if (!ps.trails[0] || !ps.trails[1]) {
         this.root.remove(model.group);
         model.dispose();
         return;
       }
       this.passers.push(ps);
-    } else ps.model.setCustomization(randomCustom(rnd, ps.def));
+    } else {
+      ps.model.setCustomization(randomCustom(rnd, ps.def));
+      this.passers.push(...this.passers.splice(this.passers.indexOf(ps), 1));
+    }
     ps.active = true;
     ps.whooshed = false;
     ps.s = this.spotS - 190;

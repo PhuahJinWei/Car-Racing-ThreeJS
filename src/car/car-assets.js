@@ -12,6 +12,11 @@ let manifestPromise = null;
 // keyed by `${id}|${version}`: 'full', or 'light' (the phone file: a mid-detail near model)
 const assetPromises = new Map();
 const assets = new Map();
+// Each prepared model holds several MB of geometry (JS and GPU). The ones car models are using
+// stay loaded; of the rest only the few used last are kept, so browsing a big roster in the garage
+// doesn't pile them all up. A freed model loads again from the browser cache when needed.
+const IDLE_KEEP = 3;
+let useClock = 0;
 // which version of each model to load and hand out (see setCarDetail)
 let detail = 'full';
 
@@ -122,6 +127,51 @@ export function getCarAsset(id) {
   return assets.get(`${id}|${want}`) || assets.get(`${id}|${want === 'light' ? 'full' : 'light'}`) || null;
 }
 
+/** A car model was built from `asset`: it stays loaded until released. */
+export function retainCarAsset(asset) {
+  if (!asset) return;
+  asset.users = (asset.users || 0) + 1;
+  asset.lastUsed = ++useClock;
+}
+
+/** A car model built from `asset` was disposed. */
+export function releaseCarAsset(asset) {
+  if (!asset) return;
+  asset.users = Math.max(0, (asset.users || 0) - 1);
+  asset.lastUsed = ++useClock;
+}
+
+/**
+ * Free the models no car is using, apart from the few used last. Call it once the models needed
+ * right now have been built (so they're in use), never between loading a model and building it.
+ */
+export function trimCarAssets() {
+  const idle = [...assets].filter(([, a]) => !a.users && !a.pinned);
+  idle.sort((a, b) => b[1].lastUsed - a[1].lastUsed);
+  for (const [key, asset] of idle.slice(IDLE_KEEP)) {
+    assets.delete(key);
+    assetPromises.delete(key);
+    // (both versions can be the same object - a previewed model is pinned, so not here)
+    if ([...assets.values()].includes(asset)) continue;
+    disposeAsset(asset);
+  }
+}
+
+function disposeAsset(asset) {
+  const geos = new Set();
+  for (const parts of Object.values(asset.lods || {})) for (const p of parts) geos.add(p.geometry);
+  if (asset.merged) for (const g of asset.merged.values()) geos.add(g);
+  asset.scene?.traverse((o) => {
+    if (!o.isMesh) return;
+    geos.add(o.geometry);
+    for (const m of [].concat(o.material)) {
+      for (const v of Object.values(m)) if (v && v.isTexture) v.dispose();
+      m.dispose();
+    }
+  });
+  for (const g of geos) g?.dispose();
+}
+
 /** Model bytes: the gzipped twin when the browser can unpack it, else the plain .glb. */
 async function fetchModel(model) {
   const get = async (url) => {
@@ -165,6 +215,8 @@ export async function ensureCarAssets(ids, renderer) {
                   (gltf) => {
                     try {
                       const asset = prepareAsset(gltf, def);
+                      asset.users = 0;
+                      asset.lastUsed = ++useClock;
                       assets.set(key, asset);
                       resolve(asset);
                     } catch (err) {
@@ -201,6 +253,10 @@ export async function previewModelFile(file, carId, renderer, extra = {}) {
   const def = getCarDef(carId);
   def.model = { ...(def.model || {}), ...extra, file: file.name, url: null, preview: true };
   const asset = prepareAsset(gltf, def);
+  // (a dropped file can't be fetched again, so it is never freed)
+  asset.pinned = true;
+  asset.users = 0;
+  asset.lastUsed = ++useClock;
   for (const version of ['full', 'light']) {
     assets.set(`${carId}|${version}`, asset);
     assetPromises.set(`${carId}|${version}`, Promise.resolve(asset));

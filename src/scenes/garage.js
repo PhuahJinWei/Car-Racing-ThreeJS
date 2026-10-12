@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef } from '../car/car-defs.js';
-import { getCarAsset, ensureCarAssets } from '../car/car-assets.js';
+import { getCarAsset, ensureCarAssets, trimCarAssets } from '../car/car-assets.js';
 import { DEFAULT_FX } from '../core/postfx.js';
 import { globalUniforms } from '../world/materials.js';
 import { damp, clamp } from '../core/math.js';
@@ -160,6 +160,8 @@ export class Garage {
     this.car.setStreaks(0, 0.05);
     this.scene.add(this.car.group);
     this.spin = 1; // little showroom spin when switching cars
+    // (cars browsed earlier and no longer shown are freed, bar the last few)
+    trimCarAssets();
   }
 
   setCustom(custom) {

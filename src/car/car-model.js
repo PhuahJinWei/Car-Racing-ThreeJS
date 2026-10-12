@@ -6,6 +6,7 @@ import { tyreGeometry, rimGeometry, discGeometry, caliperGeometry, isSharedWheel
 import { AO_GLSL, withAO, makeCarbonMaterial, makeGrilleMaterial } from './car-materials.js';
 import { PROJ_TILES, drawProjectedLivery } from './car-livery.js';
 import { CarDamage, patchDamage } from './car-damage.js';
+import { retainCarAsset, releaseCarAsset } from './car-assets.js';
 
 // ------------------------------------------------------------------------------------------
 // Geometry helpers
@@ -693,6 +694,8 @@ export class CarModel {
       uCarFwd: { value: new THREE.Vector3(0, 0, 1) },
     };
     this.asset = this.opts.asset || null;
+    // (keeps the model loaded while this car exists; see dispose)
+    retainCarAsset(this.asset);
     if (this.asset?.factory) this._buildFromFactory(this.asset);
     else if (this.asset) this._buildFromAsset(this.asset);
     else this._buildGeometry();
@@ -1509,5 +1512,8 @@ export class CarModel {
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();
+    // (once only: another car may share the model)
+    if (!this.released) releaseCarAsset(this.asset);
+    this.released = true;
   }
 }
