@@ -4,21 +4,21 @@
       "id": "volt",
       "file": "volt.glb",
       "factory": true,
-      "v": "3e2d831bc7",
+      "v": "646b45a9d7",
       "gz": true
     },
     {
       "id": "razor",
       "file": "razor.glb",
       "factory": true,
-      "v": "e3829a4c97",
+      "v": "96b5ae6377",
       "gz": true
     },
     {
       "id": "specter",
       "file": "specter.glb",
       "factory": true,
-      "v": "4216fcb1e2",
+      "v": "b59d21eb4a",
       "gz": true
     }
   ]

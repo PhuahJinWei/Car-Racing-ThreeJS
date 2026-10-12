@@ -363,33 +363,35 @@ function prepare(sdf, mesh, opts) {
     N[v * 3 + 1] = g[1];
     N[v * 3 + 2] = g[2];
   }
-  prep = { split, P, N, vm: Uint8Array.from(vm) };
+  // AO is baked here, before simplification, so the simplifier can see it: baked afterwards, a
+  // single crease vertex smeared its darkness across a whole large triangle as a black wedge
+  const AO = bakeAO(sdf, P, N, out, opts.ao);
+  prep = { split, P, N, AO, vm: Uint8Array.from(vm) };
   prepared.set(mesh, prep);
   return prep;
 }
 
 /**
- * Simplify the whole mesh in one go (normals are simplification attributes, so shading features
- * such as creases keep enough triangles), then build compact per-material meshes with baked AO.
+ * Simplify the whole mesh in one go (normals and AO are simplification attributes, so shading
+ * features such as creases and crevices keep enough triangles), then build compact per-material meshes.
  * target: total triangle count to aim for.
  */
 export async function buildParts(sdf, mesh, target, opts = {}) {
   await MeshoptSimplifier.ready;
-  const out = { m: 0 };
-  const { split, P, N, vm } = prepare(sdf, mesh, opts);
+  const { split, P, N, AO, vm } = prepare(sdf, mesh, opts);
   const goal = Math.min(split.length, Math.max(3, Math.floor(target) * 3));
   const w = opts.normalWeight ?? 0.03;
-  // per-material importance: scaling a part's normals scales how much its shading detail counts
-  let A = N;
-  if (opts.matWeights) {
-    A = new Float32Array(N.length);
-    for (let v = 0; v < vm.length; v++) {
-      const k = opts.matWeights[vm[v]] ?? 1;
-      A[v * 3] = N[v * 3] * k;
-      A[v * 3 + 1] = N[v * 3 + 1] * k;
-      A[v * 3 + 2] = N[v * 3 + 2] * k;
-    }
+  const aw = opts.aoWeight ?? w;
+  // attributes: normal + AO; per-material importance scales how much a part's shading detail counts
+  const A = new Float32Array(vm.length * 4);
+  for (let v = 0; v < vm.length; v++) {
+    const k = opts.matWeights?.[vm[v]] ?? 1;
+    A[v * 4] = N[v * 3] * k;
+    A[v * 4 + 1] = N[v * 3 + 1] * k;
+    A[v * 4 + 2] = N[v * 3 + 2] * k;
+    A[v * 4 + 3] = AO[v] * k;
   }
+  const weights = [w, w, w, aw];
   let src = split;
   // pre-passes: coarsen less visible parts (wheel wells, underbody, cockpit) with looser errors
   // while every vertex touching the remaining parts stays put
@@ -403,9 +405,9 @@ export async function buildParts(sdf, mesh, target, opts = {}) {
     }
     // seam copies of a pinned vertex must stay locked as well
     for (let v = 0; v < vm.length; v++) if (!lock[v] && pinned.has(`${P[v * 3]},${P[v * 3 + 1]},${P[v * 3 + 2]}`)) lock[v] = 1;
-    [src] = MeshoptSimplifier.simplifyWithAttributes(src, P, 3, A, 3, [w, w, w], lock, 0, stage.error, ['ErrorAbsolute']);
+    [src] = MeshoptSimplifier.simplifyWithAttributes(src, P, 3, A, 4, weights, lock, 0, stage.error, ['ErrorAbsolute']);
   }
-  const [simplified] = MeshoptSimplifier.simplifyWithAttributes(src, P, 3, A, 3, [w, w, w], null, Math.min(goal, src.length), opts.error ?? 0.002, ['ErrorAbsolute']);
+  const [simplified] = MeshoptSimplifier.simplifyWithAttributes(src, P, 3, A, 4, weights, null, Math.min(goal, src.length), opts.error ?? 0.002, ['ErrorAbsolute']);
   const byMat = new Map();
   for (let t = 0; t < simplified.length; t += 3) {
     const m = vm[simplified[t]];
@@ -418,6 +420,7 @@ export async function buildParts(sdf, mesh, target, opts = {}) {
     const remap = new Map();
     const pp = [];
     const nn = [];
+    const aa = [];
     const ind = new Uint32Array(arr.length);
     for (let i = 0; i < arr.length; i++) {
       const v = arr[i];
@@ -427,12 +430,11 @@ export async function buildParts(sdf, mesh, target, opts = {}) {
         remap.set(v, nv);
         pp.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
         nn.push(N[v * 3], N[v * 3 + 1], N[v * 3 + 2]);
+        aa.push(AO[v]);
       }
       ind[i] = nv;
     }
-    const p = { positions: new Float32Array(pp), normals: new Float32Array(nn), indices: ind };
-    p.ao = bakeAO(sdf, p.positions, p.normals, out, opts.ao);
-    parts[m] = p;
+    parts[m] = { positions: new Float32Array(pp), normals: new Float32Array(nn), ao: new Float32Array(aa), indices: ind };
   }
   return parts;
 }
