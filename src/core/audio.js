@@ -773,12 +773,41 @@ const PROGS = [
   ],
 ];
 
+// Garage: a late-night workshop - lo-fi with swung 16ths, electric piano 9th chords, a round
+// bass and vinyl crackle. Everything sits in C major, so the melody fits every chord.
+// [bass, voicing]: Dm9 G13 Cmaj9 Am9 | Fmaj9 Em7 Dm9 G13sus
+const GARAGE_PROGS = [
+  [
+    [50, [53, 57, 60, 64]],
+    [43, [53, 59, 64, 69]],
+    [48, [52, 55, 59, 62]],
+    [45, [55, 59, 60, 64]],
+  ],
+  [
+    [41, [57, 60, 64, 67]],
+    [40, [55, 59, 62, 67]],
+    [38, [53, 57, 60, 64]],
+    [43, [53, 57, 60, 64]],
+  ],
+];
+// a two-bar phrase: [step, note]
+const GARAGE_TUNE = [
+  [2, 76],
+  [6, 74],
+  [9, 72],
+  [14, 69],
+  [19, 72],
+  [22, 74],
+  [27, 67],
+];
+const MUSIC_BPM = { race: 128, menu: 98, garage: 84 };
+
 class SynthwaveMusic {
   constructor(audio, mode) {
     this.a = audio;
     this.ctx = audio.ctx;
     this.mode = mode;
-    this.bpm = mode === 'race' ? 128 : 98;
+    this.bpm = MUSIC_BPM[mode] ?? 98;
     this.intensity = 1;
     this.step = 0;
     const ctx = this.ctx;
@@ -810,6 +839,20 @@ class SynthwaveMusic {
   start() {
     const t = this.ctx.currentTime;
     this.out.gain.setTargetAtTime(1, t, 0.8);
+    if (this.mode === 'garage') {
+      // record hiss under the garage tune
+      this.hiss = this.ctx.createBufferSource();
+      this.hiss.buffer = this.a.noiseBuf;
+      this.hiss.loop = true;
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 3500;
+      f.Q.value = 0.5;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.012;
+      this.hiss.connect(f).connect(g).connect(this.out);
+      this.hiss.start(t, Math.random());
+    }
     this.next = t + 0.15;
     this.timer = setInterval(() => this._schedule(), 25);
   }
@@ -819,7 +862,11 @@ class SynthwaveMusic {
     const t = this.ctx.currentTime;
     this.out.gain.setTargetAtTime(0, t, 0.3);
     const out = this.out;
-    setTimeout(() => out.disconnect(), 1500);
+    const hiss = this.hiss;
+    setTimeout(() => {
+      out.disconnect();
+      hiss?.stop();
+    }, 1500);
   }
 
   _schedule() {
@@ -918,7 +965,58 @@ class SynthwaveMusic {
     s.stop(t + dur + 0.1);
   }
 
+  _softKick(t) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.75, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    o.connect(g).connect(this.drums);
+    o.start(t);
+    o.stop(t + 0.35);
+  }
+
+  // electric piano: a sine with a little second harmonic and a quick bark on the attack
+  _ep(f, t, dur, peak, dest) {
+    this._voice('sine', f, t, dur, peak, dest, { attack: 0.004, release: dur, cut0: 4000, detune: rand(-4, 4) });
+    this._voice('sine', f * 2, t, dur * 0.4, peak * 0.28, dest, { attack: 0.003, release: dur * 0.4, cut0: 4000 });
+    this._voice('triangle', f * 4, t, 0.08, peak * 0.07, dest, { attack: 0.002, release: 0.08, cut0: 5000 });
+  }
+
+  _playGarage(step, t, sd) {
+    const s = step % 16;
+    const bar = Math.floor(step / 16);
+    const [bass, chord] = GARAGE_PROGS[Math.floor(bar / 4) % 2][bar % 4];
+    // swing: every second 16th lands late
+    const st = t + (s % 2 === 1 ? sd * 0.22 : 0);
+    // drums: lazy kick, rim on 2 and 4, soft hats with the odd ghost note
+    if (s === 0 || s === 10 || (bar % 2 === 1 && s === 7)) this._softKick(st);
+    if (s === 4 || s === 12) {
+      this._noiseHit(st, 'bandpass', 2200, 0.09, 0.26, 1.2);
+      this._noiseHit(st, 'highpass', 5000, 0.05, 0.06);
+      this._voice('triangle', 330, st, 0.04, 0.08, this.drums, { cut0: 3000 });
+    }
+    if (s % 2 === 0) this._noiseHit(st, 'highpass', 7000, 0.035, (s % 4 === 2 ? 0.08 : 0.05) * rand(0.7, 1));
+    else if (Math.random() < 0.3) this._noiseHit(st, 'highpass', 7500, 0.025, 0.03);
+    // vinyl crackle
+    if (Math.random() < 0.45) this._noiseHit(t + rand(0, sd), 'highpass', 2500, 0.003, rand(0.04, 0.16));
+    // bass: root on the one, a push into the second half
+    if (s === 0) this._voice('triangle', midi(bass), t, sd * 6, 0.24, this.duck, { attack: 0.01, release: sd * 6, cut0: 420 });
+    if (s === 10) this._voice('triangle', midi(bass + (bar % 2 ? 7 : 12)), st, sd * 3, 0.18, this.duck, { attack: 0.01, release: sd * 3, cut0: 420 });
+    // chords: rolled on the bar, a soft stab on the off-beat every other bar
+    if (s === 0) chord.forEach((n, i) => this._ep(midi(n), t + i * 0.014, sd * 14, 0.05, this.duck));
+    if (bar % 2 === 1 && s === 11) chord.slice(1).forEach((n) => this._ep(midi(n), st, sd * 2, 0.025, this.duck));
+    // the tune comes in for the second half of each 8 bars, with echoes
+    if (bar % 8 >= 4) {
+      const i = (bar % 2) * 16 + s;
+      for (const [at, n] of GARAGE_TUNE) if (at === i) this._ep(midi(n), st, sd * 3, 0.07, this.arpBus);
+    }
+  }
+
   _play(step, t, sd) {
+    if (this.mode === 'garage') return this._playGarage(step, t, sd);
     const race = this.mode === 'race';
     const s = step % 16;
     const bar = Math.floor(step / 16);

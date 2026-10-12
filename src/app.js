@@ -116,24 +116,28 @@ export class App {
     this.state = 'menu';
     this._toStreet('setup');
     this.ui.show('setup', { mode });
+    this.audio.startMusic('menu');
   }
 
   openGarage(params) {
     this.state = 'garage';
     this.garage.setView('garage');
     this.ui.show('garage', params);
+    this.audio.startMusic('garage');
   }
 
   openSettings() {
     this.state = 'menu';
     this._toStreet('menu');
     this.ui.show('settings');
+    this.audio.startMusic('menu');
   }
 
   openDaily() {
     this.state = 'menu';
     this._toStreet('setup');
     this.ui.show('daily');
+    this.audio.startMusic('menu');
   }
 
   startDaily(d) {
