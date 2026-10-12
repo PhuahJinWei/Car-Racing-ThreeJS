@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS = {
 
 function defaultSave() {
   return {
-    v: 2,
+    v: 3,
     credits: 2500,
     car: 'volt',
     ownedCars: ['volt'],
@@ -35,7 +35,7 @@ function defaultSave() {
       finish: ['gloss'],
       livery: ['lv_none'],
       rims: ['r_split'],
-      rimColor: ['rc_gunmetal', 'rc_silver'],
+      rimColor: ['rc_silver', 'rc_gunmetal'],
       underglow: ['ug_none', 'ug_cyan'],
       trail: ['tr_red'],
     },
@@ -44,7 +44,7 @@ function defaultSave() {
     tt: {},
     daily: { date: null, best: null, completed: false, streak: 0, lastCompleted: null },
     stats: { races: 0, wins: 0, podiums: 0, nearMisses: 0, driftDistance: 0, bestCombo: 1, creditsEarned: 0, bestDrift: 0 },
-    lastSetup: { trackId: 'lumen', reverse: false, mirror: false, weather: 'clear', laps: 3, difficulty: 'easy' },
+    lastSetup: { trackId: 'district', reverse: false, mirror: false, weather: 'auto', laps: 3, difficulty: 'easy' },
     tutorialDone: false,
   };
 }
@@ -80,6 +80,16 @@ export class Storage {
           this.data.lastSetup.difficulty = 'easy';
           for (const c of Object.values(this.data.custom)) c.underglow = 'ug_none';
           this.data.v = 2;
+        }
+        // v2 -> v3: silver became the default rim colour; event setup dropped direction/mirror and defaults to auto weather
+        if (!parsed.v || parsed.v < 3) {
+          for (const c of Object.values(this.data.custom)) if (c.rimColor === 'rc_gunmetal') c.rimColor = 'rc_silver';
+          const ls = this.data.lastSetup;
+          ls.reverse = false;
+          ls.mirror = false;
+          ls.weather = 'auto';
+          if (ls.trackId === 'lumen') ls.trackId = 'district';
+          this.data.v = 3;
         }
       } catch {
         /* corrupted save -> defaults */

@@ -7,8 +7,21 @@ import { getDaily, msUntilTomorrow } from '../game/daily.js';
 import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber } from '../core/math.js';
 import { controlsCells } from './controls-help.js';
+import districtShot from '../assets/tracks/district.jpg';
+import lumenShot from '../assets/tracks/lumen.jpg';
+import circuitShot from '../assets/tracks/circuit.jpg';
 
 const THEME_LABEL = { tunnel: 'EXPRESSWAY', city: 'STREET', stadium: 'CIRCUIT' };
+
+// In-game shots for the track cards; focus is the crop point when a card's shape differs from the 16:9 shot.
+const TRACK_SHOTS = {
+  district: { src: districtShot, focus: '74% 55%' },
+  lumen: { src: lumenShot, focus: '52% 55%' },
+  circuit: { src: circuitShot, focus: '70% 55%' },
+};
+// Event setup order (TRACKS keeps its own order: the daily challenge picks from it by index)
+const SETUP_ORDER = ['district', 'lumen', 'circuit'];
+const SETUP_TRACKS = [...TRACKS].sort((a, b) => (SETUP_ORDER.indexOf(a.id) + 1 || 99) - (SETUP_ORDER.indexOf(b.id) + 1 || 99));
 const MODE_LABEL = { race: 'RACE', timetrial: 'TIME TRIAL', daily: 'DAILY CHALLENGE' };
 const SUFFIX = (n) => (n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH');
 
@@ -186,7 +199,7 @@ export class UI {
     this.root.addEventListener(
       'pointerdown',
       (e) => {
-        const b = e.target.closest('button, .track-tile, .menu-item, .item');
+        const b = e.target.closest('button, .menu-item, .item');
         if (b && !b.disabled) app.audio?.play(b.dataset.sfx || 'ui');
       },
       true,
@@ -397,7 +410,7 @@ export class UI {
       const laps = info.laps || def.laps;
       const chips = [
         `${ICONS.laps}${laps} ${laps === 1 ? 'LAP' : 'LAPS'}`,
-        v.reverse ? `${ICONS.reverse}REVERSE` : `${ICONS.forward}FORWARD`,
+        v.reverse ? `${ICONS.reverse}REVERSE` : null,
         v.mirror ? `${ICONS.mirror}MIRROR` : null,
         v.weather === 'rain' ? `${ICONS.rain}RAIN` : `${ICONS.moon}CLEAR`,
       ].filter(Boolean);
@@ -528,42 +541,34 @@ export class UI {
     const app = this.app;
     const S = app.storage;
     const st = { ...S.data.lastSetup };
+    if (!['auto', 'clear', 'rain'].includes(st.weather)) st.weather = 'auto';
+    if (!SETUP_TRACKS.some((t) => t.id === st.trackId)) st.trackId = SETUP_TRACKS[0].id;
     const isTT = mode === 'timetrial';
     const car = getCarDef(S.data.car);
     const root = el(`
       <div class="screen setup-screen">
         ${this._head(isTT ? 'SOLO · BEAT YOUR GHOST' : 'EVENT · 5 RIVALS', isTT ? 'TIME TRIAL' : 'RACE', this.creditsHtml())}
         <div class="setup-body">
-          <div class="track-list">
-            ${TRACKS.map(
-              (t, i) => `
-              <button class="track-tile anim-l" style="--d:${80 + i * 60}" data-action="track" data-id="${t.id}">
-                <canvas width="160" height="160"></canvas>
-                <span class="tt-text">
-                  <span class="tt-name">${t.name}</span>
-                  <span class="tt-meta"></span>
-                  <span class="tt-best"></span>
+          <div class="track-cards">
+            ${SETUP_TRACKS.map((t, i) => {
+              const shot = TRACK_SHOTS[t.id];
+              return `
+              <button class="track-card anim-up" style="--d:${80 + i * 70}" data-action="track" data-id="${t.id}">
+                ${shot ? `<img class="tc-shot" src="${shot.src}" alt="" draggable="false" style="object-position:${shot.focus}">` : ''}
+                <span class="tc-check">${ICONS.check}</span>
+                <canvas class="tc-map" width="120" height="120"></canvas>
+                <span class="tc-text">
+                  <span class="tc-meta"></span>
+                  <span class="tc-name">${t.name}</span>
+                  <span class="tc-best"></span>
                 </span>
-              </button>`,
-            ).join('')}
+              </button>`;
+            }).join('')}
           </div>
-          <section class="event glass anim-r" style="--d:140">
-            <div class="event-head">
-              <canvas class="event-map" width="300" height="300"></canvas>
-              <div class="event-info">
-                <div class="eyebrow accent" data-ev="meta"></div>
-                <h2 class="event-name" data-ev="name"></h2>
-                <p class="event-desc" data-ev="desc"></p>
-                <div class="event-records" data-ev="records"></div>
-              </div>
-            </div>
-            <div class="event-opts">
-              <div class="opt"><label>DIRECTION</label>${seg('reverse', [[0, `${ICONS.forward}FORWARD`], [1, `${ICONS.reverse}REVERSE`]], st.reverse ? 1 : 0)}</div>
-              <div class="opt"><label>MIRROR</label>${seg('mirror', [[0, 'OFF'], [1, `${ICONS.mirror}ON`]], st.mirror ? 1 : 0)}</div>
-              <div class="opt"><label>CONDITIONS</label>${seg('weather', [['clear', `${ICONS.moon}CLEAR`], ['rain', `${ICONS.rain}RAIN`]], st.weather)}</div>
-              <div class="opt"><label>LAPS</label>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], st.laps)}</div>
-              ${isTT ? '' : `<div class="opt wide"><label>RIVALS</label>${seg('difficulty', [['rookie', 'ROOKIE'], ['easy', 'EASY'], ['normal', 'NORMAL'], ['hard', 'HARD']], st.difficulty)}</div>`}
-            </div>
+          <section class="setup-opts glass anim-up" style="--d:290">
+            <div class="opt"><label>CONDITIONS</label>${seg('weather', [['auto', `${ICONS.shuffle}AUTO`], ['clear', `${ICONS.moon}CLEAR`], ['rain', `${ICONS.rain}RAIN`]], st.weather)}</div>
+            <div class="opt"><label>LAPS</label>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], st.laps)}</div>
+            ${isTT ? '' : `<div class="opt"><label>RIVALS</label>${seg('difficulty', [['rookie', 'ROOKIE'], ['easy', 'EASY'], ['normal', 'NORMAL'], ['hard', 'HARD']], st.difficulty)}</div>`}
           </section>
         </div>
         <footer class="setup-footer anim-up" style="--d:220">
@@ -571,53 +576,46 @@ export class UI {
           <button class="btn primary big" data-action="start">START${ICONS.chevron}</button>
         </footer>
       </div>`);
-    const variantOf = () => ({ reverse: !!st.reverse, mirror: !!st.mirror });
-    const recordKey = (id) => `${id}|${st.reverse ? 'r' : 'f'}|${st.mirror ? 'm' : 'n'}|${st.weather}`;
+    // events always run forward and unmirrored; AUTO weather is rolled when the race starts
+    const forward = { reverse: false, mirror: false };
+    const conditions = () => (st.weather === 'auto' ? ['clear', 'rain'] : [st.weather]);
+    const recordKey = (id, weather) => `${id}|f|n|${weather}`;
+    for (const card of $$(root, '.track-card')) {
+      const def = getTrackDef(card.dataset.id);
+      const tr = previewTrack(def.id, forward);
+      drawTrackPreview($(card, '.tc-map'), tr, { width: 1.5 });
+      $(card, '.tc-meta').textContent = `${THEME_LABEL[def.theme] || ''} · ${(tr.length / 1000).toFixed(1)} KM`;
+    }
     const refresh = () => {
-      for (const tile of $$(root, '.track-tile')) {
-        const id = tile.dataset.id;
+      for (const card of $$(root, '.track-card')) {
+        const id = card.dataset.id;
         const on = id === st.trackId;
-        tile.classList.toggle('selected', on);
-        const tr = previewTrack(id, variantOf());
-        drawTrackPreview(tile.querySelector('canvas'), tr, { color: on ? '#ffffff' : 'rgba(243,245,248,0.75)' });
-        $(tile, '.tt-meta').textContent = `${THEME_LABEL[getTrackDef(id).theme] || ''} · ${(tr.length / 1000).toFixed(1)} KM`;
-        const rec = S.getRecord(recordKey(id), mode);
-        $(tile, '.tt-best').innerHTML = rec?.bestTime ? `BEST <b>${formatTime(rec.bestTime)}</b>` : 'NO TIME SET';
+        card.classList.toggle('selected', on);
+        card.setAttribute('aria-pressed', String(on));
+        // AUTO shows the better of the clear and wet records
+        const best = Math.min(...conditions().map((w) => S.getRecord(recordKey(id, w), mode)?.bestTime || Infinity));
+        const ghost = isTT && conditions().some((w) => S.getGhost(recordKey(id, w)));
+        $(card, '.tc-best').innerHTML = `${isFinite(best) ? `BEST <b>${formatTime(best)}</b>` : 'NO TIME SET'}${ghost ? '<i class="tc-ghost">GHOST</i>' : ''}`;
       }
       for (const s of $$(root, '.seg')) {
-        const name = s.dataset.opt;
-        const v = name === 'reverse' || name === 'mirror' ? (st[name] ? 1 : 0) : st[name];
+        const v = st[s.dataset.opt];
         for (const b of $$(s, 'button')) b.classList.toggle('on', String(b.dataset.v) === String(v));
       }
-      const def = getTrackDef(st.trackId);
-      const tr = previewTrack(st.trackId, variantOf());
-      drawTrackPreview($(root, '.event-map'), tr, { width: 1.25 });
-      $(root, '[data-ev=meta]').textContent = `${THEME_LABEL[def.theme] || ''} · ${(tr.length / 1000).toFixed(1)} KM`;
-      $(root, '[data-ev=name]').textContent = def.name;
-      $(root, '[data-ev=desc]').textContent = def.tagline;
-      const rec = S.getRecord(recordKey(st.trackId), mode);
-      const ghost = isTT && S.getGhost(recordKey(st.trackId));
-      $(root, '[data-ev=records]').innerHTML = `
-        <div class="kv"><span>BEST TIME</span><b class="${rec?.bestTime ? 'gold' : 'dim'}">${rec?.bestTime ? formatTime(rec.bestTime) : '--:--.--'}</b></div>
-        <div class="kv"><span>BEST LAP</span><b class="${rec?.bestLap ? '' : 'dim'}">${rec?.bestLap ? formatTime(rec.bestLap) : '--:--.--'}</b></div>
-        ${isTT ? `<div class="kv"><span>GHOST</span><b class="${ghost ? 'ice' : 'dim'}">${ghost ? 'READY' : 'NONE'}</b></div>` : ''}`;
     };
     const save = () => {
-      S.data.lastSetup = { trackId: st.trackId, reverse: st.reverse, mirror: st.mirror, weather: st.weather, laps: st.laps, difficulty: st.difficulty };
+      S.data.lastSetup = { trackId: st.trackId, ...forward, weather: st.weather, laps: st.laps, difficulty: st.difficulty };
       S.save();
     };
     delegate(root, {
       back: () => app.toMenu(),
       track: (t) => {
         st.trackId = t.dataset.id;
-        const def = getTrackDef(st.trackId);
-        if (!st.lapsTouched) st.laps = def.laps;
+        if (!st.lapsTouched) st.laps = getTrackDef(st.trackId).laps;
         refresh();
       },
       seg: (b) => {
         const name = b.closest('.seg').dataset.opt;
         let v = b.dataset.v;
-        if (name === 'reverse' || name === 'mirror') v = v === '1';
         if (name === 'laps') {
           v = Number(v);
           st.lapsTouched = true;
@@ -634,7 +632,7 @@ export class UI {
         app.startRace({
           mode,
           trackId: st.trackId,
-          variant: { reverse: st.reverse, mirror: st.mirror, weather: st.weather },
+          variant: { ...forward, weather: st.weather },
           laps: st.laps,
           difficulty: st.difficulty,
         });

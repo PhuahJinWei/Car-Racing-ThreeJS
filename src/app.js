@@ -145,7 +145,9 @@ export class App {
     const carId = cfg.carId || S.data.car;
     const custom = S.ownsCar(carId) ? S.customFor(carId) : undefined;
     const v = { reverse: false, mirror: false, weather: 'clear', ...(cfg.variant || {}) };
-    const key = `${cfg.trackId}|${v.reverse ? 'r' : 'f'}|${v.mirror ? 'm' : 'n'}|${v.weather}`;
+    // AUTO rolls the conditions per race (restarts keep them); records stay split by clear/rain
+    if (v.weather === 'auto') v.weather = Math.random() < 0.35 ? 'rain' : 'clear';
+    const key =`${cfg.trackId}|${v.reverse ? 'r' : 'f'}|${v.mirror ? 'm' : 'n'}|${v.weather}`;
     const full = { opponents: 5, difficulty: 'easy', laps: 3, ...cfg, variant: v, carId, custom };
     if (full.mode === 'timetrial') full.ghost = S.getGhost(key);
     this.lastRaceCfg = full;

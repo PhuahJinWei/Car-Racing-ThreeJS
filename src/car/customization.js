@@ -42,8 +42,8 @@ export const RIMS = [
 ];
 
 export const RIM_COLORS = [
-  { id: 'rc_gunmetal', name: 'Gunmetal', color: '#3a3f48', price: 0 },
   { id: 'rc_silver', name: 'Silver', color: '#c9cfd8', price: 0 },
+  { id: 'rc_gunmetal', name: 'Gunmetal', color: '#3a3f48', price: 0 },
   { id: 'rc_black', name: 'Black', color: '#111216', price: 200 },
   { id: 'rc_gold', name: 'Gold', color: '#c99a2e', price: 600 },
   { id: 'rc_neoncyan', name: 'Neon Cyan', color: '#00e5ff', glow: true, price: 1500 },
@@ -99,7 +99,7 @@ export const DEFAULT_CUSTOM = {
   accent: 'p_white',
   livery: 'lv_none',
   rims: 'r_split',
-  rimColor: 'rc_gunmetal',
+  rimColor: 'rc_silver',
   underglow: 'ug_none',
   trail: 'tr_red',
 };
