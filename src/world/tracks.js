@@ -11,25 +11,25 @@ export const TRACKS = [
     theme: 'tunnel',
     width: 17,
     laps: 2,
-    startOffset: 140,
+    startOffset: 200,
     bankGain: 16,
     maxBank: 0.24,
     path: [
-      ['S', 300], // 0 main straight
+      ['S', 560], // 0 main straight
       ['R', 55, 230], // 1
-      ['S', 120], // 2
+      ['S', 250], // 2
       ['L', 35, 200], // 3
-      ['R', 95, 170], // 4
-      ['S', 220], // 5
+      ['R', 115, 170], // 4
+      ['S', 560], // 5
       ['R', 40, 320], // 6
       ['L', 50, 160], // 7
-      ['R', 90, 115], // 8
-      ['S', 160], // 9
+      ['R', 70, 115], // 8
+      ['S', 510], // 9
       ['R', 70, 210], // 10
-      ['S', 110], // 11
+      ['S', 320], // 11
       ['L', 30, 220], // 12
       ['R', 85, 140], // 13
-      ['S', 150], // 14
+      ['S', 410], // 14
       ['R', 40, 260], // 15
     ],
     elevation: [
@@ -43,18 +43,20 @@ export const TRACKS = [
       [0.84, 4],
     ],
     sections: [
-      { type: 'tunnel', from: [1, 0.1], to: [5, 0.6] },
+      { type: 'tunnel', from: [1, 0.1], to: [5, 0.4] },
       { type: 'tunnel', from: [8, 0.1], to: [11, 0.5] },
       { type: 'tunnel', from: [13, 0.3], to: [15, 0.7] },
-      { type: 'open', from: [5, 0.6], to: [8, 0.1] },
+      { type: 'open', from: [5, 0.4], to: [8, 0.1] },
       { type: 'open', from: [11, 0.5], to: [13, 0.3] },
       { type: 'open', from: [15, 0.7], to: [1, 0.1] },
     ],
+    // Pads sit just past a corner exit, with the whole straight ahead to use the boost and
+    // brake (track.js mirrors them along their straight in reverse).
     boostPads: [
-      { at: [0, 0.75], offset: 0 },
-      { at: [5, 0.8], offset: -3 },
-      { at: [9, 0.5], offset: 3 },
-      { at: [14, 0.4], offset: 0 },
+      { at: [0, 0.08], offset: 0 },
+      { at: [5, 0.08], offset: -2.5 },
+      { at: [9, 0.08], offset: -2.5 },
+      { at: [14, 0.1], offset: -2.5 },
     ],
     ramps: [],
     palette: {
@@ -85,29 +87,29 @@ export const TRACKS = [
     theme: 'city',
     width: 16,
     laps: 3,
-    startOffset: 120,
+    startOffset: 200,
     bankGain: 4,
     maxBank: 0.1,
     path: [
-      ['S', 320], // 0 main boulevard
+      ['S', 560], // 0 main boulevard
       ['R', 90, 48], // 1
-      ['S', 170], // 2
+      ['S', 205], // 2
       ['L', 90, 44], // 3
-      ['S', 130], // 4
+      ['S', 175], // 4
       ['R', 90, 48], // 5
-      ['S', 300], // 6 jump straight
+      ['S', 610], // 6 jump straight
       ['R', 90, 55], // 7
-      ['S', 280], // 8
+      ['S', 480], // 8
       ['R', 45, 75], // 9
-      ['S', 90], // 10
+      ['S', 150], // 10
       ['L', 45, 75], // 11
-      ['S', 300], // 12
+      ['S', 520], // 12
       ['R', 135, 38], // 13 hairpin
-      ['S', 230], // 14
+      ['S', 390], // 14
       ['L', 90, 48], // 15
-      ['S', 130], // 16
+      ['S', 200], // 16
       ['R', 90, 48], // 17
-      ['S', 160], // 18
+      ['S', 310], // 18
       ['R', 45, 90], // 19
     ],
     elevation: [
@@ -123,12 +125,13 @@ export const TRACKS = [
       { type: 'tunnel', from: [14, 0.25], to: [14, 0.8] },
     ],
     boostPads: [
-      { at: [0, 0.7], offset: 0 },
-      { at: [6, 0.18], offset: 0 },
-      { at: [12, 0.4], offset: -3 },
-      { at: [18, 0.4], offset: 3 },
+      { at: [0, 0.06], offset: 0 },
+      { at: [6, 0.12], offset: 0 }, // into the jump
+      { at: [8, 0.08], offset: -3 },
+      { at: [14, 0.12], offset: 0 },
     ],
-    ramps: [{ at: [6, 0.45], length: 26, height: 2.8, width: 10, offset: 0 }],
+    // mid-straight, so there is room to land and brake either way round
+    ramps: [{ at: [6, 0.48], length: 26, height: 2.8, width: 10, offset: 0 }],
     palette: {
       lamp: '#e6eeff',
       lamp2: '#ffb46a',
@@ -157,28 +160,27 @@ export const TRACKS = [
     theme: 'stadium',
     width: 16,
     laps: 3,
-    startOffset: 200,
+    startOffset: 320,
     bankGain: 8,
     maxBank: 0.14,
     path: [
-      ['S', 380], // 0 main straight
+      ['S', 630], // 0 main straight
       ['R', 100, 55], // 1 turn 1
-      ['S', 120], // 2
+      ['S', 185], // 2
       ['L', 50, 90], // 3
       ['R', 85, 110], // 4
-      ['S', 220], // 5 back straight
+      ['S', 480], // 5 back straight
       ['R', 45, 180], // 6
-      ['S', 160], // 7
+      ['S', 255], // 7
       ['L', 60, 50], // 8
       ['R', 150, 40], // 9 hairpin
-      ['S', 200], // 10
+      ['S', 370], // 10
       ['L', 30, 60], // 11 chicane
       ['R', 30, 60], // 12
-      ['S', 150], // 13
+      ['S', 220], // 13
       ['R', 60, 140], // 14 fast sweeper
       ['L', 30, 120], // 15
       ['R', 60, 90], // 16
-      ['S', 120], // 17
     ],
     elevation: [
       [0.0, 0],
@@ -190,14 +192,14 @@ export const TRACKS = [
       [0.9, 0],
     ],
     sections: [
-      { type: 'stadium', from: [17, 0.0], to: [1, 0.3] },
+      { type: 'stadium', from: [0, 0.0], to: [1, 0.3] },
       { type: 'stadium', from: [9, 0.0], to: [9, 1.0] },
       { type: 'stadium', from: [14, 0.2], to: [15, 0.6] },
     ],
     boostPads: [
-      { at: [0, 0.82], offset: 0 },
-      { at: [5, 0.4], offset: 2.5 },
-      { at: [13, 0.5], offset: -2.5 },
+      { at: [0, 0.06], offset: 0 },
+      { at: [5, 0.08], offset: -2.5 },
+      { at: [10, 0.12], offset: 0 },
     ],
     ramps: [],
     palette: {

@@ -174,8 +174,11 @@ export class Track {
     }
     this.boostPads = (def.boostPads || []).map((bp) => {
       const len = 10;
-      const f = resolve(bp.at);
-      const s0 = reverse ? L - f * L - len : f * L;
+      // a pad on a straight keeps its distance from the corner it follows, whichever way round
+      // the loop is driven, so it never fires the car at the next one
+      const flip = reverse && Array.isArray(bp.at);
+      const f = resolve(flip ? [bp.at[0], 1 - bp.at[1]] : bp.at);
+      const s0 = flip ? L - f * L : reverse ? L - f * L - len : f * L;
       return { s0: wrap(s0, L), len, d: (bp.offset || 0) * lateralSign, halfWidth: bp.width ? bp.width / 2 : 2.2 };
     });
     this.ramps = (def.ramps || []).map((rp) => {

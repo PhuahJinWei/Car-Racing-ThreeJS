@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS = {
 
 function defaultSave() {
   return {
-    v: 3,
+    v: 4,
     credits: 2500,
     car: 'volt',
     ownedCars: ['volt'],
@@ -68,6 +68,17 @@ function safeSet(key, value) {
   }
 }
 
+function dropGhosts() {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(GHOST_PREFIX)) localStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Persistent progress: credits, cars, cosmetics, settings, records and ghosts. */
 export class Storage {
   constructor() {
@@ -92,6 +103,13 @@ export class Storage {
           ls.weather = 'auto';
           if (ls.trackId === 'lumen') ls.trackId = 'district';
           this.data.v = 3;
+        }
+        // v3 -> v4: every track was lengthened; times and ghosts from the old layouts no longer apply
+        if (!parsed.v || parsed.v < 4) {
+          this.data.records = {};
+          this.data.tt = {};
+          dropGhosts();
+          this.data.v = 4;
         }
       } catch {
         /* corrupted save -> defaults */
@@ -213,14 +231,7 @@ export class Storage {
   setGhost(key, data) {
     if (!safeSet(GHOST_PREFIX + key, data)) {
       // storage full: drop other ghosts and retry once
-      try {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith(GHOST_PREFIX)) localStorage.removeItem(k);
-        }
-      } catch {
-        /* ignore */
-      }
+      dropGhosts();
       safeSet(GHOST_PREFIX + key, data);
     }
   }
