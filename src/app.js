@@ -6,6 +6,7 @@ import { UI } from './ui/ui.js';
 import { HUD } from './ui/hud.js';
 import { TouchControls } from './ui/touch.js';
 import { Garage } from './scenes/garage.js';
+import { MenuStreet } from './scenes/street.js';
 import { Race } from './game/race.js';
 import { getTrackDef } from './world/tracks.js';
 import { evaluateDaily, dailyProgress, todayKey } from './game/daily.js';
@@ -29,6 +30,7 @@ export class App {
     this.hud = null;
     this.touch = null;
     this.garage = null;
+    this.street = null;
     this.ui = new UI(this);
     this._appliedQuality = null;
     this.applySettings();
@@ -62,11 +64,16 @@ export class App {
     await Promise.race([ensureCarAssets([S.data.car], this.renderer.renderer), new Promise((r) => setTimeout(r, 8000))]);
     this.garage = new Garage(this);
     this.garage.setCar(S.data.car, S.customFor(S.data.car));
+    this.street = new MenuStreet(this);
+    this.street.syncCar(S.data.car, S.customFor(S.data.car));
+    this.street.build();
     // the rest load in the background
     ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer).then(() => {
-      if (this.state !== 'race' && this.garage) this.garage.setCar(this.garage.carId, S.ownsCar(this.garage.carId) ? S.customFor(this.garage.carId) : undefined);
+      if (this.state === 'race' || !this.garage) return;
+      this.garage.setCar(this.garage.carId, S.ownsCar(this.garage.carId) ? S.customFor(this.garage.carId) : undefined);
+      this.street.syncCar(S.data.car, S.customFor(S.data.car), true);
     });
-    this.garage.setView('title');
+    this.street.setView('title');
     this.ui.hideLoading();
     this.state = 'title';
     this.ui.show('title');
@@ -81,16 +88,24 @@ export class App {
     this.toMenu();
   }
 
+  /** Menus play out on the street with your car; the garage keeps its studio. */
+  _toStreet(view) {
+    const S = this.storage;
+    this.street.build();
+    this.street.syncCar(S.data.car, S.customFor(S.data.car));
+    this.street.setView(view);
+  }
+
   toMenu() {
     this.state = 'menu';
-    this.garage.setView('menu');
+    this._toStreet('menu');
     this.ui.show('menu');
     this.audio.startMusic('menu');
   }
 
   openSetup(mode) {
     this.state = 'menu';
-    this.garage.setView('setup');
+    this._toStreet('setup');
     this.ui.show('setup', { mode });
   }
 
@@ -102,13 +117,13 @@ export class App {
 
   openSettings() {
     this.state = 'menu';
-    this.garage.setView('menu');
+    this._toStreet('menu');
     this.ui.show('settings');
   }
 
   openDaily() {
     this.state = 'menu';
-    this.garage.setView('setup');
+    this._toStreet('setup');
     this.ui.show('daily');
   }
 
@@ -152,6 +167,8 @@ export class App {
     if (full.mode === 'timetrial') full.ghost = S.getGhost(key);
     this.lastRaceCfg = full;
     this._teardownRace();
+    // the race builds its own world; the menu street comes back afterwards
+    this.street?.dispose();
     this.ui.clearScreen();
     this.ui.hidePause();
     this.ui.showLoading(`BUILDING ${getTrackDef(cfg.trackId).name}`, { trackId: cfg.trackId, variant: v, mode: full.mode, laps: full.laps });
@@ -351,6 +368,7 @@ export class App {
         const r = await previewModelFile(file, carId, this.renderer.renderer);
         const S = this.storage;
         this.garage.setCar(carId, S.ownsCar(carId) ? S.customFor(carId) : undefined);
+        this.street?.syncCar(S.data.car, S.customFor(S.data.car), true);
         this.ui.toast(`PREVIEW: ${file.name} · wheels ${r.wheels ? 'found' : 'not found'} · paint ${r.roles.paint ? 'found' : 'not found'}`);
         console.info('[cars] preview report', r);
       } catch (err) {
@@ -370,7 +388,7 @@ export class App {
       id = e.pointerId;
       lx = e.clientX;
       ly = e.clientY;
-      this.garage.dragging = true;
+      this._backdrop().dragging = true;
       try {
         this.canvas.setPointerCapture(id);
       } catch {
@@ -379,7 +397,7 @@ export class App {
     });
     this.canvas.addEventListener('pointermove', (e) => {
       if (e.pointerId !== id) return;
-      this.garage.drag(e.clientX - lx, e.clientY - ly);
+      this._backdrop().drag(e.clientX - lx, e.clientY - ly);
       lx = e.clientX;
       ly = e.clientY;
     });
@@ -387,9 +405,15 @@ export class App {
       if (e.pointerId !== id) return;
       id = null;
       this.garage.dragging = false;
+      if (this.street) this.street.dragging = false;
     };
     this.canvas.addEventListener('pointerup', end);
     this.canvas.addEventListener('pointercancel', end);
+  }
+
+  /** The scene behind the current screen: the studio in the garage, the street everywhere else. */
+  _backdrop() {
+    return this.state === 'garage' || !this.street ? this.garage : this.street;
   }
 
   // ------------------------------------------------------------------ main loop
@@ -420,8 +444,10 @@ export class App {
       this.race.render();
     } else if (this.garage && this.state !== 'loading') {
       this.input.clearEdges();
-      this.garage.update(dt);
-      this.garage.render();
+      const bg = this._backdrop();
+      if (bg === this.street) this.renderer.trackFrame(dt, now);
+      bg.update(dt);
+      bg.render();
     }
   }
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildWorld } from '../world/world-builder.js';
 import { globalUniforms, MAX_HEADLIGHTS } from '../world/materials.js';
+import { aimLampLights, castCarShadow } from '../world/car-light.js';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef, CARS } from '../car/car-defs.js';
 import { getCarAsset } from '../car/car-assets.js';
@@ -19,7 +20,6 @@ const TIER_LABELS = ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'];
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
-const _q = new THREE.Quaternion();
 const _dv = new THREE.Vector3();
 const _dv2 = new THREE.Vector3();
 const _dq = new THREE.Quaternion();
@@ -163,7 +163,6 @@ export class Race {
     // ---- real lights placed on the street lamps / signs nearest the player: cars light up as they
     // sweep underneath (the track itself uses baked light, so only cars and props react)
     this.lampLights = [];
-    this.lampPool = [];
     for (let k = 0; k < (q.carHQ ? 3 : 2); k++) {
       const L = new THREE.PointLight(0xffffff, 0, 24, 2);
       this.scene.add(L);
@@ -1043,117 +1042,13 @@ export class Race {
   }
 
   _updateLamps() {
-    const lights = this.lampLights;
-    if (!lights || !lights.length) return;
+    if (!this.lampLights || !this.lampLights.length) return;
     const v = this.player.vehicle;
-    const baker = this.world.baker;
-    const n = this.world.track.n;
-    const k = Math.ceil(28 / this.world.track.ds);
-    const pool = this.lampPool;
-    let count = 0;
-    const scan = (bucket) => {
-      for (let q = 0; q < bucket.length; q++) {
-        const L = bucket[q];
-        const dx = L.x - v.x;
-        const dy = L.y - v.y;
-        const dz = L.z - v.z;
-        const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 >= L.r2) continue;
-        // rank by how much light actually reaches the car
-        const w = Math.max(L.r, L.g, L.b) / Math.max(d2, 4);
-        let e = pool[count];
-        if (!e) pool[count] = e = { L: null, w: 0 };
-        e.L = L;
-        e.w = w;
-        count++;
-      }
-    };
-    // baked lamps/signs plus dynamic-only lights (tunnel luminaires)
-    for (let j = v.frame.i - k; j <= v.frame.i + k; j++) {
-      const jj = ((j % n) + n) % n;
-      if (baker.buckets[jj]) scan(baker.buckets[jj]);
-      if (baker.dyn && baker.dyn[jj]) scan(baker.dyn[jj]);
-    }
-    // partial selection of the strongest few
-    for (let a = 0; a < Math.min(lights.length, count); a++) {
-      let best = a;
-      for (let b = a + 1; b < count; b++) if (pool[b].w > pool[best].w) best = b;
-      const t = pool[a];
-      pool[a] = pool[best];
-      pool[best] = t;
-    }
-    for (let q = 0; q < lights.length; q++) {
-      const light = lights[q];
-      if (q >= count) {
-        light.intensity = 0;
-        continue;
-      }
-      const L = pool[q].L;
-      const m = Math.max(L.r, L.g, L.b, 1e-3);
-      light.color.setRGB(L.r / m, L.g / m, L.b / m);
-      light.intensity = m * 170;
-      light.distance = Math.sqrt(L.r2) * 1.1;
-      light.position.set(L.x, L.y, L.z);
-    }
+    aimLampLights(this.world, v.frame.i, v.x, v.y, v.z, this.lampLights);
   }
 
-  /**
-   * Road shadows for one car from the two strongest lamps nearby (baked lamps, signs, tunnel
-   * lights): each casts the footprint away from itself, as dark as its share of the light there.
-   * A lamp straight overhead leaves the shadow right underneath.
-   */
   _castShadow(model, i, x, y, z, air) {
-    const baker = this.world.baker;
-    const n = this.world.track.n;
-    const k = this._shadowScan || (this._shadowScan = Math.ceil(26 / this.world.track.ds));
-    const S = this._shadowTop || (this._shadowTop = [{ w: 0, L: null }, { w: 0, L: null }]);
-    S[0].w = S[1].w = 0;
-    let total = 0;
-    const scan = (bucket) => {
-      for (let q = 0; q < bucket.length; q++) {
-        const L = bucket[q];
-        const dx = L.x - x;
-        const dy = L.y - y;
-        const dz = L.z - z;
-        const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 >= L.r2) continue;
-        const f = 1 - d2 / L.r2;
-        const w = Math.max(L.r, L.g, L.b) * f * f;
-        total += w;
-        if (w > S[0].w) {
-          S[1].w = S[0].w;
-          S[1].L = S[0].L;
-          S[0].w = w;
-          S[0].L = L;
-        } else if (w > S[1].w) {
-          S[1].w = w;
-          S[1].L = L;
-        }
-      }
-    };
-    for (let j = i - k; j <= i + k; j++) {
-      const jj = ((j % n) + n) % n;
-      if (baker.buckets[jj]) scan(baker.buckets[jj]);
-      if (baker.dyn && baker.dyn[jj]) scan(baker.dyn[jj]);
-    }
-    const out = this._shadowOut || (this._shadowOut = [0, 0, 0, 0, 0, 0, 0, 0]);
-    out.fill(0);
-    _q.copy(model.group.quaternion).invert();
-    for (let s = 0; s < 2; s++) {
-      const e = S[s];
-      if (e.w <= 0) continue;
-      // a point ~0.8 m up the car lands this far beyond it on the road
-      _v.set(x - e.L.x, 0, z - e.L.z);
-      const D = _v.length();
-      const H = Math.max(e.L.y - y, 1.2);
-      _v.applyQuaternion(_q);
-      const l = Math.hypot(_v.x, _v.z) || 1;
-      out[s * 4] = _v.x / l;
-      out[s * 4 + 1] = _v.z / l;
-      out[s * 4 + 2] = D > 0.05 ? (0.8 * D) / Math.max(H - 0.8, 0.6) : 0;
-      out[s * 4 + 3] = 0.9 * (e.w / total) * smoothstep(0.02, 0.3, e.w);
-    }
-    model.setShadow(air, out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]);
+    castCarShadow(this.world, model, i, x, y, z, air);
   }
 
   /**
