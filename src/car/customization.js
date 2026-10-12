@@ -42,6 +42,7 @@ export const RIMS = [
   { id: 'r_turbine', name: 'Turbine', style: 'turbine', price: 700 },
   { id: 'r_mesh', name: 'Mesh', style: 'mesh', price: 900 },
   { id: 'r_blade', name: 'Blade', style: 'blade', price: 1200 },
+  { id: 'r_classic', name: 'Classic Eight', style: 'classic', price: 900 },
 ];
 
 export const RIM_COLORS = [
@@ -49,6 +50,7 @@ export const RIM_COLORS = [
   { id: 'rc_gunmetal', name: 'Gunmetal', color: '#3a3f48', price: 0 },
   { id: 'rc_black', name: 'Black', color: '#111216', price: 200 },
   { id: 'rc_gold', name: 'Gold', color: '#c99a2e', price: 600 },
+  { id: 'rc_graphite', name: 'Graphite', color: '#6c727c', price: 300 },
   { id: 'rc_neoncyan', name: 'Neon Cyan', color: '#00e5ff', glow: true, price: 1500 },
   { id: 'rc_neonpink', name: 'Neon Pink', color: '#ff2bd6', glow: true, price: 1500 },
 ];
@@ -143,9 +145,9 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   volt: { ...DEFAULT_CUSTOM },
   razor: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_stripes' },
   specter: { ...DEFAULT_CUSTOM, paint: 'p_midnight', accent: 'p_silver', livery: 'lv_race', rimColor: 'rc_black' },
-  // the two-tone "panda": white over black, on the default silver rims (dark ones vanish inside
-  // its black lower half)
-  touge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_panda' },
+  // the two-tone "panda": white over black, on classic eight-spoke wheels in graphite (darker ones
+  // vanish inside its black lower half)
+  touge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_panda', rims: 'r_classic', rimColor: 'rc_graphite' },
   // black and white
   marshal: { ...DEFAULT_CUSTOM, paint: 'p_black', accent: 'p_white', livery: 'lv_police', tint: 't_light' },
 };

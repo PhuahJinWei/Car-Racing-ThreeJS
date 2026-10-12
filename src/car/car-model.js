@@ -1096,6 +1096,8 @@ export class CarModel {
     this.tailMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.12, 0.2) });
     this.headMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.5, 4.2) });
     this.lensMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.3, 2.6) });
+    // amber lamp lenses (turn signals lit as position lamps), on the cars that have them
+    if (asset.lods.lod0.some((p) => p.role === 'amber')) this.amberMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 0.72, 0.1) });
     this.exhaustGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 0.1, 0.02) });
     this.tireMat = withAO(new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.85, metalness: 0, envMapIntensity: 0.5, vertexColors: true }));
     this.rimMat = withAO(
@@ -1124,6 +1126,7 @@ export class CarModel {
       for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.interiorMat, this.exhaustGlowMat]) patchDamage(m, u, 'plain');
       patchDamage(this.headMat, u, 'headBasic');
       patchDamage(this.lensMat, u, 'headBasic');
+      if (this.amberMat) patchDamage(this.amberMat, u, 'plain');
       patchDamage(this.tailMat, u, 'tailBasic');
       patchDamage(this.tailLensMat, u, 'tailLens');
       patchDamage(this.reverseMat, u, 'tailLens');
@@ -1139,6 +1142,7 @@ export class CarModel {
       head: this.headHousingMat,
       drl: this.headMat,
       lens: this.lensMat,
+      amber: this.amberMat,
       tail: this.tailLensMat,
       reverse: this.reverseMat,
       tailglow: this.tailMat,
@@ -1203,7 +1207,7 @@ export class CarModel {
         pivot.add(spin);
         this.group.add(pivot);
         bones.push(pivot, spin);
-        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, side });
+        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, rim: w.rim, side });
         this.wheels.push({ pivot, spin, r: w.r, w: w.w, front, side });
       }
     }
@@ -1516,7 +1520,7 @@ export class CarModel {
       if (isSharedWheelGeometry(o.geometry)) return;
       o.geometry.dispose();
     });
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, ...(this.beaconMats || [])]) m?.dispose();
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, this.amberMat, ...(this.beaconMats || [])]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();

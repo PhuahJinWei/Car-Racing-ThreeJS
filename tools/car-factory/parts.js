@@ -22,6 +22,8 @@ export const MAT = {
   beaconB: 15,
   // clear reverse-lamp lens, lit by the game while the car backs up
   reverse: 16,
+  // amber lamp lens (turn signals), lit by the game as a position lamp
+  amber: 17,
 };
 export const MAT_NAMES = Object.fromEntries(Object.entries(MAT).map(([k, v]) => [v, k]));
 
@@ -44,6 +46,7 @@ export const MAT_PBR = {
   beaconR: { color: [0.5, 0.02, 0.03], metallic: 0, roughness: 0.2, emissive: [1, 0.03, 0.05] },
   beaconB: { color: [0.02, 0.08, 0.5], metallic: 0, roughness: 0.2, emissive: [0.05, 0.25, 1] },
   reverse: { color: [0.7, 0.72, 0.75], metallic: 0.6, roughness: 0.12, emissive: [0.15, 0.15, 0.16] },
+  amber: { color: [1, 0.45, 0.06], metallic: 0, roughness: 0.2, emissive: [1, 0.42, 0.05] },
 };
 
 /** Material-tracking distance accumulator. */

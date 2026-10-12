@@ -22,7 +22,8 @@ const smooth = (a, b, v) => {
   return t * t * (3 - 2 * t);
 };
 
-/** Rim radius for a tyre radius (≈ 20-21" rims on low-profile tyres). */
+/** Rim radius for a tyre radius (≈ 20-21" rims on low-profile tyres). A design can pick its own
+ * (`rim` in its wheel layout), say small rims on tall sidewalls for an older car. */
 export const rimRadius = (r) => r - 0.084;
 
 // lathe around the axle; profile points are [radius, axial]
@@ -97,9 +98,8 @@ function spokeShape(theta, half, rIn, rOut, n) {
 }
 
 // ---------------------------------------------------------------------------------------- tyre
-export function tyreGeometry(r, w, hq) {
-  return cached(`tyre|${r}|${w}|${hq}`, () => {
-    const rim = rimRadius(r);
+export function tyreGeometry(r, w, hq, rim = rimRadius(r)) {
+  return cached(`tyre|${r}|${w}|${hq}|${rim}`, () => {
     const hw = w / 2;
     const sh = 0.028;
     const prof = [
@@ -163,12 +163,18 @@ const RIM_STYLES = {
       add((t) => a + 0.16 * t, (t) => 0.019 + 0.026 * t * t, hub * 0.85, lip, 12);
     }
   },
+  // eight straight spokes, widening toward the rim: an 80s classic
+  classic: (add, hub, lip) => {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      add(() => a, (t) => 0.0125 + 0.008 * t, hub * 0.85, lip, 6);
+    }
+  },
 };
 
-export function rimGeometry(style, r, w, hq) {
+export function rimGeometry(style, r, w, hq, rim = rimRadius(r)) {
   const st = RIM_STYLES[style] ? style : 'split';
-  return cached(`rim|${st}|${r}|${w}|${hq}`, () => {
-    const rim = rimRadius(r);
+  return cached(`rim|${st}|${r}|${w}|${hq}|${rim}`, () => {
     const hw = w / 2;
     const lipFace = hw - 0.012;
     const dish = Math.min(0.06, w * 0.2);
@@ -245,30 +251,31 @@ export function rimGeometry(style, r, w, hq) {
 }
 
 // ---------------------------------------------------------------------------------------- brakes
-export function discGeometry(r, w) {
-  return cached(`disc|${r}|${w}`, () => {
-    const rim = rimRadius(r);
+export function discGeometry(r, w, rim = rimRadius(r)) {
+  return cached(`disc|${r}|${w}|${rim}`, () => {
     const rd = rim - 0.055;
+    // the hat shrinks with a small disc, so the friction band keeps its width
+    const ri = Math.min(0.11, rd * 0.62);
     const t = 0.034;
     const c = discCenter(r, w);
     const ring = lathe(
       [
-        [0.11, c - t / 2 + 0.002],
-        [0.112, c - t / 2],
+        [ri, c - t / 2 + 0.002],
+        [ri + 0.002, c - t / 2],
         [rd - 0.002, c - t / 2],
         [rd, c - t / 2 + 0.002],
         [rd, c + t / 2 - 0.002],
         [rd - 0.002, c + t / 2],
-        [0.112, c + t / 2],
-        [0.11, c + t / 2 - 0.002],
+        [ri + 0.002, c + t / 2],
+        [ri, c + t / 2 - 0.002],
       ],
       48,
     );
     const hat = lathe(
       [
-        [0.112, c - t / 2],
-        [0.105, c + t / 2 + 0.03],
-        [0.07, c + t / 2 + 0.036],
+        [ri + 0.002, c - t / 2],
+        [ri - 0.005, c + t / 2 + 0.03],
+        [ri * 0.64, c + t / 2 + 0.036],
         [0.0, c + t / 2 + 0.036],
       ],
       32,
@@ -277,7 +284,7 @@ export function discGeometry(r, w) {
     return finish(g, (x, y, z) => {
       const rho = Math.hypot(y, z);
       // brighter machined friction band
-      return rho > 0.12 && rho < rd - 0.008 ? 0.85 : 0.45;
+      return rho > ri + 0.01 && rho < rd - 0.008 ? 0.85 : 0.45;
     });
   });
 }
@@ -288,9 +295,8 @@ function discCenter(r, w) {
   return hw - 0.012 - dish - 0.075;
 }
 
-export function caliperGeometry(r, w) {
-  return cached(`caliper|${r}|${w}`, () => {
-    const rim = rimRadius(r);
+export function caliperGeometry(r, w, rim = rimRadius(r)) {
+  return cached(`caliper|${r}|${w}|${rim}`, () => {
     const rd = rim - 0.055;
     const rIn = rd - 0.06;
     const rOut = rd + 0.016;
@@ -326,9 +332,9 @@ export function caliperGeometry(r, w) {
 
 // ------------------------------------------------------------------------------- all four wheels
 /** Motion-blur disc over the spokes: a flat circle on the outer face (it carries uvs, no AO). */
-export function blurGeometry(r, w) {
-  return cached(`blur|${r}|${w}`, () => {
-    const g = new THREE.CircleGeometry(r - 0.104, 40);
+export function blurGeometry(r, w, rim = rimRadius(r)) {
+  return cached(`blur|${r}|${w}|${rim}`, () => {
+    const g = new THREE.CircleGeometry(rim - 0.02, 40);
     g.rotateY(Math.PI / 2);
     g.translate(w / 2 - 0.006, 0, 0);
     return g.toNonIndexed();
@@ -340,7 +346,7 @@ export function blurGeometry(r, w) {
  * each wheel material once instead of once per wheel. Every vertex follows one bone of its wheel:
  * `boneOf(k)` (each wheel k has a steering pivot bone 2k and a rolling spin bone 2k + 1). Left
  * wheels are baked mirrored, with their triangles turned back to face out, so no bone ever
- * scales negatively. wheels: [{ x, y, z, r, w, side }] at rest, in car space.
+ * scales negatively. wheels: [{ x, y, z, r, w, side, rim? }] at rest, in car space.
  */
 function bakeWheels(wheels, partOf, boneOf) {
   const srcs = wheels.map(partOf);
@@ -405,17 +411,18 @@ function bakeWheels(wheels, partOf, boneOf) {
  * with the spin bones; calipers and the blur disc only steer.
  */
 export function wheelSet(wheels, style, hq) {
-  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w}`).join('|')}|${style}|${hq}`;
+  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w},${w.rim}`).join('|')}|${style}|${hq}`;
   const spin = (k) => 2 * k + 1;
   const pivot = (k) => 2 * k;
+  const rimOf = (w) => w.rim ?? rimRadius(w.r);
   const set = {
-    tyre: cached(`${key}|tyre`, () => bakeWheels(wheels, (w) => tyreGeometry(w.r, w.w, hq), spin)),
-    rim: cached(`${key}|rim`, () => bakeWheels(wheels, (w) => rimGeometry(style, w.r, w.w, hq), spin)),
-    blur: cached(`${key}|blur`, () => bakeWheels(wheels, (w) => blurGeometry(w.r, w.w), pivot)),
+    tyre: cached(`${key}|tyre`, () => bakeWheels(wheels, (w) => tyreGeometry(w.r, w.w, hq, rimOf(w)), spin)),
+    rim: cached(`${key}|rim`, () => bakeWheels(wheels, (w) => rimGeometry(style, w.r, w.w, hq, rimOf(w)), spin)),
+    blur: cached(`${key}|blur`, () => bakeWheels(wheels, (w) => blurGeometry(w.r, w.w, rimOf(w)), pivot)),
   };
   if (hq) {
-    set.disc = cached(`${key}|disc`, () => bakeWheels(wheels, (w) => discGeometry(w.r, w.w), spin));
-    set.caliper = cached(`${key}|caliper`, () => bakeWheels(wheels, (w) => caliperGeometry(w.r, w.w), pivot));
+    set.disc = cached(`${key}|disc`, () => bakeWheels(wheels, (w) => discGeometry(w.r, w.w, rimOf(w)), spin));
+    set.caliper = cached(`${key}|caliper`, () => bakeWheels(wheels, (w) => caliperGeometry(w.r, w.w, rimOf(w)), pivot));
   }
   return set;
 }

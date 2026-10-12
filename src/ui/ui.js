@@ -122,6 +122,7 @@ const RIM_SPOKES = {
   turbine: () => Array.from({ length: 12 }, (_, i) => `<path transform="rotate(${i * 30} 12 12)" d="M12 9.6c1.4-1.2 1.9-2.7 1.6-4.8"/>`).join(''),
   mesh: () => [0, 1, 2, 3, 4, 5].map((i) => `<path transform="rotate(${i * 30} 12 12)" d="M5 12h14"/>`).join(''),
   blade: () => [0, 1, 2, 3, 4].map((i) => `<path transform="rotate(${i * 72} 12 12)" d="M12 9.5C11 7.6 11.3 6 12.6 4.4"/>`).join(''),
+  classic: () => Array.from({ length: 8 }, (_, i) => `<path transform="rotate(${i * 45} 12 12)" d="M12 10V4.2"/>`).join(''),
 };
 
 const LIVERY_ART = {
