@@ -3,6 +3,10 @@
 //   ['L'|'R', degrees, radius] constant-radius corner
 // Feature positions are either fractions of the loop or [commandIndex, fraction].
 
+// Boost pads are switched off for now. Their positions stay below, so turning this back on
+// restores them as they were.
+export const BOOST_PADS_ON = false;
+
 export const TRACKS = [
   {
     id: 'lumen',

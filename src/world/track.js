@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clamp, wrap, angleWrap } from '../core/math.js';
 import { buildTurtlePath, sampleProfile } from './track-gen.js';
+import { BOOST_PADS_ON } from './tracks.js';
 
 const _v = new THREE.Vector3();
 
@@ -172,7 +173,7 @@ export class Track {
       if (sec.type !== 'tunnel') continue;
       for (let i = 0; i < n; i++) if (inRange(i * ds, sec.s0, sec.s1)) this.tunnelFlags[i] = 1;
     }
-    this.boostPads = (def.boostPads || []).map((bp) => {
+    this.boostPads = ((BOOST_PADS_ON && def.boostPads) || []).map((bp) => {
       const len = 10;
       // a pad on a straight keeps its distance from the corner it follows, whichever way round
       // the loop is driven, so it never fires the car at the next one

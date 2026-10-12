@@ -1,5 +1,5 @@
 import { el, $, $$, delegate, fitText, ICONS } from './dom.js';
-import { TRACKS, getTrackDef } from '../world/tracks.js';
+import { TRACKS, getTrackDef, BOOST_PADS_ON } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
 import { CATEGORIES, findItem, PAINTS, resolveCustom } from '../car/customization.js';
@@ -17,8 +17,8 @@ const themeLabel = (def) => t(`theme.${def.theme}`);
 const modeLabel = (mode) => t(`mode.${mode === 'timetrial' || mode === 'daily' ? mode : 'race'}`);
 const diffLabel = (key) => t(`diff.${DIFFICULTY[key] ? key : 'easy'}`);
 const km = (meters) => t('km', { n: (meters / 1000).toFixed(1) });
-// loading-screen tips (tip.1 ... tip.N in the interface text)
-const TIP_COUNT = 8;
+// loading-screen tips (tip.1 ... tip.8 in the interface text); tip.6 is about boost pads
+const TIPS = [1, 2, 3, 4, 5, 6, 7, 8].filter((n) => n !== 6 || BOOST_PADS_ON);
 
 // In-game shots for the track cards; focus is the crop point when a card's shape differs from the 16:9 shot.
 const TRACK_SHOTS = {
@@ -418,7 +418,7 @@ export class UI {
         v.mirror ? `${ICONS.mirror}${t('mirror')}` : null,
         v.weather === 'rain' ? `${ICONS.rain}${t('weather.rain')}` : `${ICONS.moon}${t('weather.clear')}`,
       ].filter(Boolean);
-      const tip = t(`tip.${1 + Math.floor(Math.random() * TIP_COUNT)}`);
+      const tip = t(`tip.${TIPS[Math.floor(Math.random() * TIPS.length)]}`);
       body = `
         <div class="race-load">
           <canvas class="rl-map" width="320" height="320"></canvas>

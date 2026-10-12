@@ -18,7 +18,7 @@ A hyper-fast night-time street-racing game that runs in any modern browser, buil
 - **Arcade handling:**
   - Hold-to-drift charges a mini-turbo in three tiers (blue, orange, purple).
   - Nitro charges refill from drifts, near misses, slipstreaming and big air.
-  - Boost pads, ramps, wall scrapes with sparks.
+  - Ramps and wall scrapes with sparks. Boost pads are built in but switched off for now (`BOOST_PADS_ON` in `src/world/tracks.js`).
 - **5 AI rivals:** they follow a racing line, brake for corners, overtake each other, use nitro, and make human mistakes (running wide, lifting off, wobbling). Four difficulty levels: Rookie, Easy, Normal and Hard.
 - **Modes:**
   - **Race:** Rookie, Easy, Normal or Hard rivals. On easier levels you start mid-pack.
