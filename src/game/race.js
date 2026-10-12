@@ -652,7 +652,8 @@ export class Race {
           const razor = st.minDD < 2.45;
           this.stunts.add('nearMiss', razor ? 450 : 220, t(razor ? 'pop.razor' : 'pop.nearMiss'), { big: razor });
           v.addNitro(razor ? 0.5 : 0.3);
-          this.rig.kick(razor ? 9 : 5);
+          // a camera kick reads as a burst of speed, so only the closest passes get one
+          if (razor) this.rig.kick(9);
           this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d) });
           this.app.input.vibrate(18);
           if (razor && v.speed > 45 && (this._lastSlowmo ?? -99) < this.clock - 5) {
