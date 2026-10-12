@@ -125,6 +125,9 @@ const RIM_SPOKES = {
   classic: () => Array.from({ length: 8 }, (_, i) => `<path transform="rotate(${i * 45} 12 12)" d="M12 10V4.2"/>`).join(''),
 };
 
+// the garage camera's shot for each customization tab (see SHOTS in scenes/garage.js)
+const SHOT_FOR = { number: 'door', tint: 'glass', rims: 'wheel', rimColor: 'wheel', underglow: 'low', trail: 'rear' };
+
 const LIVERY_ART = {
   lv_none: () => '',
   lv_stripes: (a) => `<rect x="9.6" y="2" width="1.8" height="20" fill="${a}"/><rect x="12.6" y="2" width="1.8" height="20" fill="${a}"/>`,
@@ -743,7 +746,8 @@ export class UI {
     const owned = () => S.ownsCar(car().id);
     const equippedCustom = () => S.customFor(car().id);
     const previewing = () => {
-      const base = owned() ? { ...equippedCustom() } : {};
+      // (a car you don't own shows in its own colours: customFor gives its stock look)
+      const base = { ...equippedCustom() };
       if (pending) base[pending.cat] = pending.item.id;
       return base;
     };
@@ -888,6 +892,7 @@ export class UI {
       },
       tab: (b) => {
         cat = b.dataset.cat;
+        app.garage.setShot(SHOT_FOR[cat] || 'hero');
         pending = null;
         previewCustom();
         renderItems();
@@ -898,6 +903,7 @@ export class UI {
       },
       item: (b) => {
         if (!owned()) return;
+        app.garage.setShot(SHOT_FOR[cat] || 'hero');
         const item = findItem(cat, b.dataset.id);
         if (S.owns(cat, item.id)) {
           S.equip(car().id, cat, item.id);

@@ -9,9 +9,31 @@ import { damp, clamp } from '../core/math.js';
 const VIEWS = {
   title: { yaw: 0.9, pitch: 0.08, dist: 8.2, target: [0, 0.55, 0], offset: 0, fov: 34, auto: 0.12 },
   menu: { yaw: 0.65, pitch: 0.16, dist: 8.6, target: [0, 0.6, 0], offset: -0.2, fov: 34, auto: 0.08 },
-  garage: { yaw: 0.75, pitch: 0.17, dist: 9.2, target: [0, 0.5, 0], offset: -0.13, offsetY: 0.11, offsetYP: 0.08, fov: 34, auto: 0.0 },
+  garage: { yaw: 0.75, pitch: 0.17, dist: 9.2, target: [0, 0.5, 0], offset: -0.18, offsetY: 0.11, offsetYP: -0.03, fov: 34, auto: 0.0 },
   setup: { yaw: -2.3, pitch: 0.1, dist: 9.4, target: [0, 0.6, 0], offset: 0.22, fov: 32, auto: 0.05 },
 };
+
+// The garage's camera shots, one per customization tab: the angle, what it looks at (from the car's
+// measurements, see _measure; the car stands 0.12 m up on the turntable) and how much to fit in
+// view - `r` metres round the target, or the whole car when it has none.
+const LIFT = 0.12;
+const SHOTS = {
+  // front three-quarter, a touch low: paint, finish, livery, accent
+  hero: (c) => ({ yaw: 0.72, pitch: 0.12, target: [0, LIFT + c.h * 0.42, c.cz] }),
+  // the front wheel, from the side and a little ahead: rims and their colour
+  wheel: (c) => ({ yaw: Math.PI / 2 - 0.5, pitch: 0.05, target: [c.wheel[0], LIFT + c.wheel[1], c.wheel[2]], r: 0.62 }),
+  // straight onto the door: numbers
+  door: (c) => ({ yaw: Math.PI / 2, pitch: 0.06, target: [c.hw, LIFT + c.door[1], c.door[0]], r: 0.95 }),
+  // the side glass from a little above: window tint
+  glass: (c) => ({ yaw: 1.2, pitch: 0.16, target: [c.hw * 0.6, LIFT + c.h * 0.82, c.cz - 0.15], r: c.len * 0.34 }),
+  // low at the front corner, so the glow on the floor shows: underglow
+  low: (c) => ({ yaw: 0.62, pitch: -0.03, target: [0, LIFT + c.h * 0.36, c.cz] }),
+  // rear three-quarter: light trails come off the tail lamps
+  rear: (c) => ({ yaw: Math.PI - 0.72, pitch: 0.12, target: [0, LIFT + c.h * 0.42, c.cz] }),
+};
+// zoom range (a multiple of the fitted distance)
+const ZOOM_MIN = 0.45;
+const ZOOM_MAX = 1.7;
 
 /** Dark grey photo-studio showroom: the garage screen's backdrop. */
 export class Garage {
@@ -31,7 +53,11 @@ export class Garage {
     this.offsetY = 0;
     this.userYaw = 0;
     this.dragging = false;
-    this.spin = 0;
+    // the garage view's shot (see SHOTS), the zoom on it, and what the camera looks at
+    this.shot = 'hero';
+    this.zoom = 1;
+    this.target = new THREE.Vector3(0, 0.5, 0);
+    this.measure = null;
     this._build();
   }
 
@@ -165,7 +191,12 @@ export class Garage {
     // racing effect and, frozen in place, they turn the glass into a chrome band
     this.car.setStreaks(0, 0.05);
     this.scene.add(this.car.group);
-    this.spin = 1; // little showroom spin when switching cars
+    this.measure = this._measure();
+    // a new car swings in to the front three-quarter view
+    this.shot = 'hero';
+    this.userYaw = 0;
+    this.zoom = 1;
+    this.yaw = SHOTS.hero(this.measure).yaw - 1.1;
     // (cars browsed earlier and no longer shown are freed, bar the last few)
     trimCarAssets();
   }
@@ -179,30 +210,107 @@ export class Garage {
     if (!VIEWS[name]) return;
     this.viewName = name;
     this.view = { ...VIEWS[name] };
+    if (name === 'garage') this.setShot('hero', true);
+  }
+
+  /** Point the garage camera at a shot (see SHOTS); a new shot drops any turning and zoom. */
+  setShot(name, force = false) {
+    const shot = SHOTS[name] ? name : 'hero';
+    if (shot === this.shot && !force) return;
+    this.shot = shot;
+    this.userYaw = 0;
+    this.zoom = 1;
+  }
+
+  zoomBy(f) {
+    this.zoom = clamp(this.zoom * f, ZOOM_MIN, ZOOM_MAX);
+  }
+
+  /** Back to the shot as framed (double-click / double-tap). */
+  resetView() {
+    this.userYaw = 0;
+    this.zoom = 1;
   }
 
   drag(dx, dy) {
     this.userYaw -= dx * 0.008;
-    this.pitch = clamp(this.pitch + dy * 0.004, 0.02, 0.6);
+    this.pitch = clamp(this.pitch + dy * 0.004, -0.05, 0.6);
+  }
+
+  /** The car's size and landmarks for framing it (car space, metres). */
+  _measure() {
+    const def = getCarDef(this.carId);
+    const a = this.car.asset;
+    let len = def.dims.length;
+    let hw = def.dims.track / 2 + 0.15;
+    let cz = 0;
+    let h = Math.max(...def.cabin.map((c) => c[4]));
+    if (a?.dims) {
+      len = a.dims.length;
+      hw = a.dims.halfWidth;
+      cz = (a.dims.frontZ + a.dims.rearZ) / 2;
+    }
+    if (a?.lods?.lod0) h = Math.max(...a.lods.lod0.map((p) => (p.geometry.boundingBox || (p.geometry.computeBoundingBox(), p.geometry.boundingBox)).max.y));
+    const fw = (this.car.wheelLayout || []).find((w) => w.side > 0 && w.z > 0);
+    const door = this.car.liveryLayout?.livery?.door;
+    return { len, hw, h, cz, wheel: fw ? [fw.x, fw.y, fw.z] : [hw - 0.1, 0.34, len * 0.28], door: door ? [door[0], door[1]] : [0.1, 0.6] };
+  }
+
+  /**
+   * Camera distance that fits a shot in the space the panels leave: beside the info panel on a wide
+   * screen, between the panels on a tall one. A whole-car shot fits the car as seen from its angle.
+   */
+  _fitDist(s, fov) {
+    const aspect = this.app.renderer.aspect;
+    const portrait = aspect < 1;
+    const tv = Math.tan((fov * Math.PI) / 360);
+    const th = tv * aspect;
+    const uw = portrait ? 0.9 : 0.66;
+    const uh = portrait ? 0.36 : 0.6;
+    let hx = s.r;
+    let hy = s.r;
+    let near = 0;
+    if (!s.r) {
+      const c = this.measure;
+      const sy = Math.abs(Math.sin(s.yaw));
+      const cy = Math.abs(Math.cos(s.yaw));
+      hx = (c.len / 2) * sy + c.hw * cy;
+      const deep = (c.len / 2) * cy + c.hw * sy;
+      hy = c.h / 2 + deep * Math.sin(Math.abs(s.pitch) + 0.1);
+      near = deep * 0.6;
+    }
+    return Math.max(hx / (th * uw), hy / (tv * uh)) + near;
   }
 
   update(dt) {
     this.time += dt;
     globalUniforms.uTime.value = this.time;
     const v = this.view;
-    this.userYaw += v.auto * dt + this.spin * dt * 3;
-    this.spin = damp(this.spin, 0, 2, dt);
-    this.yaw = damp(this.yaw, v.yaw + this.userYaw, 4, dt);
-    if (!this.dragging) this.pitch = damp(this.pitch, v.pitch, 1.5, dt);
-    this.dist = damp(this.dist, v.dist, 3, dt);
+    this.userYaw += v.auto * dt;
+    const fov = v.fov * (this.app.renderer.aspect < 1 ? 1.5 : 1);
+    let yaw = v.yaw;
+    let pitch = v.pitch;
+    let dist = v.dist;
+    let target = v.target;
+    if (this.viewName === 'garage' && this.measure) {
+      const s = SHOTS[this.shot](this.measure);
+      yaw = s.yaw;
+      pitch = s.pitch;
+      dist = this._fitDist(s, fov) * this.zoom;
+      target = s.target;
+    }
+    this.yaw = damp(this.yaw, yaw + this.userYaw, 4, dt);
+    if (!this.dragging) this.pitch = damp(this.pitch, pitch, 1.5, dt);
+    this.dist = damp(this.dist, dist, 3, dt);
     this.offset = damp(this.offset, v.offset, 4, dt);
+    const T = this.target;
+    T.set(damp(T.x, target[0], 3.5, dt), damp(T.y, target[1], 3.5, dt), damp(T.z, target[2], 3.5, dt));
     const cam = this.camera;
-    const tx = v.target[0];
-    const ty = v.target[1];
-    const tz = v.target[2];
-    cam.position.set(tx + Math.sin(this.yaw) * Math.cos(this.pitch) * this.dist, ty + Math.sin(this.pitch) * this.dist + 0.4, tz + Math.cos(this.yaw) * Math.cos(this.pitch) * this.dist);
-    cam.lookAt(tx, ty, tz);
-    cam.fov = damp(cam.fov, v.fov * (this.app.renderer.aspect < 1 ? 1.5 : 1), 4, dt);
+    // (a close-up rises less above its target than a full view)
+    const rise = 0.4 * Math.min(1, this.dist / 8);
+    cam.position.set(T.x + Math.sin(this.yaw) * Math.cos(this.pitch) * this.dist, T.y + Math.sin(this.pitch) * this.dist + rise, T.z + Math.cos(this.yaw) * Math.cos(this.pitch) * this.dist);
+    cam.lookAt(T);
+    cam.fov = damp(cam.fov, fov, 4, dt);
     // shift the projection so the car sits beside the menu panel
     const w = this.app.renderer.width;
     const h = this.app.renderer.height;

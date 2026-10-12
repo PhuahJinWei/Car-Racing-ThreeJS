@@ -461,8 +461,24 @@ export class App {
     let id = null;
     let lx = 0;
     let ly = 0;
+    // in the garage: a second finger pinches to zoom, a double tap (or click) resets the view
+    const touches = new Map();
+    let pinch = 0;
+    let lastTap = { t: 0, x: 0, y: 0 };
+    const spread = () => {
+      const [a, b] = [...touches.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
     this.canvas.addEventListener('pointerdown', (e) => {
       if (this.state !== 'menu' && this.state !== 'garage') return;
+      if (this.state === 'garage') {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size === 2) pinch = spread();
+        const now = performance.now();
+        if (e.pointerType !== 'mouse' && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) this.garage.resetView();
+        lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+      if (id !== null) return;
       id = e.pointerId;
       lx = e.clientX;
       ly = e.clientY;
@@ -474,12 +490,25 @@ export class App {
       }
     });
     this.canvas.addEventListener('pointermove', (e) => {
+      const tp = touches.get(e.pointerId);
+      if (tp) {
+        tp.x = e.clientX;
+        tp.y = e.clientY;
+      }
+      if (touches.size >= 2) {
+        const d = spread();
+        if (pinch > 0 && d > 0) this.garage.zoomBy(pinch / d);
+        pinch = d;
+        return;
+      }
       if (e.pointerId !== id) return;
       this._backdrop().drag(e.clientX - lx, e.clientY - ly);
       lx = e.clientX;
       ly = e.clientY;
     });
     const end = (e) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = 0;
       if (e.pointerId !== id) return;
       id = null;
       this.garage.dragging = false;
@@ -487,6 +516,18 @@ export class App {
     };
     this.canvas.addEventListener('pointerup', end);
     this.canvas.addEventListener('pointercancel', end);
+    this.canvas.addEventListener(
+      'wheel',
+      (e) => {
+        if (this.state !== 'garage') return;
+        e.preventDefault();
+        this.garage.zoomBy(Math.exp(e.deltaY * 0.0012));
+      },
+      { passive: false },
+    );
+    this.canvas.addEventListener('dblclick', () => {
+      if (this.state === 'garage') this.garage.resetView();
+    });
   }
 
   /** The scene behind the current screen: the studio in the garage, the street everywhere else. */
