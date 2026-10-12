@@ -64,9 +64,27 @@ const HEAD_RANGE = 60;
 const HEAD_FADE_FAR = 90;
 
 /**
+ * The car model of each rival, drawn from two or three models, so a race only loads those and
+ * your own. A seed (the daily challenge's) gives everyone the same field.
+ */
+export function pickRivals(count, seed) {
+  const rand = seed != null ? rng(hashString(`rivals|${seed}`)) : Math.random;
+  const shuffle = (list) => {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  };
+  const models = shuffle(CARS.map((c) => c.id)).slice(0, rand() < 0.5 ? 2 : 3);
+  // each model races at least once, in a random grid slot
+  return shuffle(Array.from({ length: count }, (_, k) => models[k < models.length ? k : Math.floor(rand() * models.length)]));
+}
+
+/**
  * One race session: world, cars, rules, effects, camera and per-frame orchestration.
  * cfg: { trackId, variant: {reverse, mirror, weather}, mode: 'race'|'timetrial'|'daily',
- *        laps, difficulty, carId, custom, opponents, ghost }
+ *        laps, difficulty, carId, custom, opponents, rivals (car id per opponent), ghost }
  */
 export class Race {
   constructor(app, cfg) {
@@ -131,7 +149,9 @@ export class Race {
       this.diff = diff;
       const names = [...AI_NAMES].sort(() => rand() - 0.5);
       for (let k = 0; k < cfg.opponents; k++) {
-        const aiDef = CARS[Math.floor(rand() * CARS.length)];
+        // (the draw stays when a car is given, so the rest of a seeded field comes out the same)
+        const any = CARS[Math.floor(rand() * CARS.length)];
+        const aiDef = cfg.rivals?.[k] ? getCarDef(cfg.rivals[k]) : any;
         // spread the field: some rivals are clearly slower than others
         const pace = lerp(diff.pace[0], diff.pace[1], (k + 0.5 + (rand() - 0.5) * 0.6) / cfg.opponents);
         const r = this._makeRacer(aiDef, randomCustom(rand), false, names[k % names.length], {

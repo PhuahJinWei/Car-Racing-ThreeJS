@@ -4,7 +4,7 @@ import { aimLampLights, castCarShadow } from '../world/car-light.js';
 import { globalUniforms, MAX_HEADLIGHTS } from '../world/materials.js';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef, CARS } from '../car/car-defs.js';
-import { getCarAsset } from '../car/car-assets.js';
+import { getCarAsset, ensureCarAssets } from '../car/car-assets.js';
 import { randomCustom } from '../car/customization.js';
 import { Effects } from '../game/effects.js';
 import { DEFAULT_FX } from '../core/postfx.js';
@@ -164,10 +164,18 @@ export class MenuStreet {
     if (this.car) {
       this.root.remove(this.car.group);
       this.car.dispose();
+      this.car = null;
     }
     const q = this.app.renderer.preset;
     this.carId = carId;
     this.customKey = key;
+    if (getCarDef(carId).model && !getCarAsset(carId)) {
+      // not downloaded yet (a car bought a moment ago): parked as soon as it is
+      ensureCarAssets([carId], this.app.renderer.renderer).then(() => {
+        if (this.world && this.carId === carId && !this.car) this.syncCar(carId, this.custom, true);
+      });
+      return;
+    }
     this.car = new CarModel(getCarDef(carId), custom, { envMap: this.world.envMap, hq: q.carHQ, wheelHQ: q.carHQ && q.carDetail !== 'light', number: 7, liveryRes: Math.min(1024, q.liveryRes ?? 1024), asset: getCarAsset(carId) });
     this.car.group.position.copy(this.anchor.position);
     this.car.group.quaternion.copy(this.anchor.quaternion);
@@ -315,8 +323,21 @@ export class MenuStreet {
   }
 
   _spawnPasser() {
-    // any rival car whose model has loaded
-    const ready = CARS.filter((c) => getCarAsset(c.id));
+    // any car whose model has loaded - but not only clones of yours: if no other car is here yet
+    // (races load just their own), one is fetched first
+    let ready = CARS.filter((c) => getCarAsset(c.id));
+    if (!ready.some((c) => c.id !== this.carId)) {
+      if (!this._passerLoad) {
+        const others = CARS.filter((c) => c.id !== this.carId && c.model);
+        const pick = others[Math.floor(Math.random() * others.length)];
+        this._passerLoad = pick ? ensureCarAssets([pick.id], this.app.renderer.renderer).then(() => (this._passerLoad = 'done')) : 'done';
+      }
+      if (this._passerLoad !== 'done') {
+        this.passTimer = 1;
+        return;
+      }
+      ready = CARS.filter((c) => getCarAsset(c.id));
+    }
     if (!ready.length) return;
     const def = ready[Math.floor(Math.random() * ready.length)];
     let ps = this.passers.find((p) => p.def.id === def.id);

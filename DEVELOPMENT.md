@@ -93,6 +93,7 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
+  - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street.
 
 ## Adding real car models
 

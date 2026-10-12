@@ -7,14 +7,14 @@ import { HUD } from './ui/hud.js';
 import { TouchControls, TOUCH_SIZES } from './ui/touch.js';
 import { Garage } from './scenes/garage.js';
 import { MenuStreet } from './scenes/street.js';
-import { Race } from './game/race.js';
+import { Race, pickRivals } from './game/race.js';
 import { getTrackDef } from './world/tracks.js';
 import { evaluateDaily, dailyProgress, todayKey } from './game/daily.js';
 import { clamp } from './core/math.js';
 import { setLanguage, t } from './core/i18n.js';
 import { DIFFICULTY } from './game/ai.js';
-import { CARS } from './car/car-defs.js';
-import { loadManifest, ensureCarAssets, previewModelFile, setCarDetail } from './car/car-assets.js';
+import { CARS, getCarDef } from './car/car-defs.js';
+import { loadManifest, ensureCarAssets, getCarAsset, previewModelFile, setCarDetail } from './car/car-assets.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -80,14 +80,7 @@ export class App {
     this.street = new MenuStreet(this);
     this.street.syncCar(S.data.car, S.customFor(S.data.car));
     this.street.build();
-    // the rest load in the background, once the title screen is up and running smoothly
-    setTimeout(() => {
-      ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer).then(() => {
-        if (this.state === 'race' || !this.garage) return;
-        this.garage.setCar(this.garage.carId, S.ownsCar(this.garage.carId) ? S.customFor(this.garage.carId) : undefined);
-        this.street.syncCar(S.data.car, S.customFor(S.data.car), true);
-      });
-    }, 1500);
+    // other cars download when they're needed: a race's own, or one you look at in the garage
     this.street.setView('title');
     this.ui.hideLoading();
     this.state = 'title';
@@ -180,6 +173,8 @@ export class App {
     const key =`${cfg.trackId}|${v.reverse ? 'r' : 'f'}|${v.mirror ? 'm' : 'n'}|${v.weather}`;
     const full = { opponents: 5, difficulty: 'easy', laps: 3, ...cfg, variant: v, carId, custom };
     if (full.mode === 'timetrial') full.ghost = S.getGhost(key);
+    // restarts keep the same rivals
+    else if (!full.rivals) full.rivals = pickRivals(full.opponents, full.seed != null ? `${key}|${full.seed}` : null);
     this.lastRaceCfg = full;
     this._teardownRace();
     // the race builds its own world; the menu street comes back afterwards
@@ -189,7 +184,13 @@ export class App {
     this.ui.showLoading(t('building', { track: getTrackDef(cfg.trackId).name }), { trackId: cfg.trackId, variant: v, mode: full.mode, laps: full.laps });
     this.state = 'loading';
     await nextFrame();
-    await ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer);
+    // only the cars in this race; a rival whose model can't be fetched (offline, say) swaps to one
+    // that's here
+    await ensureCarAssets([carId, ...(full.rivals || [])], this.renderer.renderer);
+    if (full.rivals) {
+      const here = [carId, ...full.rivals].filter((id) => getCarAsset(id));
+      if (here.length) full.rivals = full.rivals.map((id, k) => (getCarAsset(id) || !getCarDef(id).model ? id : here[k % here.length]));
+    }
     const race = new Race(this, full);
     try {
       race.build();

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef } from '../car/car-defs.js';
-import { getCarAsset } from '../car/car-assets.js';
+import { getCarAsset, ensureCarAssets } from '../car/car-assets.js';
 import { DEFAULT_FX } from '../core/postfx.js';
 import { globalUniforms } from '../world/materials.js';
 import { damp, clamp } from '../core/math.js';
@@ -129,14 +129,31 @@ export class Garage {
     s.environment = this.envRT.texture;
   }
 
+  /**
+   * Put `carId` on the turntable with `custom`. A car whose model hasn't been downloaded yet is
+   * fetched first, with the turntable empty meanwhile; resolves once that's settled.
+   */
   setCar(carId, custom) {
     if (this.car) {
       this.scene.remove(this.car.group);
       this.car.dispose();
+      this.car = null;
     }
-    const def = getCarDef(carId);
     this.carId = carId;
-    this.car = new CarModel(def, custom, { envMap: this.envRT.texture, hq: true, number: 7, beams: false, liveryRes: this.app.renderer.preset?.liveryRes ?? 1024, asset: getCarAsset(carId) });
+    this.custom = custom;
+    if (!getCarDef(carId).model || getCarAsset(carId)) {
+      this._placeCar();
+      return Promise.resolve();
+    }
+    return ensureCarAssets([carId], this.app.renderer.renderer).then(() => {
+      // still the one wanted, and not mid-race (leaving a race puts your car back anyway)
+      if (this.carId === carId && !this.car && this.app.state !== 'race' && this.app.state !== 'loading') this._placeCar();
+    });
+  }
+
+  _placeCar() {
+    const def = getCarDef(this.carId);
+    this.car = new CarModel(def, this.custom, { envMap: this.envRT.texture, hq: true, number: 7, beams: false, liveryRes: this.app.renderer.preset?.liveryRes ?? 1024, asset: getCarAsset(this.carId) });
     this.car.group.position.y = 0.12;
     // the studio's own softboxes do the reflections here; the moving street-light streaks are a
     // racing effect and, frozen in place, they turn the glass into a chrome band
@@ -146,6 +163,7 @@ export class Garage {
   }
 
   setCustom(custom) {
+    this.custom = custom;
     if (this.car) this.car.setCustomization(custom);
   }
 

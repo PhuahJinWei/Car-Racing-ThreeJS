@@ -1748,6 +1748,27 @@ output {
   gap: 0.3rem;
 }
 
+/* a car still downloading: a thin sweep under its name */
+.ci-loading {
+  display: none;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: calc(0.24em * var(--track));
+  color: var(--ink-3);
+}
+
+.car-loading .ci-loading {
+  display: flex;
+}
+
+.ci-loading .load-bar {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
 .blurb {
   margin: 0;
   font-weight: 500;

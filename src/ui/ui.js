@@ -703,6 +703,7 @@ export class UI {
                 <button class="icon-btn sm" data-action="nextcar" aria-label="${t('garage.nextCar')}">${ICONS.right}</button>
               </div>
             </div>
+            <div class="ci-loading"><span>${t('loading')}</span><b class="load-bar"><i></i></b></div>
             <p class="blurb"></p>
             <div class="stats"></div>
             <div class="car-action"></div>
@@ -808,7 +809,11 @@ export class UI {
 
     const showCar = () => {
       pending = null;
-      app.garage.setCar(car().id, owned() ? equippedCustom() : undefined);
+      // a car not downloaded yet shows a loading bar until it's on the turntable
+      const id = car().id;
+      const loaded = () => car().id === id && root.classList.toggle('car-loading', !app.garage.car);
+      app.garage.setCar(id, owned() ? equippedCustom() : undefined).then(loaded);
+      loaded();
       renderCar();
       renderItems();
       renderBuyBar();
