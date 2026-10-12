@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+/** How many cars' headlights light the world at once (the player and the rivals nearest the camera). */
+export const MAX_HEADLIGHTS = 4;
+
 // Shared uniforms: every custom material references these objects, so updating them once
 // per frame updates the whole world.
 export const globalUniforms = {
@@ -9,6 +12,13 @@ export const globalUniforms = {
   uWet: { value: 0 },
   uAmbient: { value: new THREE.Color(0x202040) },
   uSkyGlow: { value: new THREE.Color(0xff3fb4) },
+  // headlights: lamp-pair centre, forward and up of each car, (power, range m, half spacing of
+  // the two lamps, -) - power 0 switches a slot off. Set every frame by the race.
+  uHeadPos: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3()) },
+  uHeadFwd: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3(0, 0, 1)) },
+  uHeadUp: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3(0, 1, 0)) },
+  uHeadParams: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector4()) },
+  uHeadColor: { value: new THREE.Color(0.93, 0.96, 1.0) },
 };
 
 export function hdr(hex, intensity = 1) {
@@ -65,6 +75,42 @@ float vnoise(vec2 p) {
   float c = hash12(i + vec2(0.0, 1.0));
   float d = hash12(i + vec2(1.0, 1.0));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+`;
+
+// Low-beam headlights: a wide beam from each pair of lamps with a cut-off line just under the
+// horizon (light pools on the road, a bright band low on the walls), fading with distance.
+// road = 1 for asphalt, which scatters light back toward the cars even at grazing angles;
+// other surfaces have to face the lamps.
+const HEADLIGHTS_GLSL = /* glsl */ `
+#define MAX_HEAD ${MAX_HEADLIGHTS}
+uniform vec3 uHeadPos[MAX_HEAD];
+uniform vec3 uHeadFwd[MAX_HEAD];
+uniform vec3 uHeadUp[MAX_HEAD];
+uniform vec4 uHeadParams[MAX_HEAD];
+uniform vec3 uHeadColor;
+vec3 headlights(vec3 P, vec3 N, float road) {
+  float sum = 0.0;
+  for (int i = 0; i < MAX_HEAD; i++) {
+    vec4 hp = uHeadParams[i];
+    if (hp.x <= 0.0) continue;
+    vec3 d = P - uHeadPos[i];
+    float ahead = dot(d, uHeadFwd[i]);
+    if (ahead < 0.5) continue;
+    float rise = dot(d, uHeadUp[i]);
+    float side = length(d - uHeadFwd[i] * ahead - uHeadUp[i] * rise);
+    float spread = max(side - hp.z, 0.0) / (ahead + 2.0);
+    float beam = (1.0 - smoothstep(0.27, 0.43, spread)) * (0.4 + 0.6 * (1.0 - smoothstep(0.0, 0.27, spread)));
+    float cut = -0.012 * ahead;
+    beam *= mix(0.06, 1.0, 1.0 - smoothstep(cut - 0.05, cut + 0.1, rise));
+    float dist = length(d);
+    float fall = smoothstep(1.5, 7.0, ahead) / (1.0 + dist * dist * (1.0 / 144.0));
+    fall *= 1.0 - smoothstep(hp.y * 0.5, hp.y, dist);
+    float ndl = max(dot(N, -d / dist), 0.0);
+    float face = road > 0.5 ? 0.35 + 0.65 * sqrt(ndl) : ndl;
+    sum += hp.x * beam * fall * face;
+  }
+  return sum * uHeadColor;
 }
 `;
 
@@ -144,6 +190,7 @@ export function createRoadMaterial(opts) {
       varying vec3 vViewDir;
       ${NOISE_GLSL}
       ${FOG_PARS_FRAG}
+      ${HEADLIGHTS_GLSL}
 
       float band(float x, float center, float halfW, float aa) {
         return 1.0 - smoothstep(halfW - aa, halfW + aa, abs(x - center));
@@ -234,9 +281,12 @@ export function createRoadMaterial(opts) {
         float puddle = smoothstep(0.52, 0.78, vnoise(vWorld.xz * 0.07) * 0.65 + vnoise(vWorld.xz * 0.31) * 0.35);
         albedo *= mix(1.0, 0.5, uWet);
         vec3 surf = mix(albedo, markCol * 0.65, mark);
-        vec3 light = vLight + uAmbient * 0.6;
+        vec3 head = headlights(vWorld, vec3(0.0, 1.0, 0.0), 1.0);
+        vec3 light = vLight + uAmbient * 0.6 + head;
         vec3 col = surf * light * uBrightness;
         col += markCol * mark * glow * 3.0;
+        // road paint is retro-reflective: it throws the headlights back toward the cars
+        col += markCol * mark * head * 0.45;
 
         // Grazing-angle sheen
         float ndv = clamp(vViewDir.y, 0.0, 1.0);
@@ -302,11 +352,13 @@ export function createLitMaterial(opts = {}) {
       varying vec3 vWorld;
       ${NOISE_GLSL}
       ${FOG_PARS_FRAG}
+      ${HEADLIGHTS_GLSL}
       void main() {
         float n = vnoise(vWorld.xz * 0.9 + vWorld.y * 0.7);
         vec3 alb = uAlbedo * (0.8 + 0.35 * n);
-        float up = clamp(vN.y, 0.0, 1.0);
-        vec3 light = vLight * (0.65 + 0.35 * up) + uAmbient * (0.35 + 0.4 * up);
+        vec3 nrm = normalize(vN);
+        float up = clamp(nrm.y, 0.0, 1.0);
+        vec3 light = vLight * (0.65 + 0.35 * up) + uAmbient * (0.35 + 0.4 * up) + headlights(vWorld, nrm, 0.0);
         vec3 col = alb * light * uBrightness;
         if (uJoints > 0.0) {
           // distance (m) to the nearest joint between precast segments
@@ -424,6 +476,7 @@ export function createTunnelMaterial(opts = {}) {
       varying vec3 vWorld;
       ${NOISE_GLSL}
       ${FOG_PARS_FRAG}
+      ${HEADLIGHTS_GLSL}
 
       float box(vec2 p, vec2 c, vec2 hs, vec2 aa) {
         vec2 q = abs(p - c) - hs;
@@ -444,7 +497,9 @@ export function createTunnelMaterial(opts = {}) {
         bool wall = uw < uWallU;
         float ph = fract(s / uSpacing);
         float pool = 0.55 + 0.45 * pow(0.5 + 0.5 * cos(ph * 6.2832), 2.0);
-        vec3 light = uLamp * pool * (wall ? 0.9 : 0.55) + uAmbient * 0.4;
+        vec3 nrm = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+        if (dot(nrm, cameraPosition - vWorld) < 0.0) nrm = -nrm;
+        vec3 light = uLamp * pool * (wall ? 0.9 : 0.55) + uAmbient * 0.4 + headlights(vWorld, nrm, 0.0) * 1.6;
         vec3 col;
         if (wall) {
           vec2 t = vec2(s / 0.3, uw / uWallU * 20.0);

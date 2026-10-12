@@ -489,30 +489,6 @@ gl_FragColor = vec4(totalDiffuse * diffuseColor.a + (outgoingLight - totalDiffus
   return mat;
 }
 
-function makeBeamMaterial() {
-  return additive(
-    new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(1.0, 0.94, 0.85) }, uIntensity: { value: 0.16 } },
-      vertexShader: /* glsl */ `
-        varying vec2 vUv;
-        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: /* glsl */ `
-        uniform vec3 uColor;
-        uniform float uIntensity;
-        varying vec2 vUv;
-        void main() {
-          float y = vUv.y;               // 0 at the bumper, 1 far ahead
-          float x = abs(vUv.x - 0.5) * 2.0;
-          float spread = 0.18 + 0.82 * y;
-          float cone = 1.0 - smoothstep(spread * 0.55, spread, x);
-          float fall = pow(clamp(1.0 - y, 0.0, 1.0), 1.6) * smoothstep(0.0, 0.08, y);
-          float a = cone * fall * uIntensity;
-          gl_FragColor = vec4(uColor * a, a);
-        }`,
-    }),
-  );
-}
-
 function makeFlameMaterial() {
   return additive(
     new THREE.ShaderMaterial({
@@ -596,14 +572,29 @@ export function makeHologramMaterial(color = 0x40e0ff) {
   );
 }
 
-/** Soft contact shadow under the car, darkest beneath the tyres. */
+// room around the car for the soft edge and the lamp-cast shadow (m)
+const SHADOW_MARGIN = 2.5;
+
+/**
+ * Shadow on the road under a car:
+ *  - occlusion: dark under the floor, with a soft edge spilling out past the sills
+ *  - tyre contact patches, nearly black
+ *  - cast shadows from the two strongest nearby lamps: the footprint swept away from each light,
+ *    longer the lower and farther the lamp is, as dark as that lamp's share of the light there
+ *    (set every frame with CarModel.setShadow)
+ * Height above the road (jumps) softens and fades it.
+ */
 function makeShadowMaterial() {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     uniforms: {
       uHalf: { value: new THREE.Vector2(1, 2.2) },
+      uCenter: { value: new THREE.Vector2(0, 0) },
       uWheels: { value: new THREE.Vector4(1.3, -1.3, 0.8, 0.12) },
+      uCast: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uCast2: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uSoft: { value: 0 },
       uOpacity: { value: 1 },
     },
     vertexShader: /* glsl */ `
@@ -611,19 +602,37 @@ function makeShadowMaterial() {
       void main() { vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */ `
       uniform vec2 uHalf;
+      uniform vec2 uCenter;
       uniform vec4 uWheels;
+      uniform vec4 uCast;
+      uniform vec4 uCast2;
+      uniform float uSoft;
       uniform float uOpacity;
       varying vec2 vP;
       float sdRR(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+      // the footprint swept along c.xy for c.z metres, fading with distance from the car
+      float lampShadow(vec2 p, vec4 c, float soft) {
+        if (c.w <= 0.0) return 0.0;
+        float t = clamp(dot(p, c.xy), 0.0, c.z);
+        float along = t / max(c.z, 0.001);
+        float dc = sdRR(p - c.xy * t, uHalf - vec2(0.15, 0.25), 0.45);
+        return (1.0 - smoothstep(-0.35, 0.3 + along * 0.55 + soft, dc)) * c.w * (1.0 - 0.6 * along);
+      }
       void main() {
-        float d = sdRR(vP, uHalf - vec2(0.12, 0.2), 0.4);
-        float a = (1.0 - smoothstep(-0.4, 0.5, d)) * 0.6;
+        vec2 p = vP - uCenter;
+        float soft = uSoft;
+        float d = sdRR(p, uHalf - vec2(0.1, 0.2), 0.35);
+        float a = (1.0 - smoothstep(-0.6 - soft, 0.42 + soft * 1.5, d)) * 0.84;
+        float contact = 1.0 - min(soft * 1.5, 1.0);
         for (int i = 0; i < 4; i++) {
           vec2 c = vec2(i < 2 ? uWheels.z : -uWheels.z, (i == 0 || i == 2) ? uWheels.x : uWheels.y);
-          float dw = sdRR(vP - c, vec2(uWheels.w, 0.24), 0.08);
-          a = max(a, (1.0 - smoothstep(-0.06, 0.2, dw)) * 0.88);
+          float dw = sdRR(vP - c, vec2(uWheels.w, 0.2), 0.08);
+          a = max(a, (1.0 - smoothstep(-0.05, 0.16, dw)) * 0.96 * contact);
         }
-        gl_FragColor = vec4(0.0, 0.0, 0.0, a * uOpacity);
+        a = 1.0 - (1.0 - a) * (1.0 - lampShadow(p, uCast, soft)) * (1.0 - lampShadow(p, uCast2, soft));
+        a *= uOpacity;
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(0.0, 0.0, 0.0, a);
       }`,
   });
 }
@@ -678,6 +687,10 @@ export class CarModel {
     else if (this.asset) this._buildFromAsset(this.asset);
     else this._buildGeometry();
     this._buildShadow();
+    // where the headlights sit (lamp-pair centre height / distance ahead, half spacing): the race
+    // feeds this to the world shaders so the beams light the road and walls
+    const h = this.asset?.head;
+    this.headLamp = h && h.length ? { x: Math.abs(h[0].x), y: h[0].y, z: h[0].z } : { x: 0.62, y: 0.6, z: (this.frontZ ?? 2.2) - 0.25 };
     this.setCustomization(custom);
   }
 
@@ -869,19 +882,6 @@ export class CarModel {
       this.wheels.push({ pivot, spin, rim, r, front, side });
     }
 
-    // --- headlight beams washing over the road ahead
-    if (this.opts.beams ?? hq) {
-      this.beamMat = makeBeamMaterial();
-      const beam = new THREE.Mesh(new THREE.PlaneGeometry(9, 26), this.beamMat);
-      beam.rotation.x = -Math.PI / 2;
-      beam.position.set(0, 0.05, frontZ + 13);
-      beam.renderOrder = 3;
-      // PlaneGeometry v runs along +Y; after rotating flat it points to -Z, so flip it forward
-      beam.scale.y = -1;
-      this.group.add(beam);
-      this.beam = beam;
-    }
-
     // --- underglow
     this.underglowMat = makeUnderglowMaterial();
     const ug = new THREE.Mesh(new THREE.PlaneGeometry(dims.track + 2.4, dims.length + 2.2), this.underglowMat);
@@ -976,7 +976,7 @@ export class CarModel {
     }
     this.body.add(root);
 
-    // lights, exhaust, flames, underglow and headlight beam sized from the model
+    // lights, exhaust, flames and underglow sized from the model
     this.tailLightPos = asset.tail.map((v) => v.clone().setZ(Math.min(v.z, dims.rearZ + 0.25) - 0.05));
     const rearZ = dims.rearZ;
     const exX = [-dims.halfWidth * 0.36, dims.halfWidth * 0.36];
@@ -996,16 +996,6 @@ export class CarModel {
     this.flames.renderOrder = 5;
     this.body.add(this.flames);
     this.exhaustPos = exX.map((x) => new THREE.Vector3(x, exY, rearZ - 0.05));
-    if (this.opts.beams ?? hq) {
-      this.beamMat = makeBeamMaterial();
-      const beam = new THREE.Mesh(new THREE.PlaneGeometry(9, 26), this.beamMat);
-      beam.rotation.x = -Math.PI / 2;
-      beam.position.set(0, 0.05, dims.frontZ + 13);
-      beam.renderOrder = 3;
-      beam.scale.y = -1;
-      this.group.add(beam);
-      this.beam = beam;
-    }
     this.underglowMat = makeUnderglowMaterial();
     const ug = new THREE.Mesh(new THREE.PlaneGeometry(dims.width + 0.6, dims.length + 1.4), this.underglowMat);
     ug.rotation.x = -Math.PI / 2;
@@ -1019,17 +1009,21 @@ export class CarModel {
   }
 
   _buildShadow() {
+    const flames = this.flames;
+    if (flames) this.body.remove(flames);
     const box = new THREE.Box3().setFromObject(this.body);
+    if (flames) this.body.add(flames);
     const hx = Math.max(0.6, (box.max.x - box.min.x) / 2);
     const hz = Math.max(1.2, (box.max.z - box.min.z) / 2);
     this.shadowMat = makeShadowMaterial();
     this.shadowMat.uniforms.uHalf.value.set(hx, hz);
+    this.shadowMat.uniforms.uCenter.value.set((box.max.x + box.min.x) / 2, (box.max.z + box.min.z) / 2);
     const fw = this.wheels.find((w) => w.front);
     const rw = this.wheels.find((w) => !w.front);
     if (fw && rw) {
       this.shadowMat.uniforms.uWheels.value.set(fw.pivot.position.z, rw.pivot.position.z, Math.abs(rw.pivot.position.x), (rw.w ?? 0.3) * 0.45);
     }
-    const geo = new THREE.PlaneGeometry(hx * 2 + 1.2, hz * 2 + 1.2);
+    const geo = new THREE.PlaneGeometry(hx * 2 + SHADOW_MARGIN * 2, hz * 2 + SHADOW_MARGIN * 2);
     geo.rotateX(-Math.PI / 2);
     geo.translate((box.max.x + box.min.x) / 2, 0.02, (box.max.z + box.min.z) / 2);
     this.shadow = new THREE.Mesh(geo, this.shadowMat);
@@ -1180,7 +1174,7 @@ export class CarModel {
     }
     this.wheelR = meta.wheels.rear.r;
 
-    // ---- lights, exhaust flames, headlight beam, underglow
+    // ---- lights, exhaust flames, underglow
     this.tailLightPos = meta.tailLights.map((p) => new THREE.Vector3(p[0], p[1], p[2] - 0.04));
     const ex = meta.exhausts;
     this.flameMat = makeFlameMaterial();
@@ -1197,16 +1191,6 @@ export class CarModel {
     this.flames.renderOrder = 5;
     this.body.add(this.flames);
     this.exhaustPos = ex.map((p) => new THREE.Vector3(p[0], p[1], p[2] - 0.04));
-    if (this.opts.beams ?? hq) {
-      this.beamMat = makeBeamMaterial();
-      const beam = new THREE.Mesh(new THREE.PlaneGeometry(9, 26), this.beamMat);
-      beam.rotation.x = -Math.PI / 2;
-      beam.position.set(0, 0.05, dims.frontZ + 13);
-      beam.renderOrder = 3;
-      beam.scale.y = -1;
-      this.group.add(beam);
-      this.beam = beam;
-    }
     this.underglowMat = makeUnderglowMaterial();
     const ug = new THREE.Mesh(new THREE.PlaneGeometry(dims.width + 0.6, dims.length + 1.4), this.underglowMat);
     ug.rotation.x = -Math.PI / 2;
@@ -1389,6 +1373,22 @@ export class CarModel {
 
   setBodyTilt(roll, pitch) {
     this.body.rotation.set(pitch, 0, roll);
+  }
+
+  /**
+   * Road shadow for this frame. air: height above the road. Per lamp (two strongest): (x, z) the
+   * direction away from it in car space (unit), len how far the cast shadow reaches (m), s 0..1.
+   */
+  setShadow(air, x1 = 0, z1 = 0, len1 = 0, s1 = 0, x2 = 0, z2 = 0, len2 = 0, s2 = 0) {
+    if (!this.shadowMat) return;
+    const u = this.shadowMat.uniforms;
+    const max = SHADOW_MARGIN - 0.6;
+    u.uCast.value.set(x1, z1, Math.min(len1, max), s1);
+    u.uCast2.value.set(x2, z2, Math.min(len2, max), s2);
+    const h = Math.max(0, air);
+    u.uSoft.value = Math.min(h * 0.35, 1.2);
+    u.uOpacity.value = 1 / (1 + h * 0.45);
+    this.shadow.position.y = -h;
   }
 
   setGhost(color = 0x40e0ff) {

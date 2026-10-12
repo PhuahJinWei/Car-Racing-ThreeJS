@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildWorld } from '../world/world-builder.js';
-import { globalUniforms } from '../world/materials.js';
+import { globalUniforms, MAX_HEADLIGHTS } from '../world/materials.js';
 import { CarModel } from '../car/car-model.js';
 import { getCarDef, CARS } from '../car/car-defs.js';
 import { getCarAsset } from '../car/car-assets.js';
@@ -12,7 +12,7 @@ import { Effects } from './effects.js';
 import { StuntTracker } from './stunts.js';
 import { GhostRecorder, GhostPlayer } from './ghost.js';
 import { DEFAULT_FX } from '../core/postfx.js';
-import { clamp, damp, lerp, rng, hashString, wrap } from '../core/math.js';
+import { clamp, damp, lerp, rng, hashString, wrap, smoothstep } from '../core/math.js';
 
 const TIER_COLORS = [null, [0.4, 1.6, 6.0], [6.0, 2.4, 0.4], [5.0, 0.6, 6.0]];
 const TIER_LABELS = ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'];
@@ -22,6 +22,13 @@ const _v2 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
+
+// headlights lighting the world: brightness (same units as the baked lamp light), reach (m) and
+// the camera distance (m) beyond which a rival's lights fade out of the shaders
+const HEAD_POWER = 2.6;
+const HEAD_POWER_RIVAL = 1.6;
+const HEAD_RANGE = 60;
+const HEAD_FADE_FAR = 90;
 
 /**
  * One race session: world, cars, rules, effects, camera and per-frame orchestration.
@@ -390,6 +397,7 @@ export class Race {
 
     this._updateProbe(dt);
     this._updateLamps();
+    this._updateHeadlights();
     // start lights: one more red column every 0.6 s of the countdown, all out at GO
     const SL = this.world.startLights;
     if (SL) {
@@ -764,6 +772,7 @@ export class Race {
     m.group.position.copy(v.position);
     m.group.quaternion.copy(v.quat);
     m.setBodyTilt(v.roll, v.pitch);
+    this._castShadow(m, v.frame.i, v.x, v.y, v.z, v.y - v.groundPrev);
     m.update(dt, { speed: v.vf, steer: this.app.input.state.steer * (P.finished ? 0 : 1), brake: v.braking, boost: v.boostLevel, drift: v.drift.active });
     // light streaks sliding over the paint (stronger in tunnels / under lamps)
     this._dist = (this._dist || 0) + v.speed * dt;
@@ -775,6 +784,7 @@ export class Race {
       r.model.setStreaks(-a.progress * 0.3, a.frame.tunnel ? 0.45 : 0.15, null, a.fwd);
       r.model.group.position.copy(a.position);
       r.model.group.quaternion.copy(a.quat);
+      this._castShadow(r.model, a.frame.i, a.position.x, a.position.y, a.position.z, a.y - a.groundPrev);
       r.model.setBodyTilt(clamp(-a.driftVis * 0.08, -0.05, 0.05), 0);
       r.model.update(dt, { speed: a.v, steer: clamp(-a.vd * 0.15 + a.driftVis, -1, 1), brake: false, boost: a.boostLevel });
     }
@@ -946,6 +956,97 @@ export class Race {
       light.intensity = m * 170;
       light.distance = Math.sqrt(L.r2) * 1.1;
       light.position.set(L.x, L.y, L.z);
+    }
+  }
+
+  /**
+   * Road shadows for one car from the two strongest lamps nearby (baked lamps, signs, tunnel
+   * lights): each casts the footprint away from itself, as dark as its share of the light there.
+   * A lamp straight overhead leaves the shadow right underneath.
+   */
+  _castShadow(model, i, x, y, z, air) {
+    const baker = this.world.baker;
+    const n = this.world.track.n;
+    const k = this._shadowScan || (this._shadowScan = Math.ceil(26 / this.world.track.ds));
+    const S = this._shadowTop || (this._shadowTop = [{ w: 0, L: null }, { w: 0, L: null }]);
+    S[0].w = S[1].w = 0;
+    let total = 0;
+    const scan = (bucket) => {
+      for (let q = 0; q < bucket.length; q++) {
+        const L = bucket[q];
+        const dx = L.x - x;
+        const dy = L.y - y;
+        const dz = L.z - z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= L.r2) continue;
+        const f = 1 - d2 / L.r2;
+        const w = Math.max(L.r, L.g, L.b) * f * f;
+        total += w;
+        if (w > S[0].w) {
+          S[1].w = S[0].w;
+          S[1].L = S[0].L;
+          S[0].w = w;
+          S[0].L = L;
+        } else if (w > S[1].w) {
+          S[1].w = w;
+          S[1].L = L;
+        }
+      }
+    };
+    for (let j = i - k; j <= i + k; j++) {
+      const jj = ((j % n) + n) % n;
+      if (baker.buckets[jj]) scan(baker.buckets[jj]);
+      if (baker.dyn && baker.dyn[jj]) scan(baker.dyn[jj]);
+    }
+    const out = this._shadowOut || (this._shadowOut = [0, 0, 0, 0, 0, 0, 0, 0]);
+    out.fill(0);
+    _q.copy(model.group.quaternion).invert();
+    for (let s = 0; s < 2; s++) {
+      const e = S[s];
+      if (e.w <= 0) continue;
+      // a point ~0.8 m up the car lands this far beyond it on the road
+      _v.set(x - e.L.x, 0, z - e.L.z);
+      const D = _v.length();
+      const H = Math.max(e.L.y - y, 1.2);
+      _v.applyQuaternion(_q);
+      const l = Math.hypot(_v.x, _v.z) || 1;
+      out[s * 4] = _v.x / l;
+      out[s * 4 + 1] = _v.z / l;
+      out[s * 4 + 2] = D > 0.05 ? (0.8 * D) / Math.max(H - 0.8, 0.6) : 0;
+      out[s * 4 + 3] = 0.9 * (e.w / total) * smoothstep(0.02, 0.3, e.w);
+    }
+    model.setShadow(air, out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7]);
+  }
+
+  /**
+   * Headlights for the world shaders: the player's car always, plus the rivals nearest the camera
+   * (they fade with distance, so a slot can change hands without the light popping).
+   */
+  _updateHeadlights() {
+    const G = globalUniforms;
+    const slots = this.app.renderer.presetName === 'low' ? 2 : MAX_HEADLIGHTS;
+    const cam = this.camera.position;
+    const cand = this._headCand || (this._headCand = []);
+    cand.length = 0;
+    for (const r of this.racers) {
+      r.camD2 = r.isPlayer ? -1 : r.ai.position.distanceToSquared(cam);
+      cand.push(r);
+    }
+    cand.sort((a, b) => a.camD2 - b.camD2);
+    for (let k = 0; k < MAX_HEADLIGHTS; k++) {
+      const prm = G.uHeadParams.value[k];
+      const r = k < slots ? cand[k] : null;
+      if (!r || r.camD2 > HEAD_FADE_FAR * HEAD_FADE_FAR) {
+        prm.x = 0;
+        continue;
+      }
+      const src = r.isPlayer ? r.vehicle : r.ai;
+      const lamp = r.model.headLamp;
+      G.uHeadPos.value[k].copy(src.position).addScaledVector(src.fwd, lamp.z).addScaledVector(src.up, lamp.y);
+      G.uHeadFwd.value[k].copy(src.fwd);
+      G.uHeadUp.value[k].copy(src.up);
+      const fade = r.isPlayer ? 1 : smoothstep(HEAD_FADE_FAR, HEAD_FADE_FAR * 0.65, Math.sqrt(r.camD2));
+      prm.set((r.isPlayer ? HEAD_POWER : HEAD_POWER_RIVAL) * fade, HEAD_RANGE, lamp.x, 0);
     }
   }
 
@@ -1134,6 +1235,7 @@ export class Race {
   }
 
   dispose() {
+    for (const p of globalUniforms.uHeadParams.value) p.x = 0;
     this.effects.dispose();
     for (const r of this.racers) r.model.dispose();
     if (this.ghostModel) this.ghostModel.dispose();
