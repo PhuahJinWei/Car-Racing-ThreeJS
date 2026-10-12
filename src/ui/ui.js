@@ -130,7 +130,8 @@ const SHOT_FOR = { number: 'door', tint: 'glass', rims: 'wheel', rimColor: 'whee
 
 // the garage dock's groups of customization tabs
 const GROUPS = [
-  { key: 'body', icon: 'car', cats: ['paint', 'finish', 'livery', 'accent', 'number'] },
+  { key: 'cars', icon: 'car', cats: ['cars'] },
+  { key: 'body', icon: 'spray', cats: ['paint', 'finish', 'livery', 'accent', 'number'] },
   { key: 'glass', icon: 'glass', cats: ['tint'] },
   { key: 'wheels', icon: 'wheel', cats: ['rims', 'rimColor'] },
   { key: 'lights', icon: 'lamp', cats: ['underglow', 'trail'] },
@@ -700,7 +701,7 @@ export class UI {
       },
       garage: () => {
         save();
-        app.openGarage({ back: () => app.openSetup(mode) });
+        app.openGarage({ back: () => app.openSetup(mode), tab: 'cars' });
       },
       start: () => {
         save();
@@ -718,11 +719,13 @@ export class UI {
   }
 
   // ---------------------------------------------------------------- garage
-  _screen_garage({ back } = {}) {
+  _screen_garage({ back, tab } = {}) {
     const app = this.app;
     const S = app.storage;
     let carIdx = Math.max(0, CARS.findIndex((c) => c.id === S.data.car));
-    let cat = 'paint';
+    let cat = tab || 'paint'; // 'cars', or a customization tab
+    let armed = false; // the buy button asked to confirm
+    let armTimer = 0;
     const lastCat = {}; // the tab last open in each group
     let pending = null; // { cat, item } preview awaiting purchase
     const root = el(`
@@ -788,15 +791,24 @@ export class UI {
       $(root, '.ci-cls').textContent = carClass(c);
       $(root, '.ci-count').textContent = `${carIdx + 1} / ${CARS.length}`;
       $(root, '.blurb').textContent = carBlurb(c);
-      $(root, '.stats').innerHTML = statList(c)
-        .map(([n, v]) => `<div class="stat"><span>${n}</span><span class="bar"><i style="--v:${v}"></i></span><b>${Math.round(v * 100)}</b></div>`)
-        .join('');
+      // a car that isn't yours marks your car's stats on its bars
+      const mine = getCarDef(S.data.car);
+      const cmp = mine.id !== c.id ? statList(mine) : null;
+      $(root, '.stats').innerHTML =
+        statList(c)
+          .map(([n, v], i) => {
+            const m = cmp?.[i][1];
+            const d = cmp ? Math.round(v * 100) - Math.round(m * 100) : 0;
+            return `<div class="stat ${d > 0 ? 'up' : d < 0 ? 'down' : ''}"><span>${n}</span><span class="bar"><i style="--v:${v}"></i>${cmp ? `<u style="--m:${m}"></u>` : ''}</span><b>${Math.round(v * 100)}</b></div>`;
+          })
+          .join('') + (cmp ? `<div class="stat-key"><u></u>${t('garage.vsYours', { car: mine.name })}</div>` : '');
       const act = $(root, '.car-action');
       if (!owned()) {
         const short = c.price - S.credits;
-        act.innerHTML = `<button class="btn primary" data-action="buycar" ${short > 0 ? 'disabled' : ''}>${ICONS.lock}${short > 0 ? t('garage.needCr', { n: formatNumber(short) }) : t('garage.buyCar', { n: formatNumber(c.price) })}</button>`;
-      } else if (S.data.car === c.id) act.innerHTML = `<div class="status">${ICONS.check}${t('garage.selected')}</div>`;
-      else act.innerHTML = `<button class="btn primary" data-action="selectcar">${t('garage.selectCar')}</button>`;
+        const n = formatNumber(c.price);
+        if (short > 0) act.innerHTML = `<button class="btn primary" data-action="buycar" disabled>${ICONS.lock}${t('garage.needCr', { n: formatNumber(short) })}</button>`;
+        else act.innerHTML = `<button class="btn primary ${armed ? 'confirm' : ''}" data-action="buycar">${armed ? t('garage.confirmBuy', { n }) : `${ICONS.lock}${t('garage.buyCar', { n })}`}</button>`;
+      } else act.innerHTML = `<div class="status">${ICONS.check}${t('garage.yourCar')}</div>`;
       fitSoon();
     };
 
@@ -813,12 +825,30 @@ export class UI {
         b.classList.toggle('on', g === group);
         b.style.display = shown(g).length ? '' : 'none';
       }
-      // the open group's tabs, as pills
+      // the open group's tabs, as pills (the cars have none)
       const subs = $(root, '.dock-subs');
-      subs.innerHTML = shown(group)
+      subs.innerHTML = cat === 'cars' ? '' : shown(group)
         .map((k) => `<button class="${k === cat ? 'on' : ''}" data-action="tab" data-cat="${k}">${t(`cat.${k}`)}</button>`)
         .join('');
       const box = $(root, '.items');
+      if (cat === 'cars') {
+        // every car: its class (with a dot of its stock paint), name, and whether it's yours, owned
+        // or its price
+        box.innerHTML = CARS.map((c, i) => {
+          const own = S.ownsCar(c.id);
+          const mine = S.data.car === c.id;
+          const cls = ['item', 'car-item', own ? '' : 'locked', mine ? 'equipped' : '', i === carIdx && !mine ? 'selected' : ''].join(' ');
+          const paint = findItem('paint', (DEFAULT_CUSTOM_BY_CAR[c.id] || DEFAULT_CUSTOM).paint);
+          const tag = mine
+            ? `<span class="pr eq">${t('garage.yourCar')}</span>`
+            : own
+              ? `<span class="pr own">${t('garage.owned')}</span>`
+              : `<span class="pr chip ${S.credits < c.price ? 'short' : ''}">${ICONS.lock}${formatNumber(c.price)}</span>`;
+          return `<button class="${cls}" data-action="pickcar" data-idx="${i}">${mine ? `<span class="tick">${ICONS.check}</span>` : ''}<span class="cc-cls"><i style="--c:${paint.color}"></i>${carClass(c)}</span><span class="nm">${c.name}</span>${tag}</button>`;
+        }).join('');
+        fitSoon();
+        return;
+      }
       if (!owned()) {
         box.innerHTML = `<div class="items-empty">${ICONS.lock}<span>${t('garage.buyToCustomize', { car: car().name })}</span></div>`;
         return;
@@ -853,8 +883,8 @@ export class UI {
     const renderBuyBar = () => {
       const box = $(root, '.sel-panel');
       const reset = $(root, '.reset-look');
-      box.style.display = reset.style.display = owned() ? '' : 'none';
-      if (!owned()) return;
+      box.style.display = reset.style.display = owned() && cat !== 'cars' ? '' : 'none';
+      if (!owned() || cat === 'cars') return;
       reset.disabled = isStock();
       box.classList.toggle('active', !!pending);
       const item = pending ? pending.item : resolveCustom(equippedCustom())[cat];
@@ -868,8 +898,19 @@ export class UI {
 
     const previewCustom = () => app.garage.setCustom(previewing());
 
+    const disarm = () => {
+      armed = false;
+      clearTimeout(armTimer);
+    };
+
     const showCar = () => {
       pending = null;
+      disarm();
+      // a car you own becomes your car as you look at it
+      if (owned() && S.data.car !== car().id) {
+        S.data.car = car().id;
+        S.save();
+      }
       // a car not downloaded yet shows a loading bar until it's on the turntable; one you don't own
       // yet shows in its own colours
       const id = car().id;
@@ -912,7 +953,26 @@ export class UI {
         carIdx = (carIdx + 1) % CARS.length;
         showCar();
       },
+      pickcar: (b) => {
+        const i = +b.dataset.idx;
+        if (i === carIdx) return;
+        carIdx = i;
+        showCar();
+        $(root, `.car-item[data-idx="${i}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      },
+      // buying a car takes a second tap within a few seconds
       buycar: () => {
+        if (!armed) {
+          armed = true;
+          armTimer = setTimeout(() => {
+            armed = false;
+            renderCar();
+          }, 3500);
+          app.audio?.play('ui');
+          renderCar();
+          return;
+        }
+        disarm();
         if (S.buyCar(car())) {
           S.data.car = car().id;
           S.save();
@@ -921,12 +981,6 @@ export class UI {
           this.refreshCredits();
           showCar();
         } else app.audio?.play('error');
-      },
-      selectcar: () => {
-        S.data.car = car().id;
-        S.save();
-        renderCar();
-        this.toast(t('garage.carSelected', { car: car().name }));
       },
       // a group opens on the tab last open in it
       group: (b) => {
@@ -989,6 +1043,7 @@ export class UI {
         if (pending) app.garage.setCustom(S.customFor(car().id));
         window.removeEventListener('resize', fitSoon);
         cancelAnimationFrame(fitFrame);
+        clearTimeout(armTimer);
       },
     };
   }

@@ -114,7 +114,8 @@ export const ICONS = {
   gamepad: S('<path d="M7.2 8h9.6a4 4 0 0 1 3.9 4.9l-.9 3.8a2.2 2.2 0 0 1-3.8 1L14.5 16h-5L8 17.7a2.2 2.2 0 0 1-3.8-1l-.9-3.8A4 4 0 0 1 7.2 8z"/><path d="M8.2 10.6v3M6.7 12.1h3"/><circle cx="15.6" cy="11.4" r=".6" fill="currentColor"/><circle cx="17.4" cy="13.2" r=".6" fill="currentColor"/>'),
   profile: S('<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>'),
   globe: S('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5s1.2-6.1 3.6-8.5z"/>'),
-  // the garage's groups: side glass, a wheel, a headlamp
+  // the garage's groups: a spray can, side glass, a wheel, a headlamp
+  spray: S('<rect x="6.5" y="9.5" width="8.5" height="11.5" rx="1.6"/><path d="M8.8 9.5V6.6h3.9v2.9M12.7 7.6h1.8"/><path d="M17.6 6.2h.01M20 4.2h.01M20 8.2h.01M21.6 6.2h.01" stroke-width="2.4"/>'),
   glass: S('<path d="M3.5 17.5l3-8.6c.3-.9 1.2-1.4 2.1-1.4h10.5c.9 0 1.5.9 1.2 1.7l-2.8 8.3z"/><path d="M9.8 10.2l-1.6 4.6M13.2 10.2l-.9 2.6" stroke-width="1.5" opacity=".6"/>'),
   wheel: S('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8V5M14.1 11.3l4.6-1.5M13.3 13.8l2.8 3.9M10.7 13.8l-2.8 3.9M9.9 11.3L5.3 9.8"/>'),
   lamp: S('<path d="M10 6.5h2.5a5.5 5.5 0 0 1 0 11H10z"/><path d="M3.5 8.5h3.5M3.5 12h3.5M3.5 15.5h3.5"/>'),

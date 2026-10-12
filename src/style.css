@@ -1821,7 +1821,6 @@ output {
   height: 4px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
-  overflow: hidden;
   position: relative;
 }
 
@@ -1844,6 +1843,76 @@ output {
   color: var(--ink);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* a car that isn't yours: your car's stat marked on each bar, and better / worse numbers tinted */
+.stat .bar i {
+  border-radius: inherit;
+}
+
+.stat .bar u,
+.stat-key u {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--m) * 100% - 1px);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ink);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+  animation: fadeIn 0.4s 0.3s backwards;
+}
+
+.stat.up b {
+  color: var(--good);
+}
+
+.stat.down b {
+  color: #ff7a86;
+}
+
+.stat-key {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: calc(0.16em * var(--track));
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.stat-key u {
+  position: relative;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.7rem;
+  flex: none;
+  animation: none;
+}
+
+/* buying a car: the button asks to confirm, the bar along its foot runs out the time to do it */
+.btn.primary.confirm {
+  background: linear-gradient(180deg, #fff1e0 0%, var(--amber-hi) 100%);
+}
+
+.btn.primary.confirm::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--amber-lo);
+  transform-origin: left;
+  animation: runOut 3.5s linear forwards;
+}
+
+@keyframes runOut {
+  to {
+    transform: scaleX(0);
+  }
 }
 
 .car-action .btn {
@@ -1985,7 +2054,12 @@ output {
   border-color: var(--ink);
 }
 
+.dock-subs:empty {
+  display: none;
+}
+
 .dock-head .reset-look {
+  margin-left: auto;
   width: 2rem;
   height: 2rem;
   border-radius: 7px;
@@ -2206,6 +2280,56 @@ output {
 .item .tick svg {
   width: 70%;
   height: 70%;
+}
+
+/* a car in the Cars group: its class with a dot of its stock paint, its name, and whether it's
+   yours, owned or its price */
+.car-item {
+  width: 7.6rem;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.6rem 0.55rem 0.5rem;
+}
+
+.cc-cls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  font-weight: 700;
+  font-size: 0.56rem;
+  letter-spacing: calc(0.16em * var(--track));
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* (clear of the tick) */
+.car-item.equipped .cc-cls {
+  padding-right: 0.85rem;
+}
+
+.cc-cls i {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.car-item .nm {
+  font-size: 1rem;
+  letter-spacing: calc(0.06em * var(--track));
+}
+
+.car-item.locked .nm {
+  color: var(--ink-2);
+}
+
+.item .pr.chip.short {
+  color: var(--ink-3);
+  border-color: var(--hair);
 }
 
 /* the item in focus: its name, and its price and buy button or that it's equipped */
@@ -4745,6 +4869,10 @@ kbd.k-pill {
   .car-info .stat b {
     font-size: 0.74rem;
   }
+  .car-info .stat-key {
+    grid-column: 1 / -1;
+    font-size: 0.54rem;
+  }
 }
 
 @media (orientation: portrait) {
@@ -4857,10 +4985,11 @@ kbd.k-pill {
   }
   .dock-groups button {
     flex: 1;
+    flex-direction: column;
     justify-content: center;
-    gap: 0.35em;
-    padding: 0.45rem 0.25rem;
-    font-size: 0.7rem;
+    gap: 0.2rem;
+    padding: 0.35rem 0.1rem 0.45rem;
+    font-size: 0.6rem;
     letter-spacing: calc(0.1em * var(--track));
   }
   .dock-groups button.on::after {
@@ -4879,6 +5008,15 @@ kbd.k-pill {
   }
   .item {
     width: 5.2rem;
+  }
+  .car-item {
+    width: 6.8rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
+  .cc-cls {
+    font-size: 0.5rem;
+    letter-spacing: calc(0.08em * var(--track));
   }
   .sel-panel {
     width: 100%;
