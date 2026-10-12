@@ -343,7 +343,7 @@ export class MenuStreet {
     let ps = this.passers.find((p) => p.def.id === def.id);
     const rnd = Math.random;
     if (!ps) {
-      const model = new CarModel(def, randomCustom(rnd), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id) });
+      const model = new CarModel(def, randomCustom(rnd, def), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id) });
       this.root.add(model.group);
       const tw = 0.06;
       ps = { def, model, frame: {}, trails: [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)] };
@@ -353,7 +353,7 @@ export class MenuStreet {
         return;
       }
       this.passers.push(ps);
-    } else ps.model.setCustomization(randomCustom(rnd));
+    } else ps.model.setCustomization(randomCustom(rnd, ps.def));
     ps.active = true;
     ps.whooshed = false;
     ps.s = this.spotS - 190;

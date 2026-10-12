@@ -49,7 +49,7 @@ You can make each track feel new by driving it **backwards**, **mirrored**, or i
 
 ## Your garage
 
-Every race earns you credits. Spend them in the garage on three different cars and on ways to make them your own: paint colours, finishes, racing stripes (liveries), wheels, glowing underlights, and the light trail your car leaves behind at speed.
+Every race earns you credits. Spend them in the garage on five different cars, from a grand tourer and a hypercar to an 80s drift hatchback and a police pursuit sedan, and on ways to make them your own: paint colours, finishes, liveries (stripes, a two-tone "panda" and more), door numbers, window tint, wheels, glowing underlights, and the light trail your car leaves behind at speed.
 
 ![The garage, showing the red Volt GT on a turntable with the paint colour options below](docs/screenshots/garage.jpg)
 

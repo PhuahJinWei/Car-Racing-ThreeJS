@@ -662,6 +662,12 @@ function wheelBlurTexture() {
 // The light (far) model: parts that read alike at range share one material and one mesh
 const FAR_ROLE = { window: 'glass', carbon: 'trim', grille: 'trim', exhaust: 'trim', head: 'chrome', lens: 'drl' };
 
+// warning lights (a patrol car's light bar) glow steadily instead of strobing when flashes are reduced
+let calmBeacons = false;
+export function setReduceFlashes(on) {
+  calmBeacons = !!on;
+}
+
 // ------------------------------------------------------------------------------------------
 // Car model
 // ------------------------------------------------------------------------------------------
@@ -1097,6 +1103,10 @@ export class CarModel {
     // no baked AO inside: an enclosed cabin bakes almost black, real ones get light through the glass
     this.interiorMat = new THREE.MeshStandardMaterial({ color: 0x2c2c31, metalness: 0.05, roughness: 0.66 });
     this.windowMat = makeWindowMaterial(hq, this.streak);
+    // a patrol car's light bar: red and blue lenses, flashed in update()
+    if (asset.lods.lod0.some((p) => p.role === 'beaconR')) {
+      this.beaconMats = [new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.01, 0.02) }), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.02, 0.06, 0.4) })];
+    }
     for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) m.envMap = env;
     // crash damage (race cars only): every body material bends with the dents, wheels don't
     if (this.opts.damage) {
@@ -1110,6 +1120,7 @@ export class CarModel {
       patchDamage(this.lensMat, u, 'headBasic');
       patchDamage(this.tailMat, u, 'tailBasic');
       patchDamage(this.tailLensMat, u, 'tailLens');
+      for (const m of this.beaconMats || []) patchDamage(m, u, 'plain');
     }
     const byRole = {
       paint: this.bodyMat,
@@ -1126,6 +1137,8 @@ export class CarModel {
       exhaust: this.exhaustGlowMat,
       interior: this.interiorMat,
       window: this.windowMat,
+      beaconR: this.beaconMats?.[0],
+      beaconB: this.beaconMats?.[1],
     };
     // Parts with the same material become one mesh. Far away, parts that read alike at range share
     // a material as well (the glass turns opaque: the light model has no cockpit behind it), so a
@@ -1389,6 +1402,23 @@ export class CarModel {
       const h = this.brakeHeat;
       this.brakeMat.emissive.setRGB(2.0 * h * h, 0.32 * h * h * h, 0.02 * h * h * h);
     }
+    // light bar: red and blue double flashes in turn (or a slow alternating glow)
+    if (this.beaconMats) {
+      let red;
+      let blue;
+      if (calmBeacons) {
+        const w = 0.5 + 0.5 * Math.sin(this.time * 2.2);
+        red = 0.15 + 0.6 * w;
+        blue = 0.15 + 0.6 * (1 - w);
+      } else {
+        const ph = (this.time * 1.3) % 1;
+        const pulse = (a) => (ph > a && ph < a + 0.08) || (ph > a + 0.14 && ph < a + 0.22);
+        red = pulse(0) ? 1 : 0.05;
+        blue = pulse(0.5) ? 1 : 0.05;
+      }
+      this.beaconMats[0].color.setRGB(6 * red, 0.12 * red, 0.2 * red);
+      this.beaconMats[1].color.setRGB(0.2 * blue, 0.9 * blue, 7 * blue);
+    }
     // brake lights
     this.brake += ((state.brake ? 1 : 0) - this.brake) * Math.min(1, dt * 18);
     const tb = 1 + this.brake * 1.6;
@@ -1475,7 +1505,7 @@ export class CarModel {
       if (isSharedWheelGeometry(o.geometry)) return;
       o.geometry.dispose();
     });
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat]) m?.dispose();
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, ...(this.beaconMats || [])]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();

@@ -14,10 +14,12 @@ import { buildDecal } from './decals.js';
 import { buildVolt } from './designs/volt.js';
 import { buildRazor } from './designs/razor.js';
 import { buildSpecter } from './designs/specter.js';
+import { buildTouge } from './designs/touge.js';
+import { buildMarshal } from './designs/marshal.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../../public/models/cars');
-const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter };
+const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, touge: buildTouge, marshal: buildMarshal };
 
 // triangle targets: full detail (player car, garage), a light version for distant opponents, and
 // a mid version that stands in for full detail on phones (medium / low quality). The mid version

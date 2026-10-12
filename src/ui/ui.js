@@ -2,7 +2,7 @@ import { el, $, $$, delegate, fitText, ICONS } from './dom.js';
 import { TRACKS, getTrackDef, BOOST_PADS_ON } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
-import { CATEGORIES, findItem, PAINTS, resolveCustom } from '../car/customization.js';
+import { CATEGORIES, findItem, PAINTS, resolveCustom, itemFits } from '../car/customization.js';
 import { getDaily, msUntilTomorrow } from '../game/daily.js';
 import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
@@ -132,6 +132,7 @@ const LIVERY_ART = {
   lv_split: (a) => `<path d="M2 14L22 7V22H2z" fill="${a}"/>`,
   lv_circuit: (a) => `<path d="M3 8h6l3 3h4l2-2h3M3 15h4l2 2h5l3-3h4M12 11v6" stroke="${a}" stroke-width="1.3" fill="none"/><circle cx="18" cy="9" r="1.1" fill="${a}"/><circle cx="9" cy="17" r="1.1" fill="${a}"/>`,
   lv_panda: (a) => `<rect x="0" y="13.5" width="24" height="10.5" fill="${a}"/>`,
+  lv_police: (a) => `<rect x="0" y="10" width="24" height="8" fill="${a}"/><rect x="6.5" y="5" width="5.5" height="2.6" rx="1" fill="#ff2a3a"/><rect x="12" y="5" width="5.5" height="2.6" rx="1" fill="#2a6bff"/>`,
 };
 
 function swatchFor(cat, item, custom) {
@@ -786,6 +787,7 @@ export class UI {
       const eq = equippedCustom()[cat];
       const look = resolveCustom(previewing());
       box.innerHTML = c.items
+        .filter((it) => itemFits(it, car().id))
         .map((it) => {
           const own = S.owns(cat, it.id);
           const isEq = eq === it.id;
@@ -820,10 +822,11 @@ export class UI {
 
     const showCar = () => {
       pending = null;
-      // a car not downloaded yet shows a loading bar until it's on the turntable
+      // a car not downloaded yet shows a loading bar until it's on the turntable; one you don't own
+      // yet shows in its own colours
       const id = car().id;
       const loaded = () => car().id === id && root.classList.toggle('car-loading', !app.garage.car);
-      app.garage.setCar(id, owned() ? equippedCustom() : undefined).then(loaded);
+      app.garage.setCar(id, equippedCustom()).then(loaded);
       loaded();
       renderCar();
       renderItems();

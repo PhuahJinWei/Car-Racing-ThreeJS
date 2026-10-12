@@ -67,7 +67,7 @@ tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, 
 
 ## The car factory
 
-The three cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
+The five cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
 
 ```bash
 npm run build:cars                              # all cars, final quality (~1.5 min each)
@@ -93,6 +93,7 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
+  - A patrol car's light bar uses two extra materials (`beaconR`, `beaconB`) that the game flashes; with reduced flashes they glow in turn instead.
   - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street.
 
 ## Adding real car models
@@ -109,7 +110,7 @@ Put `.glb` files in `public/models/cars/` and list them in `public/models/cars/c
 }
 ```
 
-- **`id`:** an existing car (`volt`, `razor`, `specter`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
+- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
 - **Optional fields:**
   - `rotateY` (degrees) if the car faces the wrong way
   - `length` (metres) or `scale` if auto-scaling picks the wrong size

@@ -15,6 +15,7 @@ import { setLanguage, t } from './core/i18n.js';
 import { DIFFICULTY } from './game/ai.js';
 import { CARS, getCarDef } from './car/car-defs.js';
 import { loadManifest, ensureCarAssets, getCarAsset, previewModelFile, setCarDetail } from './car/car-assets.js';
+import { setReduceFlashes } from './car/car-model.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -166,7 +167,8 @@ export class App {
     this.audio.unlock();
     const S = this.storage;
     const carId = cfg.carId || S.data.car;
-    const custom = S.ownsCar(carId) ? S.customFor(carId) : undefined;
+    // a car lent for the day comes in its own colours
+    const custom = S.customFor(carId);
     const v = { reverse: false, mirror: false, weather: 'clear', ...(cfg.variant || {}) };
     // AUTO rolls the conditions per race (restarts keep them); records stay split by clear/rain
     if (v.weather === 'auto') v.weather = Math.random() < 0.35 ? 'rain' : 'clear';
@@ -354,6 +356,7 @@ export class App {
       setCarDetail(this.renderer.preset.carDetail);
     }
     this.audio.applyVolumes();
+    setReduceFlashes(s.reduceFlashes);
     this.input.autoAccel = s.autoAccel;
     this.input.haptics = s.haptics;
     this.input.tiltSensitivity = s.tiltSensitivity;

@@ -32,6 +32,28 @@
         "file": "specter.m.glb",
         "v": "9948b691f8"
       }
+    },
+    {
+      "id": "touge",
+      "file": "touge.glb",
+      "gz": true,
+      "factory": true,
+      "v": "69ca160227",
+      "light": {
+        "file": "touge.m.glb",
+        "v": "6417635cb9"
+      }
+    },
+    {
+      "id": "marshal",
+      "file": "marshal.glb",
+      "gz": true,
+      "factory": true,
+      "v": "a4d1ee651c",
+      "light": {
+        "file": "marshal.m.glb",
+        "v": "230bae7507"
+      }
     }
   ]
 }

@@ -169,6 +169,20 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
       poly([[a, y0 - 1], [b, y0 - 1], [b, line], [a, line]]);
       ctx.fill();
     });
+  } else if (id === 'lv_police') {
+    // black-and-white patrol scheme: doors, pillars and roof in the accent colour
+    const pt = meta.patrol || { z0: zr + 0.45, z1: zf - 0.45, y0: 0.25, y1: shoulder + 0.12 };
+    all((kind) => {
+      if (kind === 'side') {
+        poly([[pt.z0, pt.y0], [pt.z1, pt.y0], [pt.z1, pt.y1], [pt.z0, pt.y1]]);
+        ctx.fill();
+        poly([[cabin.z0, pt.y1 - 0.01], [cabin.z1, pt.y1 - 0.01], [cabin.z1, y1 + 1], [cabin.z0, y1 + 1]]);
+        ctx.fill();
+      } else if (kind === 'top') {
+        topPoly([[-cabin.x, cabin.z0], [cabin.x, cabin.z0], [cabin.x, cabin.z1], [-cabin.x, cabin.z1]]);
+        ctx.fill();
+      }
+    });
   } else if (id === 'lv_circuit') {
     const r = rng(number * 7919 + 13);
     const traces = [];
@@ -217,6 +231,12 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
       ctx.restore();
     }
   };
+  if (id === 'lv_police') {
+    const pt = meta.patrol;
+    const [tz, ty] = pt?.text || door;
+    letter('POLICE', tz, ty, 0.15, paint, '800');
+  }
+
   // number roundel on the doors
   if (id === 'lv_race' || custom.number?.value != null) {
     all((kind) => {

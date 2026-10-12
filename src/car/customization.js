@@ -33,6 +33,8 @@ export const LIVERIES = [
   { id: 'lv_split', name: 'Two-Tone', price: 1000 },
   { id: 'lv_circuit', name: 'Circuitry', price: 1800 },
   { id: 'lv_panda', name: 'Panda', price: 1200 },
+  // only for the car named in `only`
+  { id: 'lv_police', name: 'Patrol', price: 0, only: 'marshal' },
 ];
 
 export const RIMS = [
@@ -141,7 +143,14 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   volt: { ...DEFAULT_CUSTOM },
   razor: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_stripes' },
   specter: { ...DEFAULT_CUSTOM, paint: 'p_midnight', accent: 'p_silver', livery: 'lv_race', rimColor: 'rc_black' },
+  // the two-tone "panda": white over black
+  touge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_panda', rimColor: 'rc_gunmetal' },
+  // black and white
+  marshal: { ...DEFAULT_CUSTOM, paint: 'p_black', accent: 'p_white', livery: 'lv_police', tint: 't_light' },
 };
+
+/** Whether an item is on offer for a car (some are made for one car). */
+export const itemFits = (item, carId) => !item.only || item.only === carId;
 
 export function findItem(category, id) {
   const cat = CATEGORIES.find((c) => c.key === category);
@@ -165,18 +174,19 @@ export function resolveCustom(custom) {
   };
 }
 
-/** Random cosmetic setup for AI opponents (deterministic per seed). */
-export function randomCustom(r) {
+/** Random cosmetic setup for AI opponents (deterministic per seed); patrol cars keep their colours. */
+export function randomCustom(r, def) {
   const pick = (arr) => arr[Math.floor(r() * arr.length)];
-  return {
+  const c = {
     paint: pick(PAINTS).id,
     finish: pick(['gloss', 'metallic', 'metallic', 'pearl', 'matte']),
     accent: pick(PAINTS).id,
-    livery: pick(LIVERIES).id,
+    livery: pick(LIVERIES.filter((l) => !l.only)).id,
     tint: pick(['t_clear', 't_clear', 't_light', 't_dark', 't_limo']),
     rims: pick(RIMS).id,
     rimColor: pick(RIM_COLORS).id,
     underglow: r() < 0.85 ? 'ug_none' : pick(UNDERGLOWS.slice(1, 7)).id,
     trail: 'tr_red',
   };
+  return def?.patrol ? { ...c, ...DEFAULT_CUSTOM_BY_CAR[def.id] } : c;
 }

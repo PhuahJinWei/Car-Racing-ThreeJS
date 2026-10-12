@@ -17,6 +17,9 @@ export const MAT = {
   lens: 11,
   interior: 12,
   window: 13,
+  // warning-light lenses (a patrol car's light bar), flashed by the game
+  beaconR: 14,
+  beaconB: 15,
 };
 export const MAT_NAMES = Object.fromEntries(Object.entries(MAT).map(([k, v]) => [v, k]));
 
@@ -36,6 +39,8 @@ export const MAT_PBR = {
   lens: { color: [0.9, 0.92, 1], metallic: 0, roughness: 0.05, emissive: [0.9, 0.95, 1] },
   interior: { color: [0.045, 0.045, 0.05], metallic: 0, roughness: 0.75 },
   window: { color: [0.02, 0.025, 0.03], metallic: 0, roughness: 0.04 },
+  beaconR: { color: [0.5, 0.02, 0.03], metallic: 0, roughness: 0.2, emissive: [1, 0.03, 0.05] },
+  beaconB: { color: [0.02, 0.08, 0.5], metallic: 0, roughness: 0.2, emissive: [0.05, 0.25, 1] },
 };
 
 /** Material-tracking distance accumulator. */

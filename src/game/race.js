@@ -154,7 +154,7 @@ export class Race {
         const aiDef = cfg.rivals?.[k] ? getCarDef(cfg.rivals[k]) : any;
         // spread the field: some rivals are clearly slower than others
         const pace = lerp(diff.pace[0], diff.pace[1], (k + 0.5 + (rand() - 0.5) * 0.6) / cfg.opponents);
-        const r = this._makeRacer(aiDef, randomCustom(rand), false, names[k % names.length], {
+        const r = this._makeRacer(aiDef, randomCustom(rand, aiDef), false, names[k % names.length], {
           pace,
           aggression: rand(),
           laneBias: (rand() - 0.5) * 2.4,
