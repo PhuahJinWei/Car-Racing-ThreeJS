@@ -185,14 +185,21 @@ export class App {
     this.ui.hidePause();
     this.ui.showLoading(t('building', { track: getTrackDef(cfg.trackId).name }), { trackId: cfg.trackId, variant: v, mode: full.mode, laps: full.laps });
     this.state = 'loading';
+    // the bar shows real progress: downloading the cars, building the race, preparing the graphics
+    const progress = (p) => this.ui.setLoadProgress(p);
+    progress(0.05);
     await nextFrame();
     // only the cars in this race; a rival whose model can't be fetched (offline, say) swaps to one
     // that's here
-    await ensureCarAssets([carId, ...(full.rivals || [])], this.renderer.renderer);
+    const ids = [...new Set([carId, ...(full.rivals || [])])];
+    let fetched = 0;
+    await Promise.all(ids.map((id) => ensureCarAssets([id], this.renderer.renderer).then(() => progress(0.05 + (0.4 * ++fetched) / ids.length))));
     if (full.rivals) {
       const here = [carId, ...full.rivals].filter((id) => getCarAsset(id));
       if (here.length) full.rivals = full.rivals.map((id, k) => (getCarAsset(id) || !getCarDef(id).model ? id : here[k % here.length]));
     }
+    progress(0.5);
+    await nextFrame();
     const race = new Race(this, full);
     try {
       race.build();
@@ -203,6 +210,9 @@ export class App {
       this.toMenu();
       return;
     }
+    progress(0.65);
+    await nextFrame();
+    await this._warmUp(race, progress);
     this.race = race;
     race.on('results', (res) => this.onRaceResults(res));
     this.hud = new HUD(this, race);
@@ -219,6 +229,33 @@ export class App {
     race.start();
     this.ui.updateRotateHint();
     if (!S.data.tutorialDone) this._tips(race);
+  }
+
+  /**
+   * Get the race ready to draw while the loading screen is still up: compile every shader (in the
+   * background where the browser can) and draw two frames, which uploads the textures and builds the
+   * post-processing - otherwise all of that freezes the race's first frame.
+   */
+  async _warmUp(race, progress) {
+    const gl = this.renderer.renderer;
+    race.resize(this.renderer.aspect);
+    try {
+      // the scene draws into the post-processing target, so compile for that
+      gl.setRenderTarget(this.renderer.post.sceneRT);
+      await gl.compileAsync(race.scene, race.camera);
+    } catch (e) {
+      console.warn('[race] shader warm-up', e);
+    } finally {
+      gl.setRenderTarget(null);
+    }
+    progress(0.85);
+    await nextFrame();
+    race.render();
+    progress(0.95);
+    await nextFrame();
+    race.render();
+    progress(1);
+    await nextFrame();
   }
 
   _tips(race) {

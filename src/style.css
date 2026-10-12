@@ -2443,6 +2443,14 @@ output {
   animation: loadbar 1.15s cubic-bezier(0.6, 0, 0.4, 1) infinite;
 }
 
+/* real progress (a race loading): the bar fills */
+.load-bar.det i {
+  width: calc(var(--p, 0) * 100%);
+  background: linear-gradient(90deg, var(--amber-lo), var(--amber) 85%, #fff);
+  animation: none;
+  transition: width 0.3s var(--ease);
+}
+
 .load-text {
   margin-top: 0.9rem;
   padding-left: 0.34em;

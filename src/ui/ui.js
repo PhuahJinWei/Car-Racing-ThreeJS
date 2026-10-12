@@ -459,6 +459,15 @@ export class UI {
     this.overlayLayer.appendChild(this.loading);
   }
 
+  /** Turn the loading bar's sweep into real progress, 0..1 (it only moves forward). */
+  setLoadProgress(p) {
+    const bar = this.loading && $(this.loading, '.load-bar');
+    if (!bar) return;
+    bar.classList.add('det');
+    const v = Math.max(Number(bar.style.getPropertyValue('--p')) || 0, Math.min(1, p));
+    bar.style.setProperty('--p', v.toFixed(3));
+  }
+
   hideLoading() {
     if (this.loading) {
       this.loading.remove();
