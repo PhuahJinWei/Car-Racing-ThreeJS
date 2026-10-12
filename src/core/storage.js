@@ -167,9 +167,12 @@ export class Storage {
     if (this.ownsCar(car.id)) return true;
     if (!this.spend(car.price)) return false;
     this.data.ownedCars.push(car.id);
-    // the car ships with its default look - grant those items
+    // the car ships with its (current) default look - grant those items
     const def = DEFAULT_CUSTOM_BY_CAR[car.id];
-    if (def) for (const [cat, id] of Object.entries(def)) this.grant(cat, id);
+    if (def) {
+      this.data.custom[car.id] = { ...def };
+      for (const [cat, id] of Object.entries(def)) this.grant(cat, id);
+    }
     this.save();
     return true;
   }
@@ -194,7 +197,11 @@ export class Storage {
   }
 
   customFor(carId) {
-    return this.data.custom[carId] || (this.data.custom[carId] = { ...(DEFAULT_CUSTOM_BY_CAR[carId] || DEFAULT_CUSTOM_BY_CAR.volt) });
+    const def = DEFAULT_CUSTOM_BY_CAR[carId] || DEFAULT_CUSTOM_BY_CAR.volt;
+    // a car you don't own shows its current default look (only owned cars can be restyled, so a
+    // saved copy would just be a stale default)
+    if (!this.ownsCar(carId)) return { ...def };
+    return this.data.custom[carId] || (this.data.custom[carId] = { ...def });
   }
 
   equip(carId, category, id) {

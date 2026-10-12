@@ -143,8 +143,9 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   volt: { ...DEFAULT_CUSTOM },
   razor: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_stripes' },
   specter: { ...DEFAULT_CUSTOM, paint: 'p_midnight', accent: 'p_silver', livery: 'lv_race', rimColor: 'rc_black' },
-  // the two-tone "panda": white over black
-  touge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_panda', rimColor: 'rc_gunmetal' },
+  // the two-tone "panda": white over black, on the default silver rims (dark ones vanish inside
+  // its black lower half)
+  touge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', livery: 'lv_panda' },
   // black and white
   marshal: { ...DEFAULT_CUSTOM, paint: 'p_black', accent: 'p_white', livery: 'lv_police', tint: 't_light' },
 };
