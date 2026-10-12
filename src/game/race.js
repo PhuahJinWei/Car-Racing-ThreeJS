@@ -210,7 +210,10 @@ export class Race {
       d: 0,
       v: 0,
     };
-    if (isPlayer) r.vehicle = new Vehicle(this.track, def);
+    if (isPlayer) {
+      r.vehicle = new Vehicle(this.track, def);
+      r.vehicle.wet = !!this.world.rain;
+    }
     else r.ai = new AIDriver(this.track, def, { name, ...opts });
     const tw = isPlayer ? 0.085 : 0.06;
     r.trails = [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)];
@@ -335,8 +338,11 @@ export class Race {
         else this.emit('popup', { kind: 'fail', label: 'NO NITRO', points: 0, combo: 1 });
       }
       if (input.consume('reset')) this.respawn();
-      // auto-recover when stuck or going the wrong way for too long
-      if ((v.speed < 2.5 && this.time > 4) || v.wrongWay > 3) {
+      // auto-recover when stuck (driving but not getting anywhere) or going the wrong way for too
+      // long - a car the player has stopped on purpose stays put
+      const ctl = input.state;
+      const trying = (ctl.throttle > 0.5 && ctl.brake < 0.05) || (ctl.brake > 0.05 && v.reversing);
+      if ((trying && v.speed < 2.5 && this.time > 4) || v.wrongWay > 3) {
         this._stuck = (this._stuck || 0) + dtReal;
         if (this._stuck > 2.5) {
           this._stuck = 0;
@@ -857,7 +863,7 @@ export class Race {
     const m = P.model;
     m.group.position.copy(v.position);
     m.group.quaternion.copy(v.quat);
-    m.setBodyTilt(v.roll, v.pitch);
+    m.setBodyTilt(v.roll, v.pitch, v.squirm);
     this._castShadow(m, v.frame.i, v.x, v.y, v.z, v.y - v.groundPrev);
     m.update(dt, { speed: v.vf, steer: this.app.input.state.steer * (P.finished ? 0 : 1), brake: v.braking, boost: v.boostLevel, drift: v.drift.active });
     // light streaks sliding over the paint (stronger in tunnels / under lamps)
@@ -921,6 +927,32 @@ export class Race {
           1.4 + s * 1.4,
           1 + s * 0.6,
         );
+      }
+      // tyre smoke while the driven wheels spin off the line (rivals: as they pull away)
+      let spin = 0;
+      if (isP) spin = r.vehicle.wheelspin;
+      else {
+        if (!r.ai.frozen && r.ai.v > 0.3 && r.ai.v > (r.prevV ?? 0)) spin = clamp(1 - r.ai.v / 11, 0, 1) * 0.55;
+        r.prevV = r.ai.v;
+      }
+      if (spin > 0.12) {
+        for (const w of [m.wheels[2], m.wheels[3]]) {
+          if (Math.random() > spin) continue;
+          w.pivot.getWorldPosition(_v);
+          fx.puff(
+            _v.x + (Math.random() - 0.5) * 0.3,
+            _v.y - w.r * 0.6,
+            _v.z + (Math.random() - 0.5) * 0.3,
+            vel.x * 0.3 + (Math.random() - 0.5) * 1.5,
+            0.4 + Math.random() * 0.6,
+            vel.z * 0.3 + (Math.random() - 0.5) * 1.5,
+            wet ? [0.74, 0.77, 0.83] : [0.7, 0.7, 0.74],
+            (wet ? 0.2 : 0.34) * spin + 0.06,
+            0.45,
+            2.2 + spin * 1.8,
+            wet ? 0.8 : 1.4,
+          );
+        }
       }
       // drift smoke from rear wheels (tinted neon by the underglow)
       if (drifting && speed > 12) {
@@ -1242,7 +1274,7 @@ export class Race {
       speed: v.speed,
       topSpeed: v.topSpeed,
       boost: v.boostLevel,
-      drift: v.drift.active ? clamp(v.drift.slip, 0, 1) : 0,
+      drift: Math.max(v.drift.active ? clamp(v.drift.slip, 0, 1) : 0, v.wheelspin * 0.7),
       scrape: v.wallContact,
       tunnel: v.frame.tunnel ? 1 : 0,
       airborne: !v.grounded,
@@ -1268,7 +1300,7 @@ export class Race {
     h.lapTime = this.phase === 'racing' ? this.time - P.lapStart : 0;
     h.bestLap = P.bestLap;
     h.speed = v.speed;
-    h.gear = v.gear;
+    h.gear = v.reversing ? 'R' : v.gear;
     h.rpm = v.rpm;
     h.nitro = v.nitro;
     h.nitroMax = v.nitroMax;

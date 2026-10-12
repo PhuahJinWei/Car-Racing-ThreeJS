@@ -4,6 +4,17 @@ import { makeFrame } from '../world/track.js';
 
 const GRAVITY = 24;
 const CAR_HALF_W = 1.0;
+// longitudinal (m/s^2, m/s, s)
+const BRAKE = 34; // full brakes
+const COAST = 3; // engine braking + rolling resistance off the pedals
+const REVERSE_ACC = 6;
+const REVERSE_MAX = 9; // ~32 km/h
+const REVERSE_DELAY = 0.45; // brake held at a standstill this long engages reverse
+const STOPPED = 0.05;
+// realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
+const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
+const SHIFT_CUT = 0.12; // torque gap of an upshift
+const PAYBACK = 12; // how fast lost drive is returned once the tyres hook up again
 
 /**
  * Arcade vehicle dynamics in world space (x/z plane) with the track providing height,
@@ -16,6 +27,7 @@ export class Vehicle {
     this.def = def;
     this.stats = def.stats;
     this.frame = makeFrame();
+    this.wet = false; // rain: the tyres spin up more easily
     this.reset();
   }
 
@@ -55,6 +67,13 @@ export class Vehicle {
     this.frozen = false;
     this.steerVis = 0;
     this.braking = false;
+    this.reversing = false;
+    this.stopHold = 0;
+    this.wheelspin = 0;
+    this.shiftCut = 0;
+    this.driveDebt = 0;
+    this.squirm = 0;
+    this._spinPhase = 0;
     this.offTrackTimer = 0;
     this.wrongWay = 0;
     this.up = new THREE.Vector3(0, 1, 0);
@@ -195,31 +214,68 @@ export class Vehicle {
     let vl = this.vx * rx + this.vz * rz;
 
     // ---------------- longitudinal
-    let a = 0;
+    // drive pushes the car; resistance (brakes, drag, engine braking) only ever slows it to a stop
+    let drive = 0;
+    let resist = 0;
+    const pedalBrake = brake > 0.05;
     this.braking = false;
+    if (!pedalBrake || Math.abs(vf) > STOPPED) this.stopHold = 0;
+    if (throttle > 0.1 && !pedalBrake) this.reversing = false;
+    // flooring it from low speed spins the driven tyres for a moment (more so in the wet)
+    const launching = this.grounded && throttle > 0.5 && !pedalBrake && vf > -1 && vf < SPIN_SPEED;
+    const spinT = launching ? Math.pow(1 - Math.max(vf, 0) / SPIN_SPEED, 1.5) * (this.wet ? 1 : 0.75) : 0;
+    this.wheelspin = damp(this.wheelspin, spinT, spinT > this.wheelspin ? 14 : 4, dt);
+    this.shiftCut = Math.max(0, this.shiftCut - dt);
+    if (throttle < 0.1 || pedalBrake) this.driveDebt = 0;
     if (this.grounded) {
-      if (brake > 0.05 && vf > 1) {
-        a -= 34 * brake;
+      let engine = 0;
+      if (pedalBrake && this.reversing) {
+        // in reverse the brake pedal drives backwards
+        if (vf > -REVERSE_MAX) drive -= REVERSE_ACC * brake;
+      } else if (pedalBrake) {
+        // brakes stop the car and hold it; keep holding at a standstill to engage reverse
+        resist += BRAKE * brake;
         this.braking = true;
-      } else if (brake > 0.05) {
-        a -= 11 * brake;
-        if (vf < -15) a = 0;
-        this.braking = true;
+        if (Math.abs(vf) <= STOPPED) {
+          this.stopHold += dt;
+          if (this.stopHold >= REVERSE_DELAY) this.reversing = true;
+        }
       } else if (throttle > 0) {
         const ratio = clamp(vf / vmax, -1, 1.5);
         // strong launch that tapers off toward top speed (~0-100 km/h in 1.7 s, top speed in ~8 s)
         const base = 17.5 * st.accel * throttle;
         const r = Math.max(ratio, 0);
-        a += ratio < 1 ? base * (1 - Math.pow(r, 2.4)) * (1 + 0.25 * (1 - r)) : -(ratio - 1) * 20;
+        if (ratio < 1) engine = base * (1 - Math.pow(r, 2.4)) * (1 + 0.25 * (1 - r));
+        else resist += (ratio - 1) * 20;
       }
-      if (this.boostLevel > 0.02 && vf < vmax * 1.02) a += 24 * this.boostLevel;
-      // drag + rolling
-      a -= 0.0007 * vf * Math.abs(vf);
-      if (throttle < 0.1 && brake < 0.05) a -= Math.sign(vf) * Math.min(Math.abs(vf), 3.0);
-      if (D.active) a -= 2.2 * clamp(D.slip, 0, 1) * Math.sign(vf);
-      if (vf > vmax && this.boostLevel < 0.05) a = Math.min(a, -(vf - vmax) * 0.9);
+      // spinning tyres and the torque gap of an upshift cost drive; it comes back as a surge once
+      // the car hooks up again, so they add feel without costing time
+      const cut = Math.max(this.shiftCut > 0 ? 0.8 : 0, 0.35 * this.wheelspin);
+      if (engine > 0 && cut > 0.01) {
+        this.driveDebt += engine * cut * dt;
+        engine *= 1 - cut;
+      } else if (engine > 0 && this.driveDebt > 0) {
+        const pay = Math.min(this.driveDebt, PAYBACK * dt);
+        this.driveDebt -= pay;
+        engine += pay / dt;
+      }
+      drive += engine;
+      if (this.boostLevel > 0.02 && vf < vmax * 1.02) drive += 24 * this.boostLevel;
+      resist += 0.0007 * vf * vf;
+      if (throttle < 0.1 && !pedalBrake) resist += COAST;
+      if (D.active) resist += 2.2 * clamp(D.slip, 0, 1);
+      if (vf > vmax && this.boostLevel < 0.05) resist = Math.max(resist, drive + (vf - vmax) * 0.9);
+      // hills: gravity along the road under the car (ramps are left to the jump physics). Added
+      // after the top-speed limit, so a downhill carries the car a little past it as an uphill
+      // holds it a little below
+      const tl = Math.hypot(f.tx, f.ty, f.tz) || 1;
+      const along = (fx * f.tx + fz * f.tz) / (Math.hypot(f.tx, f.tz) || 1);
+      drive -= GRAVITY * (f.ty / tl) * along;
     }
-    vf += a * dt;
+    vf += drive * dt;
+    const dv = resist * dt;
+    vf = Math.abs(vf) <= dv ? 0 : vf - Math.sign(vf) * dv;
+    if (this.reversing && !pedalBrake && vf > -STOPPED) this.reversing = false;
 
     // ---------------- lateral grip
     let grip = D.active ? 2.1 + (1 - clamp(steer * D.dir, -1, 1)) * 0.6 : 13 * st.grip;
@@ -335,14 +391,25 @@ export class Vehicle {
     // gears / rpm for audio + HUD
     const gearTop = [0, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 2.0];
     const sr = clamp(Math.abs(vf) / st.topSpeed, 0, 1.5);
-    let g = 1;
+    // shift down a little later than up, so a speed right at a shift point doesn't hunt
+    let g = this.gear;
     while (g < 7 && sr > gearTop[g]) g++;
-    if (g > this.gear) this.events.push({ type: 'shift', up: true, gear: g });
+    while (g > 1 && sr < gearTop[g - 1] - 0.04) g--;
+    if (g > this.gear) {
+      this.events.push({ type: 'shift', up: true, gear: g });
+      // a moment without drive while the next gear goes in (paid back afterwards, see above)
+      if (throttle > 0.5 && this.grounded) this.shiftCut = SHIFT_CUT;
+    }
     this.gear = g;
     const lo = gearTop[g - 1];
     const hi = gearTop[g];
-    const rpmT = clamp(0.28 + 0.72 * ((sr - lo) / Math.max(0.01, Math.min(hi, 1.2) - lo)), 0.2, 1.05);
+    // spinning tyres let the engine rev past the road speed
+    const rpmT = clamp(0.28 + 0.72 * ((sr - lo) / Math.max(0.01, Math.min(hi, 1.2) - lo)) + this.wheelspin * 0.45, 0.2, 1.05);
     this.rpm = damp(this.rpm, throttle > 0.1 || this.boostLevel > 0.1 ? rpmT : rpmT * 0.85, 12, dt);
+
+    // a car spinning its tyres squirms a little (visual only)
+    this._spinPhase += dt * 24;
+    this.squirm = this.wheelspin * (0.016 * Math.sin(this._spinPhase) + 0.009 * Math.sin(this._spinPhase * 2.37));
 
     this._updateOrientation(dt, false);
   }

@@ -1386,8 +1386,8 @@ export class CarModel {
     this.backfire = 1;
   }
 
-  setBodyTilt(roll, pitch) {
-    this.body.rotation.set(pitch, 0, roll);
+  setBodyTilt(roll, pitch, yaw = 0) {
+    this.body.rotation.set(pitch, yaw, roll);
   }
 
   /**
