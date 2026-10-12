@@ -15,16 +15,16 @@ export function buildTouge() {
   const GAP = 0.035; // tyre to arch clearance
 
   // ------------------------------------------------------------------ main volumes
-  // side silhouette (z, y): bumper, grille slot, the long hood, beltline, tail
+  // side silhouette (z, y): a squared-off 80s bumper, grille slot, the long hood, beltline, tail
   const bodySide = new Profile2D(
     [
       [1.95, 0.16, 1],
-      [2.06, 0.18],
-      [2.115, 0.24],
-      [2.13, 0.34],
-      [2.125, 0.47],
-      [2.105, 0.505, 1],
-      [2.085, 0.52, 1],
+      [2.09, 0.17, 1],
+      [2.125, 0.2],
+      [2.135, 0.3],
+      [2.135, 0.46],
+      [2.125, 0.5, 1],
+      [2.088, 0.512, 1],
       [2.085, 0.6],
       [2.07, 0.632, 1],
       [1.85, 0.662],
@@ -40,32 +40,32 @@ export function buildTouge() {
       [-2.035, 0.86],
       [-2.05, 0.7],
       [-2.045, 0.6, 1],
-      [-2.075, 0.57],
-      [-2.09, 0.5],
-      [-2.09, 0.3],
-      [-2.07, 0.22],
+      [-2.088, 0.585, 1],
+      [-2.1, 0.55],
+      [-2.1, 0.24],
+      [-2.088, 0.19, 1],
       [-1.98, 0.17, 1],
     ],
     { band: 0.2 },
   );
-  // plan outline (x, z): a slab-sided box with rounded corners
+  // plan outline (x, z): a slab-sided box with tight corners
   const bodyPlan = new Profile2D(
     mirrorU([
-      [0, 2.13],
-      [0.45, 2.125],
-      [0.68, 2.1],
-      [0.775, 2.05],
-      [0.805, 1.95],
-      [0.812, 1.7],
+      [0, 2.135],
+      [0.5, 2.13],
+      [0.72, 2.115],
+      [0.79, 2.08],
+      [0.81, 2.0],
+      [0.813, 1.7],
       [0.815, 1.2],
       [0.815, 0.4],
       [0.815, -0.6],
       [0.815, -1.3],
-      [0.81, -1.8],
-      [0.795, -1.98],
-      [0.74, -2.06],
-      [0.5, -2.09],
-      [0, -2.095],
+      [0.812, -1.85],
+      [0.805, -2.0],
+      [0.77, -2.075],
+      [0.55, -2.1],
+      [0, -2.105],
     ]),
     { band: 0.2 },
   );
@@ -88,12 +88,15 @@ export function buildTouge() {
     ],
     { band: 0.2 },
   );
+  // (straight sides right up to the windshield base, so the windshield pillars rise from the
+  // corners instead of twisting down onto the beltline)
   const cabPlan = new Profile2D(
     mirrorU([
       [0, 0.88],
-      [0.5, 0.86],
-      [0.66, 0.74],
-      [0.72, 0.4],
+      [0.53, 0.875],
+      [0.67, 0.83],
+      [0.72, 0.74],
+      [0.725, 0.5],
       [0.735, -0.2],
       [0.73, -0.9],
       [0.7, -1.4],
@@ -122,9 +125,9 @@ export function buildTouge() {
     [-0.45, 0.882, 1],
   ];
   const WINDSHIELD = mirrorU([
-    [0, 0.775],
-    [0.46, 0.765],
-    [0.56, 0.62],
+    [0, 0.79],
+    [0.53, 0.78],
+    [0.62, 0.7],
     [0.575, 0.32],
     [0.53, 0.1],
     [0, 0.075],
@@ -143,23 +146,25 @@ export function buildTouge() {
     small,
   );
 
-  // cross-section: slab sides that tuck in at the sills, a soft crease at the beltline and a
+  // cross-section: slab sides that tuck in at the sills, a crisp crease at the beltline and a
   // touch of tumblehome above it
   const ramp = (x, k) => (x > 12 * k ? x : k * Math.log1p(Math.exp(x / k))); // smooth max(x, 0)
   const sec = (y) => {
     if (y < 0.3) return 0.955 + 0.045 * smoothstep(0.14, 0.3, y);
-    return 1.0 - ramp(y - 0.74, 0.012) * 0.22;
+    return 1.0 - ramp(y - 0.74, 0.003) * 0.22;
   };
 
-  // the pop-up headlights, raised: each lid has swung up on its hinge at the back, so from the side
-  // a light is a wedge standing on the hood corner, its lamp facing forward
-  const POD = { x: 0.55, hw: 0.155, zf: 2.0, top: 0.805, zh: 1.76, yh: 0.668 };
-  const lidLen = Math.hypot(POD.zf - POD.zh, POD.top - POD.yh);
-  const lidNz = -(POD.top - POD.yh) / lidLen;
-  const lidNy = (POD.zf - POD.zh) / lidLen;
+  // the pop-up headlights, raised: a body-coloured lamp box standing on each hood corner, set back a
+  // little from the nose, its lid sloping back slightly and the lamp facing forward in a black bezel
+  const POD = { x: 0.55, hw: 0.155, zf: 1.98, zb: 1.79, top: 0.81, slope: 0.16 };
+  const lidK = 1 / Math.hypot(1, POD.slope);
+  const lidY = (z) => POD.top - (POD.zf - z) * POD.slope;
+  const hoodY = (z) => 0.668 - (z - 1.79) * 0.126; // the hood line under the boxes
   // (its foot reaches down into the hood, which hides it)
-  const pod = (ax, y, z) =>
-    smax(smax(Math.abs(ax - POD.x) - POD.hw, (z - POD.zh) * lidNz + (y - POD.yh) * lidNy, 0.01), smax(z - POD.zf, 0.6 - y, 0.01), 0.01);
+  const pod = (ax, y, z) => {
+    const box = smax(Math.abs(ax - POD.x) - POD.hw, Math.max(z - POD.zf, POD.zb - z), 0.012);
+    return smax(box, smax((y - lidY(z)) * lidK, 0.6 - y, 0.012), 0.012);
+  };
 
   // un-cut outer skin, lamp pods included (also used to lay the glass and lamps onto)
   const S = { bS: 0, bP: 0, dBody: 0, dCab: 0, cS: 0, cP: 0 };
@@ -168,11 +173,12 @@ export function buildTouge() {
     const s = sec(y);
     const bP = bodyPlan.sample(ax / s, z) * s;
     const bS = bodySide.sample(z, y);
-    const dBody = smax(bS, bP, 0.045);
+    // (tight edge radii: 80s cars were crisp boxes, not soap bars)
+    const dBody = smax(bS, bP, 0.022);
     const tilt = Math.max(0, y - 0.85) * 0.35;
     const cP = cabPlan.sample(ax + tilt, z);
     const cS = cabSide.sample(z, y);
-    const dCab = smax(cS, cP, 0.05);
+    const dCab = smax(cS, cP, 0.03);
     S.bS = bS;
     S.bP = bP;
     S.dBody = dBody;
@@ -203,10 +209,10 @@ export function buildTouge() {
     if (z < -1.8 && z > -2.1 && y > 0.86 && y < 1.0 && ax < 0.8) {
       acc.add(sdRoundBox(x, y - 0.918, z + 1.965, 0.69, 0.016, 0.07, 0.012), MAT.paint, 0.02);
     }
-    // door mirrors at the front corner of the door glass
-    if (z > 0.5 && z < 0.8 && y > 0.8 && y < 1.0 && ax > 0.72) {
+    // door mirrors at the front corner of the door glass, their stalks rooted in the pillar foot
+    if (z > 0.5 && z < 0.8 && y > 0.8 && y < 1.0 && ax > 0.66) {
       acc.add(sdRoundBox(ax - 0.9, y - 0.915, z - 0.63, 0.07, 0.048, 0.04, 0.03), MAT.paint, 0.006);
-      acc.add(sdCapsule(ax, y, z, 0.8, 0.885, 0.655, 0.87, 0.905, 0.64, 0.016), MAT.trim, 0.01);
+      acc.add(sdCapsule(ax, y, z, 0.7, 0.88, 0.66, 0.87, 0.905, 0.64, 0.016), MAT.trim, 0.01);
     }
     // single exhaust under the rear bumper, on the right
     if (z < -1.85 && y < 0.32 && x < -0.3 && x > -0.6) {
@@ -237,7 +243,7 @@ export function buildTouge() {
     }
     // lamp faces on the front of the pods
     if (z > POD.zf - 0.05 && y > 0.64 && y < 0.82 && ax > 0.37 && ax < 0.73) {
-      const reg = Math.max(Math.abs(ax - POD.x) - 0.13, Math.abs(y - 0.7235) - 0.0545);
+      const reg = Math.max(Math.abs(ax - POD.x) - 0.13, Math.abs(y - 0.728) - 0.06);
       acc.cut(Math.max(reg, z - (POD.zf + 0.01), POD.zf - 0.022 - z), MAT.head, 0.004);
     }
     // grille slot between the bumper and the hood (parking lamps at its ends), and an intake in
@@ -247,6 +253,11 @@ export function buildTouge() {
       const intake = Math.max(ax - 0.42, Math.abs(y - 0.3) - 0.035);
       const d = pocket(Math.min(slot, intake), sh, 0.05, po);
       acc.cut(d, po.wall ? MAT.trim : ax > 0.645 && y > 0.45 ? MAT.head : MAT.grille, 0.004);
+    }
+    // turn-signal lamps in the bumper corners, wrapping round onto the sides
+    if (z > 1.85 && y > 0.33 && y < 0.46 && ax > 0.52) {
+      const reg = Math.max(0.6 - ax, Math.abs(y - 0.395) - 0.03, 1.9 - z);
+      acc.cut(pocket(reg, sh, 0.015, po), po.wall ? MAT.trim : MAT.head, 0.003);
     }
     // tail-light band: lamps at the sides, a black garnish between them
     if (z < -1.9 && y > 0.6 && y < 0.88) {
@@ -268,6 +279,9 @@ export function buildTouge() {
     if (acc.m === MAT.paint) {
       if (y < 0.168) acc.m = MAT.trim; // underbody
       else if (z < -2.0 && y < 0.3 && ax < 0.7) acc.m = MAT.trim; // valance under the rear bumper
+      // the lamp boxes: black at the back and round the lamp (black sides vanish against a night
+      // sky, leaving the lids floating)
+      else if (z > POD.zb - 0.006 && z < POD.zf + 0.006 && Math.abs(ax - POD.x) < POD.hw + 0.006 && y > hoodY(z) + 0.008 && y < lidY(z) - 0.008 && (z < POD.zb + 0.012 || z > POD.zf - 0.012)) acc.m = MAT.trim;
     }
     out.m = acc.m;
     return acc.d;
@@ -288,10 +302,10 @@ export function buildTouge() {
       mat: MAT.lens,
       view: VIEW.front,
       outline: [
-        [0.43, 0.677, 1],
-        [0.67, 0.677, 1],
-        [0.67, 0.766, 1],
-        [0.43, 0.766, 1],
+        [0.43, 0.674, 1],
+        [0.67, 0.674, 1],
+        [0.67, 0.782, 1],
+        [0.43, 0.782, 1],
       ].map(([u, v, s]) => [u * sx, v, s]),
       depth: 0.016,
       rings: 3,
@@ -353,8 +367,8 @@ export function buildTouge() {
         [-0.55, 0.745, -2.05],
       ],
       headLights: [
-        [0.55, 0.72, 2.0],
-        [-0.55, 0.72, 2.0],
+        [0.55, 0.728, 1.98],
+        [-0.55, 0.728, 1.98],
       ],
       exhausts: [[-0.45, 0.2, -2.12]],
     },

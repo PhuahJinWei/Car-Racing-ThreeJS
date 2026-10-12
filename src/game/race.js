@@ -28,7 +28,7 @@ const _sv2 = new THREE.Vector3();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
 // per-frame scratch: car model state, and effect colours (emitters copy them straight away)
-const _modelState = { speed: 0, steer: 0, brake: false, boost: 0, drift: false };
+const _modelState = { speed: 0, steer: 0, brake: false, boost: 0, drift: false, reverse: false };
 const _smokeCol = [0, 0, 0];
 const STEAM = [0.2, 0.2, 0.22];
 const SPIN_WET = [0.74, 0.77, 0.83];
@@ -940,6 +940,7 @@ export class Race {
     st.brake = v.braking;
     st.boost = v.boostLevel;
     st.drift = v.drift.active;
+    st.reverse = v.reversing;
     m.update(dt, st);
     // light streaks sliding over the paint (stronger in tunnels / under lamps)
     this._dist = (this._dist || 0) + v.speed * dt;
@@ -958,6 +959,7 @@ export class Race {
       st.brake = false;
       st.boost = a.boostLevel;
       st.drift = false;
+      st.reverse = false;
       r.model.update(dt, st);
     }
   }

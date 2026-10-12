@@ -323,7 +323,7 @@ function prepare(sdf, mesh, opts) {
     const m = triMats[t];
     for (let k = 0; k < 3; k++) {
       const v = indices[t * 3 + k];
-      const id = v * 16 + m;
+      const id = v * 32 + m; // (room for 32 materials)
       let nv = key.get(id);
       if (nv === undefined) {
         nv = vm.length;

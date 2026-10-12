@@ -661,7 +661,7 @@ function wheelBlurTexture() {
 }
 
 // The light (far) model: parts that read alike at range share one material and one mesh
-const FAR_ROLE = { window: 'glass', carbon: 'trim', grille: 'trim', exhaust: 'trim', head: 'chrome', lens: 'drl' };
+const FAR_ROLE = { window: 'glass', carbon: 'trim', grille: 'trim', exhaust: 'trim', head: 'chrome', lens: 'drl', reverse: 'chrome' };
 
 // warning lights (a patrol car's light bar) glow steadily instead of strobing when flashes are reduced
 let calmBeacons = false;
@@ -686,6 +686,7 @@ export class CarModel {
     this.time = 0;
     this.boost = 0;
     this.brake = 0;
+    this.reverse = 0;
     this.backfire = 0;
     this.streak = {
       uStreakPhase: { value: 0 },
@@ -1090,6 +1091,8 @@ export class CarModel {
     // smoked-chrome lamp housings: the LED graphics and lenses carry the look, not a grey box
     this.headHousingMat = withAO(new THREE.MeshStandardMaterial({ color: 0x3a3f48, metalness: 1, roughness: 0.18, emissive: new THREE.Color(0.018, 0.02, 0.026), vertexColors: true }));
     this.tailLensMat = withAO(new Phys({ color: 0x3a0306, metalness: 0.1, roughness: 0.12, emissive: new THREE.Color(0.5, 0.02, 0.035), vertexColors: true }));
+    // clear reverse-lamp lens: pale beside the lit tail lamps, white while backing up (see update)
+    this.reverseMat = withAO(new Phys({ color: 0xb8bcc4, metalness: 0.6, roughness: 0.12, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0.1, vertexColors: true }));
     this.tailMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.12, 0.2) });
     this.headMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.5, 4.2) });
     this.lensMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.3, 2.6) });
@@ -1110,7 +1113,7 @@ export class CarModel {
     if (asset.lods.lod0.some((p) => p.role === 'beaconR')) {
       this.beaconMats = [new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.01, 0.02) }), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.02, 0.06, 0.4) })];
     }
-    for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) m.envMap = env;
+    for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) m.envMap = env;
     // crash damage (race cars only): every body material bends with the dents, wheels don't
     if (this.opts.damage) {
       this.damage = new CarDamage(asset, { layout: this.liveryLayout, res: this.opts.damageRes ?? 256 });
@@ -1123,6 +1126,7 @@ export class CarModel {
       patchDamage(this.lensMat, u, 'headBasic');
       patchDamage(this.tailMat, u, 'tailBasic');
       patchDamage(this.tailLensMat, u, 'tailLens');
+      patchDamage(this.reverseMat, u, 'tailLens');
       for (const m of this.beaconMats || []) patchDamage(m, u, 'plain');
     }
     const byRole = {
@@ -1136,6 +1140,7 @@ export class CarModel {
       drl: this.headMat,
       lens: this.lensMat,
       tail: this.tailLensMat,
+      reverse: this.reverseMat,
       tailglow: this.tailMat,
       exhaust: this.exhaustGlowMat,
       interior: this.interiorMat,
@@ -1427,6 +1432,9 @@ export class CarModel {
     const tb = 1 + this.brake * 1.6;
     this.tailMat.color.setRGB(4 * tb, 0.12 * tb, 0.2 * tb);
     if (this.tailLensMat) this.tailLensMat.emissiveIntensity = 1 + this.brake * 2.2;
+    // reverse lamps
+    this.reverse += ((state.reverse ? 1 : 0) - this.reverse) * Math.min(1, dt * 14);
+    if (this.reverseMat) this.reverseMat.emissiveIntensity = 0.1 + this.reverse * 3;
     // boost flames
     this.boost += ((state.boost || 0) - this.boost) * Math.min(1, dt * 10);
     this.backfire = Math.max(0, this.backfire - dt * 6);
@@ -1508,7 +1516,7 @@ export class CarModel {
       if (isSharedWheelGeometry(o.geometry)) return;
       o.geometry.dispose();
     });
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, ...(this.beaconMats || [])]) m?.dispose();
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, ...(this.beaconMats || [])]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();

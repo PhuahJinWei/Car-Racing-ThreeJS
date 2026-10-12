@@ -4,11 +4,11 @@
       "id": "volt",
       "file": "volt.glb",
       "factory": true,
-      "v": "646b45a9d7",
+      "v": "a2f6264385",
       "gz": true,
       "light": {
         "file": "volt.m.glb",
-        "v": "dc50339e6e"
+        "v": "53fae2f237"
       }
     },
     {
@@ -38,10 +38,10 @@
       "file": "touge.glb",
       "gz": true,
       "factory": true,
-      "v": "14c2ab2af2",
+      "v": "d90706f334",
       "light": {
         "file": "touge.m.glb",
-        "v": "c2c902241e"
+        "v": "d6b8f0952a"
       }
     },
     {
@@ -49,10 +49,10 @@
       "file": "marshal.glb",
       "gz": true,
       "factory": true,
-      "v": "a4d1ee651c",
+      "v": "664410598f",
       "light": {
         "file": "marshal.m.glb",
-        "v": "230bae7507"
+        "v": "7cc85c6467"
       }
     }
   ]

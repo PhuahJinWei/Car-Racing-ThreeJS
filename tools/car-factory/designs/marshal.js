@@ -1,8 +1,10 @@
 // MARSHAL - a full-size pursuit sedan. A long hood with a big black grille between swept
-// headlights, a steel push bar, a roof light bar (red on the driver's side, blue on the other), an
-// upright four-door glasshouse and a short trunk. Left-hand drive.
+// headlights, fog lamps and a steel push bar with strobes, a segmented roof light bar (red on the
+// driver's side, blue on the other) with antennas, a pillar spotlight, an upright four-door
+// glasshouse with door handles and rubber side mouldings, and a short trunk with a plate recess.
+// Left-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
-import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule } from '../sdf.js';
+import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylY, sdCylZ, sdCapsule } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
 import { VIEW } from '../decals.js';
 
@@ -84,12 +86,15 @@ export function buildMarshal() {
     ],
     { band: 0.2 },
   );
+  // (straight sides right up to the windshield base, so the windshield pillars rise from the
+  // corners instead of twisting down onto the beltline)
   const cabPlan = new Profile2D(
     mirrorU([
       [0, 1.08],
-      [0.6, 1.06],
-      [0.78, 0.9],
-      [0.84, 0.5],
+      [0.62, 1.07],
+      [0.8, 1.02],
+      [0.855, 0.9],
+      [0.86, 0.6],
       [0.86, -0.2],
       [0.85, -0.9],
       [0.8, -1.35],
@@ -122,9 +127,9 @@ export function buildMarshal() {
     [-1.12, 0.995, 1],
   ];
   const WINDSHIELD = mirrorU([
-    [0, 1.0],
-    [0.55, 0.99],
-    [0.66, 0.82],
+    [0, 1.02],
+    [0.62, 1.01],
+    [0.74, 0.88],
     [0.68, 0.45],
     [0.63, 0.12],
     [0, 0.09],
@@ -153,11 +158,11 @@ export function buildMarshal() {
     { band: 0.08, res: 0.002 },
   );
 
-  // cross-section: tucked sills, upright flanks, a shoulder crease and tumblehome above it
+  // cross-section: tucked sills, upright flanks, a crisp shoulder crease and tumblehome above it
   const ramp = (x, k) => (x > 12 * k ? x : k * Math.log1p(Math.exp(x / k))); // smooth max(x, 0)
   const sec = (y) => {
     if (y < 0.32) return 0.955 + 0.045 * smoothstep(0.15, 0.32, y);
-    return 1.0 - ramp(y - 0.88, 0.012) * 0.22;
+    return 1.0 - ramp(y - 0.88, 0.004) * 0.3;
   };
 
   // un-cut outer skin (also used to lay the glass and light strips onto)
@@ -192,16 +197,36 @@ export function buildMarshal() {
     acc.set(sh, MAT.paint);
 
     // ---------------------------------------------------------------- add-ons
-    // roof light bar: a black base on two feet, red lenses on the driver's side, blue on the other
-    if (y > 1.38 && y < 1.6 && z > -0.45 && z < -0.05 && ax < 0.66) {
+    // roof light bar: a black base on two feet with end caps; four lamp modules a side (red on the
+    // driver's side, blue on the other) around a clear takedown module
+    if (y > 1.38 && y < 1.62 && z > -0.45 && z < -0.05 && ax < 0.68) {
       acc.add(sdRoundBox(x, y - 1.483, z + 0.25, 0.6, 0.03, 0.12, 0.02), MAT.trim, 0.004);
       acc.add(sdRoundBox(ax - 0.45, y - 1.445, z + 0.25, 0.06, 0.03, 0.08, 0.015), MAT.trim, 0.012);
-      acc.add(sdRoundBox(ax - 0.305, y - 1.54, z + 0.25, 0.265, 0.03, 0.112, 0.024), x > 0 ? MAT.beaconR : MAT.beaconB, 0.004);
+      acc.add(sdRoundBox(ax - 0.6, y - 1.522, z + 0.25, 0.035, 0.058, 0.125, 0.03), MAT.trim, 0.006);
+      for (let i = 0; i < 4; i++) {
+        acc.add(sdRoundBox(ax - (0.155 + i * 0.11), y - 1.543, z + 0.25, 0.05, 0.03, 0.108, 0.016), x > 0 ? MAT.beaconR : MAT.beaconB, 0.002);
+      }
+      acc.add(sdRoundBox(x, y - 1.54, z + 0.25, 0.095, 0.027, 0.104, 0.015), MAT.head, 0.002);
+    }
+    // radio antennas: two low pucks behind the light bar and a short whip at the back of the roof
+    if (y > 1.38 && y < 1.7 && z > -1.0 && z < -0.6 && ax < 0.36) {
+      acc.add(sdCylY(ax - 0.28, y - 1.44, z + 0.72, 0.026, 0.012) - 0.006, MAT.trim, 0.008);
+      acc.add(sdCylY(x, y - 1.425, z + 0.9, 0.014, 0.012) - 0.004, MAT.trim, 0.006);
+      acc.add(sdCapsule(x, y, z, 0, 1.43, -0.9, 0, 1.66, -0.95, 0.0075), MAT.trim, 0.004);
+    }
+    // a spotlight on the driver's windshield pillar: chrome lamp on a short arm, above the mirror
+    if (x > 0.72 && x < 1.02 && y > 1.0 && y < 1.2 && z > 0.6 && z < 0.82) {
+      acc.add(sdCapsule(x, y, z, 0.78, 1.1, 0.7, 0.87, 1.1, 0.71, 0.012), MAT.chrome, 0.008);
+      acc.add(sdCylZ(x - 0.89, y - 1.1, z - 0.72, 0.052, 0.049) - 0.006, MAT.chrome, 0.004);
+    }
+    // black rubber mouldings along the doors
+    if (ax > 0.85 && y > 0.4 && y < 0.54 && z > -1.05 && z < 1.1) {
+      acc.add(Math.max(sdRoundBox(0, y - 0.47, z - 0.03, 1, 0.022, 1.02, 0.014), sh - 0.009, -(sh + 0.02)), MAT.trim, 0.004);
     }
     // door mirrors on the door tops
     if (z > 0.7 && z < 1.0 && y > 0.92 && y < 1.15 && ax > 0.85) {
       acc.add(sdRoundBox(ax - 1.04, y - 1.035, z - 0.86, 0.085, 0.055, 0.045, 0.03), MAT.trim, 0.006);
-      acc.add(sdCapsule(ax, y, z, 0.93, 1.0, 0.88, 0.99, 1.02, 0.865, 0.016), MAT.trim, 0.01);
+      acc.add(sdCapsule(ax, y, z, 0.84, 0.99, 0.88, 0.99, 1.02, 0.865, 0.016), MAT.trim, 0.01);
     }
     // twin exhausts under the rear bumper
     if (z < -2.3 && y < 0.36 && ax > 0.45 && ax < 0.75) {
@@ -250,11 +275,11 @@ export function buildMarshal() {
       const d = pocket(headFoot.sample(ax, y), sh, 0.03, po);
       acc.cut(d, po.wall ? MAT.trim : MAT.head, 0.004);
     }
-    // tail lights wrapping the rear corners
+    // tail lights wrapping the rear corners, with a clear reverse lamp at the inner end of each
     if (z < -2.2 && y > 0.8 && y < 1.02 && ax > 0.4) {
       const reg = Math.max(0.45 - ax, Math.abs(y - 0.915) - 0.055);
       const d = pocket(reg, sh, 0.026, po);
-      acc.cut(d, po.wall ? MAT.trim : MAT.tail, 0.003);
+      acc.cut(d, po.wall ? MAT.trim : ax < 0.56 ? MAT.reverse : MAT.tail, 0.003);
     }
     // wheel arches (open to the side, black liners inside)
     if (ax > 0.55 && y < 0.85) {
@@ -265,6 +290,37 @@ export function buildMarshal() {
     if (z > 0.7 && z < 1.0 && y > 0.92 && y < 1.15 && ax > 0.85) {
       acc.cut(sdRoundBox(ax - 1.04, y - 1.035, z - 0.817, 0.07, 0.042, 0.012, 0.01), MAT.chrome, 0.003);
     }
+    // spotlight face
+    if (x > 0.82 && x < 0.96 && y > 1.04 && y < 1.16 && z > 0.74 && z < 0.8) {
+      acc.cut(sdCylZ(x - 0.89, y - 1.1, z - 0.778, 0.045, 0.008), MAT.head, 0.002);
+    }
+    // door handles: a pull bar in a shallow cup toward the back of each door
+    if (ax > 0.85 && y > 0.8 && y < 0.92 && z > -1.0 && z < -0.15) {
+      for (const zc of [-0.28, -0.9]) {
+        const cup = sdRoundBox(0, y - 0.862, z - zc, 1, 0.03, 0.085, 0.022);
+        acc.cut(pocket(cup, sh, 0.014, po), MAT.trim, 0.003);
+        acc.add(Math.max(sdRoundBox(0, y - 0.866, z - zc, 1, 0.011, 0.072, 0.009), sh - 0.006, -(sh + 0.016)), MAT.trim, 0.003);
+      }
+    }
+    // side marker lamps on the front corners
+    if (ax > 0.85 && y > 0.56 && y < 0.67 && z > 2.1 && z < 2.38) {
+      acc.cut(pocket(sdRoundBox(0, y - 0.615, z - 2.24, 1, 0.018, 0.06, 0.012), sh, 0.01, po), po.wall ? MAT.trim : MAT.head, 0.002);
+    }
+    // round fog lamps in the bumper corners (the glowing lenses are decals)
+    if (z > 2.3 && y > 0.28 && y < 0.44 && ax > 0.66 && ax < 0.86) {
+      acc.cut(pocket(Math.hypot(ax - 0.76, y - 0.36) - 0.042, sh, 0.022, po), po.wall ? MAT.trim : MAT.head, 0.003);
+    }
+    // licence plate recess in the rear bumper (the livery paints the plate)
+    if (z < -2.4 && y > 0.38 && y < 0.62 && ax < 0.22) {
+      acc.cut(pocket(sdRoundBox(x, y - 0.5, 0, 0.17, 0.085, 1, 0.02), sh, 0.012, po), po.wall ? MAT.trim : MAT.paint, 0.003);
+    }
+    // trunk lid shut lines: across the deck behind the rear glass, along both sides, over the tail
+    // lights, down their inner ends and across above the bumper (painted gaps vanish on black paint)
+    if (z < -1.55 && y > 0.66 && ax < 0.86) {
+      const ex = 0.44 + 0.34 * smoothstep(0.975, 1.0, y);
+      const lid = Math.max(ax - ex, z + 1.66, 0.725 - y);
+      acc.cut(pocket(Math.abs(lid) - 0.004, sh, 0.008, po), MAT.trim, 0.002);
+    }
     // (after the grille cuts, which reach out through it)
     // steel push bar: two uprights, two cross bars, mounts back into the bumper
     if (z > 2.4 && z < 2.7 && y > 0.2 && y < 0.9 && ax < 0.56) {
@@ -272,6 +328,8 @@ export function buildMarshal() {
       acc.add(sdRoundBox(x, y - 0.74, z - 2.615, 0.4, 0.028, 0.028, 0.02), MAT.trim, 0.012);
       acc.add(sdRoundBox(x, y - 0.42, z - 2.615, 0.4, 0.028, 0.028, 0.02), MAT.trim, 0.012);
       acc.add(sdRoundBox(ax - 0.36, y - 0.42, z - 2.52, 0.026, 0.026, 0.09, 0.01), MAT.trim, 0.006);
+      // LED strobes on the top rail, flashing with the light bar
+      acc.add(sdRoundBox(ax - 0.2, y - 0.74, z - 2.648, 0.055, 0.016, 0.01, 0.006), x > 0 ? MAT.beaconR : MAT.beaconB, 0.002);
     }
 
     // ---------------------------------------------------------------- material zones
@@ -310,25 +368,41 @@ export function buildMarshal() {
     ]) {
       decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [u * sx, v], radius: 0.026, depth: 0.018 });
     }
-    // tail lamps: a bright bar in each
+    // fog lamp lenses
+    decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [0.76 * sx, 0.36], radius: 0.028, depth: 0.018 });
+    // tail lamps: a bright bar in each, clear of the reverse lamp
     decals.push({
       kind: 'ribbon',
       mat: MAT.tailglow,
       view: VIEW.rear,
       path: [
-        [0.5 * sx, 0.93],
+        [0.6 * sx, 0.93],
         [0.86 * sx, 0.93],
       ],
       width: 0.016,
       depth: 0.01,
     });
   }
+  // third brake light along the top of the rear glass
+  decals.push({
+    kind: 'ribbon',
+    mat: MAT.tail,
+    view: VIEW.rear,
+    path: [
+      [-0.15, 1.372],
+      [0.15, 1.372],
+    ],
+    width: 0.012,
+    depth: 0.006,
+  });
 
   return {
     id: 'marshal',
     sdf,
     shell,
     decals,
+    // the grille mesh sits deep behind the push bar: full AO turns it into a black box
+    aoStrength: { [MAT.grille]: 0.45 },
     bounds: { min: [-1.25, 0.0, -2.75], max: [1.25, 1.7, 2.8] },
     meta: {
       wheels: WH,
@@ -340,15 +414,20 @@ export function buildMarshal() {
           [[1.95, 0.56], [2.5, 0.56]],
           [[-2.0, 0.72], [-2.5, 0.72]],
         ],
-        top: [
-          [[-0.85, 1.02], [0.85, 1.02], [0.9, 1.6], [0.86, 2.4], [-0.86, 2.4], [-0.9, 1.6], [-0.85, 1.02]],
-          [[-0.8, -1.55], [0.8, -1.55], [0.85, -2.0], [0.8, -2.42], [-0.8, -2.42], [-0.85, -2.0], [-0.8, -1.55]],
-        ],
+        // (the trunk lid's shut lines are cut into the body)
+        top: [[[-0.85, 1.02], [0.85, 1.02], [0.9, 1.6], [0.86, 2.4], [-0.86, 2.4], [-0.9, 1.6], [-0.85, 1.02]]],
         front: [[[-0.9, 0.56], [0.9, 0.56]]],
         rear: [[[-0.95, 0.72], [0.95, 0.72]]],
       },
-      // `patrol`: the doors that go white in the patrol livery, and where its lettering sits
-      livery: { door: [0.2, 0.62], shoulder: 0.86, cabin: { x: 0.7, z0: -1.5, z1: 1.0 }, patrol: { z0: -1.0, z1: 1.06, y0: 0.27, y1: 0.99, text: [0.06, 0.64] } },
+      // `patrol`: the doors that go white in the patrol livery, and where its lettering sits;
+      // `plate`: the licence plate painted into the bumper recess (rear view, metres)
+      livery: {
+        door: [0.2, 0.62],
+        shoulder: 0.86,
+        cabin: { x: 0.7, z0: -1.5, z1: 1.0 },
+        patrol: { z0: -1.0, z1: 1.06, y0: 0.27, y1: 0.99, text: [0.06, 0.64] },
+        plate: { x: 0, y: 0.5, w: 0.31, h: 0.155, text: 'PD 418' },
+      },
       tailLights: [
         [0.7, 0.915, -2.5],
         [-0.7, 0.915, -2.5],

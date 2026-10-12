@@ -253,6 +253,32 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
     letter(digits, door[0], door[1], digits.length > 1 ? 0.2 : 0.26, '#0b0b10', '900');
   }
 
+  // licence plate (designs that have a plate recess say where): white, a dark border and lettering
+  const plate = meta.plate;
+  if (plate) {
+    inView('B', () => {
+      ctx.fillStyle = '#e8ebef';
+      ctx.fillRect(plate.x - plate.w / 2, plate.y - plate.h / 2, plate.w, plate.h);
+      ctx.strokeStyle = '#1d2b4c';
+      ctx.lineWidth = 0.007;
+      ctx.strokeRect(plate.x - plate.w / 2 + 0.008, plate.y - plate.h / 2 + 0.008, plate.w - 0.016, plate.h - 0.016);
+    });
+    // lettering drawn in canvas space so it isn't mirrored (the rear view's x runs right to left)
+    const t = tileRect('B', W, H);
+    const [x0] = layout.min;
+    const [x1] = layout.max;
+    const wid = x1 - x0;
+    const sz = ((plate.h * 0.5) / hgt) * t.h;
+    ctx.save();
+    ctx.setTransform(t.w / wid / (t.h / hgt), 0, 0, 1, t.x + ((x1 - plate.x) / wid) * t.w, t.y + ((y1 - plate.y) / hgt) * t.h);
+    ctx.fillStyle = '#1d2b4c';
+    ctx.font = `800 ${Math.round(sz)}px Arial Black, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(plate.text, 0, sz * 0.04, ((plate.w - 0.05) / hgt) * t.h);
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------------------- panel gaps
   const panels = layout.panels;
   if (panels) {

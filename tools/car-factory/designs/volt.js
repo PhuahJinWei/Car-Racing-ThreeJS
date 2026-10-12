@@ -289,19 +289,24 @@ export function buildVolt() {
       reg = Math.max(rearGlass.sample(ax, z), top);
       acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
     }
-    // hood extractor vents
+    // hood extractor vents: louvres over a mesh
     if (z > 1.45 && z < 1.95 && ax < 0.55 && y > 0.45) {
-      const d = pocket(hoodVent.sample(ax, z), sh, 0.045, po);
-      acc.cut(d, po.wall ? MAT.trim : MAT.grille, 0.005);
+      const reg = hoodVent.sample(ax, z);
+      acc.cut(pocket(reg, sh, 0.045, po), po.wall ? MAT.trim : MAT.grille, 0.012);
+      for (let i = 0; i < 5; i++) {
+        const zs = 1.615 + i * 0.05;
+        acc.add(Math.max(reg, Math.abs(z - zs) - 0.008, sh + 0.004, -(sh + 0.04)), MAT.carbon, 0.002);
+      }
     }
     // front intakes: wide centre mouth split by a body-colour aero blade, finned side intakes
-    // (depth measured from the nose face)
+    // (depth measured from the nose face; kept shallow with a rounded rim - deep, sharp-edged
+    // pockets mesh into spiky lips and crumpled walls)
     if (z > 1.8 && y < 0.42) {
       const mouth = frontMouth.sample(x, y);
       const side = frontSideIntake.sample(ax, y);
-      const d = pocket(Math.min(mouth, side), bP, 0.13, po);
-      acc.cut(d, po.wall ? MAT.trim : MAT.grille, 0.006);
-      const inner = Math.max(bP + 0.014, -(bP + 0.125));
+      const d = pocket(Math.min(mouth, side), bP, 0.075, po);
+      acc.cut(d, po.wall ? MAT.trim : MAT.grille, 0.014);
+      const inner = Math.max(bP + 0.014, -(bP + 0.07));
       acc.add(Math.max(mouth, Math.abs(y - 0.252) - 0.0075, inner), MAT.paint, 0.004);
       for (const xf of [0.66, 0.76]) acc.add(Math.max(side, Math.abs(ax - xf) - 0.006, inner), MAT.carbon, 0.003);
     }
@@ -325,10 +330,17 @@ export function buildVolt() {
       const d = pocket(reg, sh, 0.026, po);
       acc.cut(d, po.wall ? MAT.trim : MAT.tail, 0.003);
     }
-    // rear mesh panel with twin centre exhausts
+    // rear mesh panel behind horizontal louvres (which stop short of the exhausts), with twin
+    // centre exhausts: on its own the mesh reads as a black void at night
     if (z < -1.9 && y > 0.5 && y < 0.84) {
-      const d = pocket(sdRoundBox(x, y - 0.69, 0, 0.66, 0.11, 1, 0.035), sh, 0.06, po);
+      const panel = sdRoundBox(x, y - 0.69, 0, 0.66, 0.11, 1, 0.035);
+      const d = pocket(panel, sh, 0.06, po);
       acc.cut(d, po.wall ? MAT.trim : MAT.grille, 0.005);
+      const clear = 0.068 - Math.hypot(ax - 0.13, y - 0.665);
+      for (let i = 0; i < 5; i++) {
+        const ys = 0.605 + i * 0.04;
+        acc.add(Math.max(panel, Math.abs(y - ys) - 0.007, sh + 0.004, -(sh + 0.06), clear), MAT.carbon, 0.002);
+      }
       if (ax < 0.3) {
         acc.add(sdCylZ(ax - 0.13, y - 0.665, z + 2.22, 0.054, 0.04), MAT.chrome, 0.003);
         acc.cut(sdCylZ(ax - 0.13, y - 0.665, z + 2.22, 0.043, 0.2), MAT.exhaust);
@@ -417,6 +429,9 @@ export function buildVolt() {
     sdf,
     shell,
     decals,
+    // the meshes and louvres sit deep in the rear panel, intakes and vents: full AO turns them into
+    // black voids
+    aoStrength: { [MAT.grille]: 0.45, [MAT.carbon]: 0.5 },
     bounds: { min: [-1.2, 0.0, -2.42], max: [1.2, 1.3, 2.42] },
     meta: {
       wheels: WH,
