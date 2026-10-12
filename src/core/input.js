@@ -50,7 +50,10 @@ export class Input {
       this.touch.throttle = 0;
       this.touch.brake = 0;
     });
-    window.addEventListener('gamepadconnected', () => (this.device = 'gamepad'));
+    window.addEventListener('gamepadconnected', () => {
+      this.device = 'gamepad';
+      this.padSeen = true;
+    });
   }
 
   _typingTarget(t) {
@@ -62,7 +65,9 @@ export class Input {
   }
 
   has(action) {
-    return BINDINGS[action].some((c) => this.keys.has(c));
+    const codes = BINDINGS[action];
+    for (let i = 0; i < codes.length; i++) if (this.keys.has(codes[i])) return true;
+    return false;
   }
 
   /** Edge-triggered action (true once per press). */
@@ -133,6 +138,8 @@ export class Input {
   }
 
   _pollGamepad(dt = 1 / 60) {
+    // getGamepads() hands back a new list every call: skip it until a pad has shown up
+    if (!this.padSeen) return null;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const gp of pads) {
       if (!gp || !gp.connected) continue;

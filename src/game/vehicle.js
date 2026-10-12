@@ -11,6 +11,8 @@ const REVERSE_ACC = 6;
 const REVERSE_MAX = 9; // ~32 km/h
 const REVERSE_DELAY = 0.45; // brake held at a standstill this long engages reverse
 const STOPPED = 0.05;
+// top of each gear's speed band, as a share of top speed
+const GEAR_TOP = [0, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 2.0];
 const DRIFT_MIN = 17; // a drift needs this much speed; slower, the drift button only brakes
 // realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
@@ -397,7 +399,7 @@ export class Vehicle {
     this.wrongWay = align < -0.3 && this.speed > 5 ? this.wrongWay + dt : 0;
 
     // gears / rpm for audio + HUD
-    const gearTop = [0, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 2.0];
+    const gearTop = GEAR_TOP;
     const sr = clamp(Math.abs(vf) / st.topSpeed, 0, 1.5);
     // shift down a little later than up, so a speed right at a shift point doesn't hunt
     let g = this.gear;

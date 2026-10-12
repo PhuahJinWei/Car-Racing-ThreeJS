@@ -309,7 +309,7 @@ export class MenuStreet {
       if (ps.s > this.spotS + 260) {
         ps.active = false;
         m.group.visible = false;
-        for (const t of ps.trails) t.pts.length = 0;
+        for (const t of ps.trails) this.effects.trails.reset(t);
       }
     }
   }

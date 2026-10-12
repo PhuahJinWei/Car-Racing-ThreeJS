@@ -42,12 +42,15 @@ export function setLanguage(choice = 'auto') {
 export const language = () => current.id;
 export const locale = () => current.locale;
 
+// {name} placeholders (one regex for every call)
+const PARAM = /\{(\w+)\}/g;
+
 /** Interface text for `key`, with {name} placeholders filled from `params`. */
 export function t(key, params) {
   const s = table[key] ?? en[key];
   if (s === undefined) return key;
   if (typeof s === 'function') return s(params || {});
-  return params ? s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? params[k] : m)) : s;
+  return params ? s.replace(PARAM, (m, k) => (k in params ? params[k] : m)) : s;
 }
 
 /** Catalogue text: its translation under `key`, else the catalogue's own English. */

@@ -19,6 +19,8 @@ const diffLabel = (key) => t(`diff.${DIFFICULTY[key] ? key : 'easy'}`);
 const km = (meters) => t('km', { n: (meters / 1000).toFixed(1) });
 // loading-screen tips (tip.1 ... tip.8 in the interface text); tip.6 is about boost pads
 const TIPS = [1, 2, 3, 4, 5, 6, 7, 8].filter((n) => n !== 6 || BOOST_PADS_ON);
+// menu navigation actions, checked every frame
+const NAV_ACTIONS = ['ui-up', 'ui-down', 'ui-left', 'ui-right', 'ui-ok', 'ui-back'];
 
 // In-game shots for the track cards; focus is the crop point when a card's shape differs from the 16:9 shot.
 const TRACK_SHOTS = {
@@ -312,10 +314,13 @@ export class UI {
 
   /** Gamepad edges from the input module (always consumed, acted on only while a menu is up). */
   pollNav(input) {
-    const acts = [];
-    for (const a of ['ui-up', 'ui-down', 'ui-left', 'ui-right', 'ui-ok', 'ui-back']) if (input.consume(a)) acts.push(a);
-    if (!acts.length || !this._navAllowed() || this.loading) return;
-    for (const a of acts) {
+    // runs every frame: which of the nav actions fired, as bits (no list to allocate)
+    let fired = 0;
+    for (let i = 0; i < NAV_ACTIONS.length; i++) if (input.consume(NAV_ACTIONS[i])) fired |= 1 << i;
+    if (!fired || !this._navAllowed() || this.loading) return;
+    for (let i = 0; i < NAV_ACTIONS.length; i++) {
+      if (!(fired & (1 << i))) continue;
+      const a = NAV_ACTIONS[i];
       if (a === 'ui-ok') this.navOk();
       else if (a === 'ui-back') this.navBack();
       else this.navigate(a.slice(3));

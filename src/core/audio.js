@@ -4,6 +4,15 @@
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
 const rand = (a, b) => a + Math.random() * (b - a);
+// Aim an audio param at a value, but only when it really changed: the engine sound updates about
+// 30 params every frame, and every setTargetAtTime queues another automation event (garbage, and
+// work for the audio thread) even when the value is the same as last frame's.
+function aim(param, v, t, k) {
+  const last = param._aim;
+  if (last !== undefined && Math.abs(v - last) <= 1e-4 + Math.abs(last) * 0.002) return;
+  param._aim = v;
+  param.setTargetAtTime(v, t, k);
+}
 
 // game-feedback stingers: not part of the world, so slow motion doesn't muffle them and the
 // pause menu doesn't mute the menu blips
@@ -264,30 +273,30 @@ export class AudioEngine {
     const pitchMul = 0.62 + 0.38 * ts;
     const f0 = (40 + p.rpm * 175 + p.boost * 22) * pitchMul;
     const k = 0.035;
-    e.oscA.frequency.setTargetAtTime(f0, t, k);
-    e.oscB.frequency.setTargetAtTime(f0 * 0.5, t, k);
-    e.oscC.frequency.setTargetAtTime(f0 * 2.006, t, k);
-    e.whine.frequency.setTargetAtTime(f0 * 5.5, t, k);
-    e.lfo.frequency.setTargetAtTime(f0 * 0.5, t, k);
+    aim(e.oscA.frequency, f0, t, k);
+    aim(e.oscB.frequency, f0 * 0.5, t, k);
+    aim(e.oscC.frequency, f0 * 2.006, t, k);
+    aim(e.whine.frequency, f0 * 5.5, t, k);
+    aim(e.lfo.frequency, f0 * 0.5, t, k);
     const thr = clamp(p.throttle, 0, 1);
-    e.filter.frequency.setTargetAtTime(220 + p.rpm * 1700 * (0.35 + 0.65 * thr) + p.boost * 1600, t, 0.05);
-    e.out.gain.setTargetAtTime((0.12 + thr * 0.13 + p.boost * 0.08) * (p.airborne ? 0.85 : 1), t, 0.06);
-    e.gW.gain.setTargetAtTime(sp * 0.025 + p.boost * 0.05, t, 0.1);
-    e.wind.g.gain.setTargetAtTime(sp * sp * 0.2 + p.boost * 0.06, t, 0.1);
-    e.wind.f.frequency.setTargetAtTime(300 + sp * 1500, t, 0.1);
+    aim(e.filter.frequency, 220 + p.rpm * 1700 * (0.35 + 0.65 * thr) + p.boost * 1600, t, 0.05);
+    aim(e.out.gain, (0.12 + thr * 0.13 + p.boost * 0.08) * (p.airborne ? 0.85 : 1), t, 0.06);
+    aim(e.gW.gain, sp * 0.025 + p.boost * 0.05, t, 0.1);
+    aim(e.wind.g.gain, sp * sp * 0.2 + p.boost * 0.06, t, 0.1);
+    aim(e.wind.f.frequency, 300 + sp * 1500, t, 0.1);
     const scr = clamp(p.drift, 0, 1);
-    e.screech.g.gain.setTargetAtTime(scr * 0.11, t, 0.05);
-    e.screech2.g.gain.setTargetAtTime(scr * 0.05, t, 0.05);
-    e.screech.f.frequency.setTargetAtTime(1800 + Math.sin(t * 9) * 140 + sp * 300, t, 0.03);
-    e.gSq.gain.setTargetAtTime(scr * scr * 0.05, t, 0.05);
-    e.squeal.frequency.setTargetAtTime((950 + sp * 300 + scr * 250 + (Math.random() - 0.5) * 140) * pitchMul, t, 0.04);
-    e.scrape.g.gain.setTargetAtTime(clamp(p.scrape, 0, 1) * 0.2 * (0.6 + Math.random() * 0.4), t, 0.03);
+    aim(e.screech.g.gain, scr * 0.11, t, 0.05);
+    aim(e.screech2.g.gain, scr * 0.05, t, 0.05);
+    aim(e.screech.f.frequency, 1800 + Math.sin(t * 9) * 140 + sp * 300, t, 0.03);
+    aim(e.gSq.gain, scr * scr * 0.05, t, 0.05);
+    aim(e.squeal.frequency, (950 + sp * 300 + scr * 250 + (Math.random() - 0.5) * 140) * pitchMul, t, 0.04);
+    aim(e.scrape.g.gain, clamp(p.scrape, 0, 1) * 0.2 * (0.6 + Math.random() * 0.4), t, 0.03);
     // boost: low roar, a jet rush that climbs with speed, a turbo whistle and flame pops
-    e.roar.g.gain.setTargetAtTime(p.boost * 0.26, t, 0.08);
-    e.jet.g.gain.setTargetAtTime(p.boost * 0.1, t, 0.08);
-    e.jet.f.frequency.setTargetAtTime(700 + p.boost * 800 + sp * 700, t, 0.1);
-    e.gSpool.gain.setTargetAtTime(p.boost * 0.012, t, 0.15);
-    e.spool.frequency.setTargetAtTime((2000 + p.rpm * 1500 + p.boost * 700) * pitchMul, t, 0.12);
+    aim(e.roar.g.gain, p.boost * 0.26, t, 0.08);
+    aim(e.jet.g.gain, p.boost * 0.1, t, 0.08);
+    aim(e.jet.f.frequency, 700 + p.boost * 800 + sp * 700, t, 0.1);
+    aim(e.gSpool.gain, p.boost * 0.012, t, 0.15);
+    aim(e.spool.frequency, (2000 + p.rpm * 1500 + p.boost * 700) * pitchMul, t, 0.12);
     if (p.boost > 0.3 && Math.random() < dt * 8 * p.boost) this._pop(0.3 * p.boost);
     // lift off at high revs: the dump valve sighs and the exhaust crackles for a moment
     if (e.prevThr > 0.7 && thr < 0.2 && p.rpm > 0.55 && sp > 0.3 && !p.airborne && ts > 0.9 && t - e.lastLift > 1.2) {
@@ -298,17 +307,17 @@ export class AudioEngine {
     e.prevThr = thr;
     if (t < e.crackleUntil && Math.random() < dt * 14) this._pop(rand(0.15, 0.32));
     // p.wet: 0 dry or sheltered .. 1 out in the rain
-    e.rain.g.gain.setTargetAtTime(+p.wet * (0.035 + sp * 0.03), t, 0.3);
-    e.verbSend.gain.setTargetAtTime(p.tunnel ? 0.55 : 0.04, t, 0.25);
+    aim(e.rain.g.gain, +p.wet * (0.035 + sp * 0.03), t, 0.3);
+    aim(e.verbSend.gain, p.tunnel ? 0.55 : 0.04, t, 0.25);
     // opponent pass-by
     const near = clamp(1 - p.opponentDist / 70, 0, 1);
-    e.oppG.gain.setTargetAtTime(near * near * 0.08, t, 0.05);
+    aim(e.oppG.gain, near * near * 0.08, t, 0.05);
     const doppler = clamp(1 - (p.relSpeed || 0) / 340, 0.7, 1.4);
     const fo = (55 + (p.opponentSpeed || 0) * 2.4) * doppler * pitchMul;
-    e.opp.frequency.setTargetAtTime(fo, t, 0.05);
-    e.opp2.frequency.setTargetAtTime(fo * 2.01, t, 0.05);
+    aim(e.opp.frequency, fo, t, 0.05);
+    aim(e.opp2.frequency, fo * 2.01, t, 0.05);
     // slow motion = muffled world
-    this.slowmo.frequency.setTargetAtTime(ts < 0.95 ? 500 + ts * 5000 : 20000, t, 0.06);
+    aim(this.slowmo.frequency, ts < 0.95 ? 500 + ts * 5000 : 20000, t, 0.06);
   }
 
   shift() {
@@ -317,6 +326,7 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     e.out.gain.cancelScheduledValues(t);
     e.out.gain.setTargetAtTime(0.06, t, 0.01);
+    e.out.gain._aim = undefined;
     this._noise(0.12, 'bandpass', 1200, 400, 1.5, 0.05);
     // the gearbox clunk
     this._tone('sine', 190, 110, 0.05, 0.08);

@@ -162,21 +162,18 @@ class ParticleSystem {
     }
     this.geo.instanceCount = n;
     if (n > 0) {
-      for (const a of [this.aPos, this.aVel, this.aCol, this.aSize]) {
-        a.clearUpdateRanges();
-        a.addUpdateRange(0, n * a.itemSize);
-        a.needsUpdate = true;
-      }
+      // whole buffers (a few tens of KB): upload ranges would cost new objects every frame
+      this.aPos.needsUpdate = true;
+      this.aVel.needsUpdate = true;
+      this.aCol.needsUpdate = true;
+      this.aSize.needsUpdate = true;
     }
   }
 
   _move(from, to) {
-    const cp = (arr, sz) => {
-      for (let k = 0; k < sz; k++) arr[to * sz + k] = arr[from * sz + k];
-    };
-    cp(this.p, 3);
-    cp(this.v, 3);
-    cp(this.c, 4);
+    copySlot(this.p, 3, from, to);
+    copySlot(this.v, 3, from, to);
+    copySlot(this.c, 4, from, to);
     this.life[to] = this.life[from];
     this.maxLife[to] = this.maxLife[from];
     this.size0[to] = this.size0[from];
@@ -204,6 +201,9 @@ class TrailSystem {
     this.flat = !!opts.flat;
     this.lifetime = opts.lifetime ?? 0.35;
     this.trails = [];
+    // points that fell off a trail, reused for new ones (a trail point every frame per trail
+    // would otherwise be garbage within a second)
+    this.spare = [];
     const vcount = maxTrails * maxPoints * 2;
     this.pos = new Float32Array(vcount * 3);
     this.col = new Float32Array(vcount * 4);
@@ -246,8 +246,21 @@ class TrailSystem {
   }
 
   push(tr, x, y, z, time, wx = 0, wy = 0, wz = 0) {
-    tr.pts.unshift({ x, y, z, t: time, wx, wy, wz });
-    if (tr.pts.length > this.maxPoints) tr.pts.pop();
+    const p = this.spare.pop() || {};
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    p.t = time;
+    p.wx = wx;
+    p.wy = wy;
+    p.wz = wz;
+    tr.pts.unshift(p);
+    if (tr.pts.length > this.maxPoints) this.spare.push(tr.pts.pop());
+  }
+
+  /** Empty a trail (its points are kept for reuse). */
+  reset(tr) {
+    while (tr.pts.length) this.spare.push(tr.pts.pop());
   }
 
   update(camera, time) {
@@ -259,7 +272,7 @@ class TrailSystem {
     P.fill(0);
     C.fill(0);
     for (const tr of this.trails) {
-      while (tr.pts.length && time - tr.pts[tr.pts.length - 1].t > this.lifetime) tr.pts.pop();
+      while (tr.pts.length && time - tr.pts[tr.pts.length - 1].t > this.lifetime) this.spare.push(tr.pts.pop());
       const base = tr.id * this.maxPoints * 2;
       const n = tr.pts.length;
       if (n < 2) continue;
@@ -326,7 +339,7 @@ class TrailSystem {
   }
 
   clearAll() {
-    for (const t of this.trails) t.pts.length = 0;
+    for (const t of this.trails) this.reset(t);
   }
 }
 
@@ -492,7 +505,7 @@ export class Effects {
     }
   }
 
-  spark(x, y, z, vx, vy, vz, color = [6, 3.2, 1.2], life = 0.5, size = 0.06, stretch = 0.045) {
+  spark(x, y, z, vx, vy, vz, color = SPARK, life = 0.5, size = 0.06, stretch = 0.045) {
     this.sparks.emit(x, y, z, vx, vy, vz, life, size, size * 0.5, color[0], color[1], color[2], 1, stretch, 1.5, 9);
   }
 
@@ -626,6 +639,12 @@ export class Effects {
       m.material.dispose();
     }
   }
+}
+
+/** Copy particle slot `from` over slot `to` in a packed array with `sz` values per particle. */
+const SPARK = [6, 3.2, 1.2];
+function copySlot(arr, sz, from, to) {
+  for (let k = 0; k < sz; k++) arr[to * sz + k] = arr[from * sz + k];
 }
 
 const _rainVel = new THREE.Vector3();

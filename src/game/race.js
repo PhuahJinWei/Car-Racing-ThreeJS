@@ -25,6 +25,36 @@ const _dv2 = new THREE.Vector3();
 const _dq = new THREE.Quaternion();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
+// per-frame scratch: car model state, and effect colours (emitters copy them straight away)
+const _modelState = { speed: 0, steer: 0, brake: false, boost: 0, drift: false };
+const _smokeCol = [0, 0, 0];
+const STEAM = [0.2, 0.2, 0.22];
+const SPIN_WET = [0.74, 0.77, 0.83];
+const SPIN_DRY = [0.7, 0.7, 0.74];
+const SCRAPE = [6, 3.0, 1.0];
+const EXHAUST = [0.6, 1.0, 2.4];
+const SPRAY = [0.6, 0.65, 0.75];
+// running order: finishers by time, then by distance covered
+const byPlace = (a, b) => {
+  if (a.finished && b.finished) return a.finishTime - b.finishTime;
+  if (a.finished) return -1;
+  if (b.finished) return 1;
+  return b.progress - a.progress;
+};
+/** Sort a short, mostly sorted list in place (an insertion sort: no garbage, unlike Array#sort). */
+function sortInPlace(list, cmp) {
+  for (let i = 1; i < list.length; i++) {
+    const x = list[i];
+    let j = i - 1;
+    while (j >= 0 && cmp(list[j], x) > 0) {
+      list[j + 1] = list[j];
+      j--;
+    }
+    list[j + 1] = x;
+  }
+  return list;
+}
+const byCamDist = (a, b) => a.camD2 - b.camD2;
 
 // headlights lighting the world: brightness (same units as the baked lamp light), reach (m) and
 // the camera distance (m) beyond which a rival's lights fade out of the shaders
@@ -381,7 +411,7 @@ export class Race {
     for (let i = 0; i < steps; i++) v.step(h, ctrl);
 
     // ---- AI
-    const ctx = { racers: this.racers, player: P };
+    const ctx = this._aiCtx || (this._aiCtx = { racers: this.racers, player: P });
     for (const r of this.ais) r.ai.update(dt, ctx);
 
     this._syncRacers(dt);
@@ -853,14 +883,9 @@ export class Race {
   }
 
   _positions() {
-    const sorted = [...this.racers].sort((a, b) => {
-      if (a.finished && b.finished) return a.finishTime - b.finishTime;
-      if (a.finished) return -1;
-      if (b.finished) return 1;
-      return b.progress - a.progress;
-    });
+    const sorted = sortInPlace(this._order || (this._order = this.racers.slice()), byPlace);
     const prev = this.player.place;
-    sorted.forEach((r, i) => (r.place = i + 1));
+    for (let i = 0; i < sorted.length; i++) sorted[i].place = i + 1;
     this.order = sorted;
     if (this.phase === 'racing' && prev && this.player.place < prev && !this.player.finished) {
       const gained = prev - this.player.place;
@@ -876,7 +901,13 @@ export class Race {
     m.group.quaternion.copy(v.quat);
     m.setBodyTilt(v.roll, v.pitch, v.squirm);
     this._castShadow(m, v.frame.i, v.x, v.y, v.z, v.y - v.groundPrev);
-    m.update(dt, { speed: v.vf, steer: this.app.input.state.steer * (P.finished ? 0 : 1), brake: v.braking, boost: v.boostLevel, drift: v.drift.active });
+    const st = _modelState;
+    st.speed = v.vf;
+    st.steer = this.app.input.state.steer * (P.finished ? 0 : 1);
+    st.brake = v.braking;
+    st.boost = v.boostLevel;
+    st.drift = v.drift.active;
+    m.update(dt, st);
     // light streaks sliding over the paint (stronger in tunnels / under lamps)
     this._dist = (this._dist || 0) + v.speed * dt;
     const lum = this.probe ? this.probe.intensity / 6 : 0.3;
@@ -889,7 +920,12 @@ export class Race {
       r.model.group.quaternion.copy(a.quat);
       this._castShadow(r.model, a.frame.i, a.position.x, a.position.y, a.position.z, a.y - a.groundPrev);
       r.model.setBodyTilt(clamp(-a.driftVis * 0.08, -0.05, 0.05), 0);
-      r.model.update(dt, { speed: a.v, steer: clamp(-a.vd * 0.15 + a.driftVis, -1, 1), brake: false, boost: a.boostLevel });
+      st.speed = a.v;
+      st.steer = clamp(-a.vd * 0.15 + a.driftVis, -1, 1);
+      st.brake = false;
+      st.boost = a.boostLevel;
+      st.drift = false;
+      r.model.update(dt, st);
     }
   }
 
@@ -912,7 +948,7 @@ export class Race {
         if (near) {
           _v.copy(m.tailLightPos[k]).applyMatrix4(m.body.matrixWorld);
           fx.trails.push(tr, _v.x, _v.y, _v.z, time);
-        } else tr.pts.length = 0;
+        } else if (tr.pts.length) fx.trails.reset(tr);
         tr.intensity = (clamp((speed - 22) / 45, 0, 1) * (isP ? 1.0 : 0.8) + boost * 1.2) * (m.damage ? m.damage.tailOn(k) : 1);
         tr.color.copy(m.trailColor).multiplyScalar(2.0);
         tr.width = (isP ? 0.055 : 0.045) * (1 + boost * 0.9);
@@ -932,7 +968,7 @@ export class Race {
           vel.x * 0.55 + (Math.random() - 0.5),
           0.8 + Math.random() * 0.8,
           vel.z * 0.55 + (Math.random() - 0.5),
-          [0.2, 0.2, 0.22],
+          STEAM,
           0.1 + 0.2 * s,
           0.3,
           1.4 + s * 1.4,
@@ -947,7 +983,8 @@ export class Race {
         r.prevV = r.ai.v;
       }
       if (spin > 0.12) {
-        for (const w of [m.wheels[2], m.wheels[3]]) {
+        for (let k = 2; k < 4; k++) {
+          const w = m.wheels[k];
           if (Math.random() > spin) continue;
           w.pivot.getWorldPosition(_v);
           fx.puff(
@@ -957,7 +994,7 @@ export class Race {
             vel.x * 0.3 + (Math.random() - 0.5) * 1.5,
             0.4 + Math.random() * 0.6,
             vel.z * 0.3 + (Math.random() - 0.5) * 1.5,
-            wet ? [0.74, 0.77, 0.83] : [0.7, 0.7, 0.74],
+            wet ? SPIN_WET : SPIN_DRY,
             (wet ? 0.2 : 0.34) * spin + 0.06,
             0.45,
             2.2 + spin * 1.8,
@@ -969,7 +1006,11 @@ export class Race {
       if (drifting && speed > 12) {
         const ug = m.underglow.visible ? m.underglowMat.uniforms.uColor.value : _c.setRGB(0.6, 0.6, 0.7);
         const amt = isP ? clamp(r.vehicle.drift.slip, 0.2, 1) : 0.5;
-        for (const w of [m.wheels[2], m.wheels[3]]) {
+        _smokeCol[0] = lerp(0.55, ug.r * 0.35, 0.45);
+        _smokeCol[1] = lerp(0.55, ug.g * 0.35, 0.45);
+        _smokeCol[2] = lerp(0.6, ug.b * 0.35, 0.45);
+        for (let k = 2; k < 4; k++) {
+          const w = m.wheels[k];
           w.pivot.getWorldPosition(_v);
           if (Math.random() < 0.85 * amt) {
             fx.puff(
@@ -979,7 +1020,7 @@ export class Race {
               vel.x * 0.25 + (Math.random() - 0.5) * 2,
               0.6 + Math.random() * 0.8,
               vel.z * 0.25 + (Math.random() - 0.5) * 2,
-              [lerp(0.55, ug.r * 0.35, 0.45), lerp(0.55, ug.g * 0.35, 0.45), lerp(0.6, ug.b * 0.35, 0.45)],
+              _smokeCol,
               isP ? 0.32 : 0.22,
               0.7,
               isP ? 4.2 : 3.2,
@@ -997,18 +1038,18 @@ export class Race {
         const on = drifting && speed > 12;
         if (on && !r.wasDrifting) {
           r.skidSlot ^= 1;
-          r.skids[r.skidSlot * 2].pts.length = 0;
-          r.skids[r.skidSlot * 2 + 1].pts.length = 0;
+          fx.skids.reset(r.skids[r.skidSlot * 2]);
+          fx.skids.reset(r.skids[r.skidSlot * 2 + 1]);
         }
         r.wasDrifting = on;
         if (on) {
-          const wheels = [m.wheels[2], m.wheels[3]];
           const ug = m.underglow.visible ? m.underglowMat.uniforms.uColor.value : _c.setRGB(1.2, 1.2, 1.4);
           _v2.set(1, 0, 0).applyQuaternion(m.group.quaternion);
           for (let k = 0; k < 2; k++) {
             const sk = r.skids[r.skidSlot * 2 + k];
-            wheels[k].pivot.getWorldPosition(_v);
-            fx.skids.push(sk, _v.x, _v.y - wheels[k].r + 0.05, _v.z, time, _v2.x, _v2.y, _v2.z);
+            const w = m.wheels[2 + k];
+            w.pivot.getWorldPosition(_v);
+            fx.skids.push(sk, _v.x, _v.y - w.r + 0.05, _v.z, time, _v2.x, _v2.y, _v2.z);
             sk.color.copy(ug).multiplyScalar(0.9);
             sk.intensity = 1;
           }
@@ -1030,7 +1071,7 @@ export class Race {
             vel.x * 0.75 + (Math.random() - 0.5) * 5,
             Math.random() * 4,
             vel.z * 0.75 + (Math.random() - 0.5) * 5,
-            [6, 3.0, 1.0],
+            SCRAPE,
             0.45,
             0.05,
             0.05,
@@ -1041,14 +1082,14 @@ export class Race {
       if (boost > 0.3 && Math.random() < (isP ? 0.6 : 0.25)) {
         const e = m.exhaustPos[Math.floor(Math.random() * m.exhaustPos.length)];
         _v.copy(e).applyMatrix4(m.body.matrixWorld);
-        fx.spark(_v.x, _v.y, _v.z, vel.x * 0.85 + (Math.random() - 0.5) * 3, (Math.random() - 0.3) * 2, vel.z * 0.85 + (Math.random() - 0.5) * 3, [0.6, 1.0, 2.4], 0.2, 0.04, 0.03);
+        fx.spark(_v.x, _v.y, _v.z, vel.x * 0.85 + (Math.random() - 0.5) * 3, (Math.random() - 0.3) * 2, vel.z * 0.85 + (Math.random() - 0.5) * 3, EXHAUST, 0.2, 0.04, 0.03);
       }
       // rain spray (not off the dry road under a roof)
       const gp = m.group.position;
       if (wet && speed > 18 && Math.random() < 0.9 && !this.world.cover.covers(gp.x, gp.y + 1, gp.z)) {
-        for (const w of [m.wheels[2], m.wheels[3]]) {
-          w.pivot.getWorldPosition(_v);
-          fx.puff(_v.x, _v.y - 0.1, _v.z, vel.x * 0.6, 0.8 + Math.random(), vel.z * 0.6, [0.6, 0.65, 0.75], 0.09 * clamp(speed / 60, 0.3, 1.2), 0.6, 3.2, 0.7);
+        for (let k = 2; k < 4; k++) {
+          m.wheels[k].pivot.getWorldPosition(_v);
+          fx.puff(_v.x, _v.y - 0.1, _v.z, vel.x * 0.6, 0.8 + Math.random(), vel.z * 0.6, SPRAY, 0.09 * clamp(speed / 60, 0.3, 1.2), 0.6, 3.2, 0.7);
         }
       }
     }
@@ -1082,13 +1123,9 @@ export class Race {
     const G = globalUniforms;
     const slots = this.app.renderer.presetName === 'low' ? 2 : MAX_HEADLIGHTS;
     const cam = this.camera.position;
-    const cand = this._headCand || (this._headCand = []);
-    cand.length = 0;
-    for (const r of this.racers) {
-      r.camD2 = r.isPlayer ? -1 : r.ai.position.distanceToSquared(cam);
-      cand.push(r);
-    }
-    cand.sort((a, b) => a.camD2 - b.camD2);
+    const cand = this._headCand || (this._headCand = this.racers.slice());
+    for (const r of cand) r.camD2 = r.isPlayer ? -1 : r.ai.position.distanceToSquared(cam);
+    sortInPlace(cand, byCamDist);
     for (let k = 0; k < MAX_HEADLIGHTS; k++) {
       const prm = G.uHeadParams.value[k];
       const r = k < slots ? cand[k] : null;
@@ -1196,24 +1233,25 @@ export class Race {
         nearest = r;
       }
     }
-    a.updateRace({
-      rpm: v.rpm,
-      throttle: this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25,
-      speed: v.speed,
-      topSpeed: v.topSpeed,
-      boost: v.boostLevel,
-      drift: Math.max(v.drift.active ? clamp(v.drift.slip, 0, 1) : 0, v.wheelspin * 0.7),
-      scrape: v.wallContact,
-      tunnel: v.frame.tunnel ? 1 : 0,
-      airborne: !v.grounded,
-      timeScale: this.timeScale,
-      opponentDist: nd,
-      opponentSpeed: nearest ? nearest.ai.v : 0,
-      relSpeed: nearest ? v.speed - nearest.ai.v : 0,
-      // how loud the rain is: none under a roof
-      wet: this.world.rain ? 1 - this.shelter : 0,
-      dt,
-    });
+    // one state object, refilled every frame
+    const st = this._audioState || (this._audioState = {});
+    st.rpm = v.rpm;
+    st.throttle = this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25;
+    st.speed = v.speed;
+    st.topSpeed = v.topSpeed;
+    st.boost = v.boostLevel;
+    st.drift = Math.max(v.drift.active ? clamp(v.drift.slip, 0, 1) : 0, v.wheelspin * 0.7);
+    st.scrape = v.wallContact;
+    st.tunnel = v.frame.tunnel ? 1 : 0;
+    st.airborne = !v.grounded;
+    st.timeScale = this.timeScale;
+    st.opponentDist = nd;
+    st.opponentSpeed = nearest ? nearest.ai.v : 0;
+    st.relSpeed = nearest ? v.speed - nearest.ai.v : 0;
+    // how loud the rain is: none under a roof
+    st.wet = this.world.rain ? 1 - this.shelter : 0;
+    st.dt = dt;
+    a.updateRace(st);
   }
 
   _updateHud() {
@@ -1246,17 +1284,28 @@ export class Race {
   }
 
   /** Minimap data: track polyline + cars. */
+  /** Where everyone is, for the minimap (one object, refilled on every call). */
   minimapData() {
-    return {
-      track: this.track,
-      cars: this.racers.map((r) => ({
-        x: r.isPlayer ? r.vehicle.x : r.ai.position.x,
-        z: r.isPlayer ? r.vehicle.z : r.ai.position.z,
-        player: r.isPlayer,
-        color: r.color,
-      })),
-      ghost: this.ghostModel && this.ghostModel.group.visible ? { x: this.ghostModel.group.position.x, z: this.ghostModel.group.position.z } : null,
-    };
+    const d =
+      this._map ||
+      (this._map = {
+        track: this.track,
+        cars: this.racers.map((r) => ({ x: 0, z: 0, player: r.isPlayer, color: r.color })),
+        ghostAt: { x: 0, z: 0 },
+        ghost: null,
+      });
+    for (let i = 0; i < this.racers.length; i++) {
+      const r = this.racers[i];
+      d.cars[i].x = r.isPlayer ? r.vehicle.x : r.ai.position.x;
+      d.cars[i].z = r.isPlayer ? r.vehicle.z : r.ai.position.z;
+    }
+    const g = this.ghostModel && this.ghostModel.group.visible ? this.ghostModel.group.position : null;
+    if (g) {
+      d.ghostAt.x = g.x;
+      d.ghostAt.z = g.z;
+    }
+    d.ghost = g ? d.ghostAt : null;
+    return d;
   }
 
   getResults() {

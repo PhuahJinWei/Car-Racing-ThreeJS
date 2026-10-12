@@ -1,9 +1,20 @@
 import { el, $, $$, ICONS } from './dom.js';
 import { controlsCells } from './controls-help.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
-import { t } from '../core/i18n.js';
+import { t, language } from '../core/i18n.js';
 
 const TIER_CLASS = ['', 'turbo1', 'turbo2', 'turbo3'];
+// HUD text from numbers, made only when the number changes (see _setNum)
+const fmtPre = (n) => (n ? t('ord.pre', { n }) : '');
+const fmtSuf = (n) => (n ? t('ord.suf', { n }) : '');
+const fmtPlace = (n) => (n ? String(n) : '-');
+const fmtOf = (n) => `/${n || '-'}`;
+const fmtLap = (n) => String(n || 1);
+const fmtLaps = (n) => `/${n || 1}`;
+const fmtBest = (n) => (isFinite(n) ? formatTime(n) : '--:--.--');
+const fmtCombo = (n) => `x${n || 1}`;
+const fmtStyle = (n) => t('hud.style', { n: formatNumber(n || 0) });
+const fmtTier = (n) => (n > 0 ? t(`turbo.${n}`) : t('hud.drift'));
 const TIER_COLOR = ['#ffffff', '#a8d8ff', '#ffb466', '#ff7a6b'];
 // rev counter numbers (x1000 rpm) around the inside of the ring, which sweeps 270 degrees from
 // the bottom left; 7 and 8 sit in the red
@@ -227,7 +238,13 @@ export class HUD {
     const sx = (W - pad * 2) / Math.max(b.maxX - b.minX, b.maxZ - b.minZ);
     const cx = (b.minX + b.maxX) / 2;
     const cz = (b.minZ + b.maxZ) / 2;
-    this.mapXf = (x, z) => [W / 2 + (x - cx) * sx, W / 2 + (z - cz) * sx];
+    // map position of a world point, written to one reused pair
+    const xy = [0, 0];
+    this.mapXf = (x, z) => {
+      xy[0] = W / 2 + (x - cx) * sx;
+      xy[1] = W / 2 + (z - cz) * sx;
+      return xy;
+    };
     const off = document.createElement('canvas');
     off.width = W;
     off.height = W;
@@ -268,16 +285,24 @@ export class HUD {
     g.drawImage(this.mapBase, 0, 0);
     const data = this.race.minimapData();
     if (data.ghost) {
-      const [x, y] = this.mapXf(data.ghost.x, data.ghost.z);
+      const p = this.mapXf(data.ghost.x, data.ghost.z);
+      const x = p[0];
+      const y = p[1];
       g.strokeStyle = 'rgba(168, 216, 255, 0.9)';
       g.lineWidth = 2.5;
       g.beginPath();
       g.arc(x, y, 6, 0, Math.PI * 2);
       g.stroke();
     }
+    let me = null;
     for (const c of data.cars) {
-      if (c.player) continue;
-      const [x, y] = this.mapXf(c.x, c.z);
+      if (c.player) {
+        me = c;
+        continue;
+      }
+      const p = this.mapXf(c.x, c.z);
+      const x = p[0];
+      const y = p[1];
       g.fillStyle = c.color;
       g.strokeStyle = 'rgba(0,0,0,0.85)';
       g.lineWidth = 2.5;
@@ -286,9 +311,10 @@ export class HUD {
       g.fill();
       g.stroke();
     }
-    const me = data.cars.find((c) => c.player);
     if (me) {
-      const [x, y] = this.mapXf(me.x, me.z);
+      const p = this.mapXf(me.x, me.z);
+      const x = p[0];
+      const y = p[1];
       // heading from recent movement, smoothed
       if (this._last) {
         const dx = x - this._last[0];
@@ -303,7 +329,9 @@ export class HUD {
           }
         }
       }
-      this._last = [x, y];
+      if (!this._last) this._last = [0, 0];
+      this._last[0] = x;
+      this._last[1] = y;
       const h = this._heading ?? 0;
       g.save();
       g.translate(x, y);
@@ -349,9 +377,18 @@ export class HUD {
     node[prop] = value;
   }
 
+  /** Like _set for a number: its text is only made (by `fmt`) when the number changes. */
+  _setNum(key, node, n, fmt) {
+    if (this.cache[key] === n) return;
+    this.cache[key] = n;
+    node.textContent = fmt(n);
+  }
+
   update(dt) {
     const h = this.race.hud;
     const $ = this.$;
+    // a language change (from the pause menu) redraws every text
+    if (this.cache.lang !== language()) this.cache = { lang: language() };
     const timeTrial = h.mode === 'timetrial';
     if (!timeTrial) {
       const place = h.place || 0;
@@ -361,26 +398,26 @@ export class HUD {
         $.posBox.classList.add('changed');
       }
       this.cache.place = place;
-      this._set('pre', $.pre, place ? t('ord.pre', { n: place }) : '');
-      this._set('p', $.p, place ? String(place) : '-');
-      this._set('suf', $.suf, place ? t('ord.suf', { n: place }) : '');
-      this._set('of', $.of, `/${h.total || '-'}`);
+      this._setNum('pre', $.pre, place, fmtPre);
+      this._setNum('p', $.p, place, fmtPlace);
+      this._setNum('suf', $.suf, place, fmtSuf);
+      this._setNum('of', $.of, h.total || 0, fmtOf);
     }
-    this._set('l', $.l, String(h.lap || 1));
-    this._set('ls', $.ls, `/${h.laps || 1}`);
+    this._setNum('l', $.l, h.lap || 1, fmtLap);
+    this._setNum('ls', $.ls, h.laps || 1, fmtLaps);
     this._set('time', $.time, formatTime(h.time || 0));
     this._set('lapt', $.lapt, formatTime(h.lapTime || 0));
-    this._set('best', $.best, isFinite(h.bestLap) ? formatTime(h.bestLap) : '--:--.--');
+    this._setNum('best', $.best, h.bestLap, fmtBest);
     // gauge
     const mph = this.app.settings.units === 'mph';
     const spd = Math.round((h.speed || 0) * (mph ? 2.23694 : 3.6));
-    this._set('num', $.num, String(spd));
-    this._set('gear', $.gear, String(h.gear || 1));
+    this._setNum('num', $.num, spd, String);
+    this._set('gear', $.gear, h.gear === 'R' ? 'R' : fmtLap(h.gear));
     const rpm = clamp((h.rpm || 0) / 1.05, 0, 1);
-    const p = rpm.toFixed(3);
+    const p = Math.round(rpm * 1000);
     if (this.cache.rpm !== p) {
       this.cache.rpm = p;
-      $.gauge.style.setProperty('--p', p);
+      $.gauge.style.setProperty('--p', (p / 1000).toFixed(3));
     }
     const red = rpm > 0.9;
     if (this.cache.red !== red) {
@@ -393,12 +430,12 @@ export class HUD {
       $.gauge.classList.toggle('boost', boost);
     }
     // nitro bars
+    const bars = this.cache.bars || (this.cache.bars = [-1, -1, -1]);
     for (let i = 0; i < 3; i++) {
       const f = clamp((h.nitro || 0) - i, 0, 1);
-      const key = 'n' + i;
-      const v = f.toFixed(2);
-      if (this.cache[key] !== v) {
-        this.cache[key] = v;
+      const v = Math.round(f * 100);
+      if (bars[i] !== v) {
+        bars[i] = v;
         $.nitro[i].firstChild.style.transform = `scaleX(${f})`;
         $.nitro[i].classList.toggle('full', f >= 1);
       }
@@ -411,8 +448,8 @@ export class HUD {
     }
     if (drifting) {
       const tier = h.driftTier;
-      this._set('dl', $.driftLbl, tier > 0 ? t(`turbo.${tier}`) : t('hud.drift'));
-      this._set('dp', $.driftPts, formatNumber(h.driftPoints * (h.combo || 1)));
+      this._setNum('dl', $.driftLbl, tier, fmtTier);
+      this._setNum('dp', $.driftPts, Math.round(h.driftPoints * (h.combo || 1)), formatNumber);
       const col = TIER_COLOR[tier];
       if (this.cache.dc !== col) {
         this.cache.dc = col;
@@ -425,9 +462,13 @@ export class HUD {
       this.cache.comboOn = comboOn;
       $.combo.classList.toggle('on', comboOn);
     }
-    this._set('cx', $.comboX, `x${h.combo || 1}`);
-    $.comboBar.style.transform = `scaleX(${clamp(h.comboTimer || 0, 0, 1).toFixed(3)})`;
-    this._set('st', $.style, t('hud.style', { n: formatNumber(h.style || 0) }));
+    this._setNum('cx', $.comboX, h.combo || 1, fmtCombo);
+    const cb = Math.round(clamp(h.comboTimer || 0, 0, 1) * 1000);
+    if (this.cache.cb !== cb) {
+      this.cache.cb = cb;
+      $.comboBar.style.transform = `scaleX(${cb / 1000})`;
+    }
+    this._setNum('st', $.style, Math.round(h.style || 0), fmtStyle);
     // wrong way
     if (h.wrongWay && !this._wrongShown) {
       this._wrongShown = true;

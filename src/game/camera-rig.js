@@ -14,6 +14,7 @@ const _v2 = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _left = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+const _look = new THREE.Vector3();
 
 /**
  * Dynamic chase camera: lag in turns, surge on acceleration, FOV punch at speed and on boost,
@@ -149,7 +150,7 @@ export class CameraRig {
     if (this.mode === 'bumper') {
       pos.copy(P).addScaledVector(t.fwd, 1.9).addScaledVector(t.up, cfg.height);
     }
-    const look = new THREE.Vector3().copy(P).addScaledVector(this.mode === 'bumper' ? t.fwd : this.dir, cfg.ahead + sp * 6).addScaledVector(camUp, cfg.look);
+    const look = _look.copy(P).addScaledVector(this.mode === 'bumper' ? t.fwd : this.dir, cfg.ahead + sp * 6).addScaledVector(camUp, cfg.look);
 
     // ---- keep the camera inside walls / under tunnel roofs
     if (this.mode !== 'bumper') {
