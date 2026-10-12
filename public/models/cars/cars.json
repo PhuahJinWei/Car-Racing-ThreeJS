@@ -76,6 +76,17 @@
         "file": "ronin.m.glb",
         "v": "8b395ea7d8"
       }
+    },
+    {
+      "id": "sidewinder",
+      "file": "sidewinder.glb",
+      "gz": true,
+      "factory": true,
+      "v": "f3f5c6603e",
+      "light": {
+        "file": "sidewinder.m.glb",
+        "v": "c93c70c0c5"
+      }
     }
   ]
 }
