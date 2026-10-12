@@ -151,8 +151,15 @@ export function buildTouge() {
     return 1.0 - ramp(y - 0.74, 0.012) * 0.22;
   };
 
-  // the raised pop-up lamp pods on the hood corners
-  const POD = { x: 0.55, y: 0.738, z: 1.85, hx: 0.165, hy: 0.072, hz: 0.085 };
+  // the pop-up headlights, raised: each lid has swung up on its hinge at the back, so from the side
+  // a light is a wedge standing on the hood corner, its lamp facing forward
+  const POD = { x: 0.55, hw: 0.155, zf: 2.0, top: 0.805, zh: 1.76, yh: 0.668 };
+  const lidLen = Math.hypot(POD.zf - POD.zh, POD.top - POD.yh);
+  const lidNz = -(POD.top - POD.yh) / lidLen;
+  const lidNy = (POD.zf - POD.zh) / lidLen;
+  // (its foot reaches down into the hood, which hides it)
+  const pod = (ax, y, z) =>
+    smax(smax(Math.abs(ax - POD.x) - POD.hw, (z - POD.zh) * lidNz + (y - POD.yh) * lidNy, 0.01), smax(z - POD.zf, 0.6 - y, 0.01), 0.01);
 
   // un-cut outer skin, lamp pods included (also used to lay the glass and lamps onto)
   const S = { bS: 0, bP: 0, dBody: 0, dCab: 0, cS: 0, cP: 0 };
@@ -173,8 +180,8 @@ export function buildTouge() {
     S.cS = cS;
     S.cP = cP;
     const d = smin(dBody, dCab, 0.025);
-    if (z < 1.7 || z > 2.0 || y < 0.6 || y > 0.85 || ax < 0.3 || ax > 0.8) return d;
-    return smin(d, sdRoundBox(ax - POD.x, y - POD.y, z - POD.z, POD.hx, POD.hy, POD.hz, 0.014), 0.008);
+    if (z < 1.6 || z > 2.05 || y < 0.58 || y > 0.85 || ax < 0.35 || ax > 0.75) return d;
+    return smin(d, pod(ax, y, z), 0.008);
   }
 
   const acc = new Acc();
@@ -228,10 +235,10 @@ export function buildTouge() {
       reg = Math.max(rearGlass.sample(ax, z), top);
       acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
     }
-    // lamp faces in the pods
-    if (z > 1.85 && y > 0.66 && y < 0.82 && ax > 0.37 && ax < 0.73) {
-      const reg = Math.max(Math.abs(ax - POD.x) - 0.142, Math.abs(y - POD.y) - 0.05);
-      acc.cut(Math.max(reg, z - (POD.z + POD.hz + 0.01), POD.z + POD.hz - 0.022 - z), MAT.head, 0.004);
+    // lamp faces on the front of the pods
+    if (z > POD.zf - 0.05 && y > 0.64 && y < 0.82 && ax > 0.37 && ax < 0.73) {
+      const reg = Math.max(Math.abs(ax - POD.x) - 0.13, Math.abs(y - 0.7235) - 0.0545);
+      acc.cut(Math.max(reg, z - (POD.zf + 0.01), POD.zf - 0.022 - z), MAT.head, 0.004);
     }
     // grille slot between the bumper and the hood (parking lamps at its ends), and an intake in
     // the bumper
@@ -281,10 +288,10 @@ export function buildTouge() {
       mat: MAT.lens,
       view: VIEW.front,
       outline: [
-        [0.425, 0.697, 1],
-        [0.675, 0.697, 1],
-        [0.675, 0.779, 1],
-        [0.425, 0.779, 1],
+        [0.43, 0.677, 1],
+        [0.67, 0.677, 1],
+        [0.67, 0.766, 1],
+        [0.43, 0.766, 1],
       ].map(([u, v, s]) => [u * sx, v, s]),
       depth: 0.016,
       rings: 3,
@@ -346,8 +353,8 @@ export function buildTouge() {
         [-0.55, 0.745, -2.05],
       ],
       headLights: [
-        [0.55, 0.738, 1.94],
-        [-0.55, 0.738, 1.94],
+        [0.55, 0.72, 2.0],
+        [-0.55, 0.72, 2.0],
       ],
       exhausts: [[-0.45, 0.2, -2.12]],
     },
