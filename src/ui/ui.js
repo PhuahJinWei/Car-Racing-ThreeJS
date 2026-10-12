@@ -1124,7 +1124,7 @@ export class UI {
             <div class="daily-map"><canvas width="300" height="300"></canvas></div>
             <div class="daily-info">
               <div class="eyebrow accent">${d.trackName}</div>
-              <div class="obj-label">${ICONS.target}${t('daily.objective')}</div>
+              <div class="obj-label">${ICONS.target}${t('daily.objective')}<b class="gold">+${formatNumber(d.bonus)}</b></div>
               <h2 class="obj">${d.objective.label}</h2>
               <p class="obj-detail">${d.objective.detail}</p>
               <div class="chips">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>
@@ -1245,8 +1245,9 @@ export class UI {
     const tags = [];
     if (reward.newRecord) tags.push(`<span class="chip c-gold">${ICONS.trophy}${t('res.newRecord')}</span>`);
     if (reward.newLap) tags.push(`<span class="chip c-ice">${ICONS.stopwatch}${t('res.bestLap')}</span>`);
-    if (reward.daily === true) tags.push(`<span class="chip c-good">${ICONS.check}${t('res.dailyComplete')}</span>`);
-    if (reward.daily === false) tags.push(`<span class="chip c-bad">${t('res.dailyFailed', { p: reward.dailyProgress })}</span>`);
+    if (reward.daily) tags.push(`<span class="chip c-good">${ICONS.check}${t('res.dailyComplete')}</span>`);
+    if (reward.objective === true) tags.push(`<span class="chip c-good">${ICONS.target}${t('res.objectiveMet')}</span>`);
+    if (reward.objective === false) tags.push(`<span class="chip c-bad">${t('res.dailyFailed', { p: reward.dailyProgress })}</span>`);
     const leader = res.rows[0]?.time || 0;
     const ordPre = t('ord.pre', { n: res.place });
     const hero = isTT

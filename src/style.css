@@ -2331,6 +2331,12 @@ output {
   color: var(--amber);
 }
 
+/* what the bonus objective pays */
+.obj-label b {
+  margin-left: 0.3em;
+  letter-spacing: calc(0.08em * var(--track));
+}
+
 .obj {
   margin: 0.2rem 0 0;
   font-weight: 700;

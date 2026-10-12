@@ -330,36 +330,44 @@ export class App {
     const diffMul = (DIFFICULTY[cfg.difficulty] || DIFFICULTY.easy).reward;
     const lapMul = clamp(cfg.laps / 3, 0.5, 1.6);
     if (res.mode !== 'timetrial') {
-      const table = [1500, 1000, 700, 500, 350, 250];
-      lines.push([t('rw.place', { n: res.place }), Math.round((table[res.place - 1] || 200) * diffMul * lapMul)]);
+      const table = [3500, 2500, 1800, 1300, 1000, 800];
+      lines.push([t('rw.place', { n: res.place }), Math.round((table[res.place - 1] || 700) * diffMul * lapMul)]);
     } else {
-      lines.push([t('mode.timetrial'), Math.round(400 * lapMul)]);
+      lines.push([t('mode.timetrial'), Math.round(1200 * lapMul)]);
     }
-    if (res.style > 0) lines.push([t('rw.styleBonus'), Math.round(res.style / 10)]);
+    if (res.style > 0) lines.push([t('rw.styleBonus'), Math.round(res.style / 5)]);
     const prev = S.getRecord(res.trackKey, res.mode);
     const hadRecord = !!(prev && prev.bestTime);
     const rec = S.setRecord(res.trackKey, res.mode, res.time, res.bestLap);
     const reward = { lines, newRecord: rec.newTime && hadRecord, newLap: rec.newLap && hadRecord };
-    if (reward.newRecord) lines.push([t('res.newRecord'), 500]);
+    if (reward.newRecord) lines.push([t('res.newRecord'), 1000]);
     if (res.mode === 'timetrial' && rec.newTime && res.ghost) S.setGhost(res.trackKey, res.ghost);
     if (res.mode === 'daily' && this.currentDaily) {
+      // finishing today's challenge pays once a day, whatever the result; meeting its objective
+      // pays a bonus on top (also once)
       const d = this.currentDaily;
       const ok = evaluateDaily(d, res);
       const ds = S.data.daily;
-      reward.daily = ok;
+      if (ds.date !== d.key) {
+        ds.date = d.key;
+        ds.completed = false;
+        ds.bonus = false;
+      }
+      reward.objective = ok;
       reward.dailyProgress = dailyProgress(d, res);
-      if (ok && !(ds.date === d.key && ds.completed)) {
+      if (!ds.completed) {
         const y = new Date();
         y.setDate(y.getDate() - 1);
         ds.streak = ds.lastCompleted === todayKey(y) ? (ds.streak || 0) + 1 : 1;
         ds.lastCompleted = d.key;
-        ds.date = d.key;
         ds.completed = true;
+        reward.daily = true;
         lines.push([t('mode.daily'), d.reward]);
-        if (ds.streak > 1) lines.push([t('rw.streak', { n: ds.streak }), Math.min(1000, (ds.streak - 1) * 200)]);
-      } else if (!ok && ds.date !== d.key) {
-        ds.date = d.key;
-        ds.completed = false;
+        if (ds.streak > 1) lines.push([t('rw.streak', { n: ds.streak }), Math.min(2500, (ds.streak - 1) * 500)]);
+      }
+      if (ok && !ds.bonus) {
+        ds.bonus = true;
+        lines.push([t('rw.objective'), d.bonus]);
       }
     }
     const st = S.data.stats;

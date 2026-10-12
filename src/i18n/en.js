@@ -54,7 +54,7 @@ export default {
   'tip.4': 'Chain stunts within four seconds of each other to build your <b>combo</b> multiplier.',
   'tip.5': 'Tuck in behind a rival to catch their <b>slipstream</b>, then slingshot past.',
   'tip.6': 'Glowing chevron pads on the road give you a free burst of speed.',
-  'tip.7': 'Daily challenges change at midnight. Complete them in a row to grow your streak bonus.',
+  'tip.7': 'Daily challenges change at midnight. Finishing one pays out; play on days in a row to grow your streak bonus.',
   'tip.8': 'Time Trial saves a ghost of your best run, so you can race against yourself.',
   'rotate.title': 'ROTATE YOUR DEVICE',
   'rotate.sub': 'Midnight Overdrive plays best in landscape.',
@@ -194,7 +194,7 @@ export default {
   'set.noMotion': 'Motion sensors unavailable - using the stick',
 
   // ---------------------------------------------------------------- daily challenge
-  'daily.objective': 'OBJECTIVE',
+  'daily.objective': 'BONUS OBJECTIVE',
   'daily.carProvided': 'CAR PROVIDED',
   'daily.reward': 'REWARD',
   'daily.streak': 'STREAK',
@@ -233,7 +233,8 @@ export default {
   'res.newRecord': 'NEW RECORD',
   'res.bestLap': 'BEST LAP',
   'res.dailyComplete': 'DAILY COMPLETE',
-  'res.dailyFailed': 'DAILY FAILED · {p}',
+  'res.dailyFailed': 'OBJECTIVE MISSED · {p}',
+  'res.objectiveMet': 'OBJECTIVE MET',
   'res.lap': 'LAP {n}',
   'res.fastest': 'FASTEST',
   'res.style': 'STYLE',
@@ -251,6 +252,7 @@ export default {
   'rw.place': ({ n }) => `${n}${SUFFIX(n)} PLACE`,
   'rw.styleBonus': 'STYLE BONUS',
   'rw.streak': 'STREAK x{n}',
+  'rw.objective': 'OBJECTIVE BONUS',
   'race.buildFailed': 'Could not build the track',
 
   // ---------------------------------------------------------------- in race

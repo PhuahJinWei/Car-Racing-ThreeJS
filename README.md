@@ -43,7 +43,7 @@ You can make each track feel new by driving it **backwards**, **mirrored**, or i
 
 - **Race.** The main event. Pick a track, the weather, the number of laps and how tough your rivals are: *Rookie*, *Easy*, *Normal* or *Hard*.
 - **Time Trial.** Just you against the clock, chasing a see-through "ghost" car that replays your best lap.
-- **Daily Challenge.** A new track and goal every day. Complete challenges on days in a row to build a streak and earn bonus credits.
+- **Daily Challenge.** A new track every day. Finish it once to collect the day's credits, hit its goal for a bonus, and play on days in a row to build a streak.
 
 ![The race setup screen, with the three tracks and the weather, lap and difficulty options](docs/screenshots/setup.jpg)
 

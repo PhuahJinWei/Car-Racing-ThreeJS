@@ -49,7 +49,7 @@ export default {
   'tip.4': '在4秒内连续完成特技，提升<b>连击</b>倍率。',
   'tip.5': '紧跟在对手身后借助<b>尾流</b>，然后弹射超车。',
   'tip.6': '驶过路面上发光的箭头加速板，即可获得一次免费加速。',
-  'tip.7': '每日挑战在午夜刷新。连续完成可以提升连胜奖励。',
+  'tip.7': '每日挑战在午夜刷新。跑完一次即可领奖，连续几天参加可以提升连续奖励。',
   'tip.8': '计时赛会将你的最佳成绩保存为幽灵车，让你与自己一较高下。',
   'rotate.title': '请横置设备',
   'rotate.sub': 'Midnight Overdrive 横屏游玩体验最佳。',
@@ -189,7 +189,7 @@ export default {
   'set.noMotion': '无法使用体感传感器，已切换为摇杆',
 
   // ---------------------------------------------------------------- daily challenge
-  'daily.objective': '目标',
+  'daily.objective': '奖励目标',
   'daily.carProvided': '指定车辆',
   'daily.reward': '奖励',
   'daily.streak': '连续',
@@ -228,7 +228,8 @@ export default {
   'res.newRecord': '新纪录',
   'res.bestLap': '最佳圈速',
   'res.dailyComplete': '每日挑战完成',
-  'res.dailyFailed': '每日挑战失败 · {p}',
+  'res.dailyFailed': '目标未达成 · {p}',
+  'res.objectiveMet': '目标达成',
   'res.lap': '第{n}圈',
   'res.fastest': '最快',
   'res.style': '风格分',
@@ -246,6 +247,7 @@ export default {
   'rw.place': '第{n}名',
   'rw.styleBonus': '风格奖励',
   'rw.streak': '连续奖励 x{n}',
+  'rw.objective': '目标奖励',
   'race.buildFailed': '无法构建赛道',
 
   // ---------------------------------------------------------------- in race

@@ -59,7 +59,9 @@ export function getDaily(date = new Date()) {
     laps: 2,
     difficulty: objective.difficulty || 'easy',
     objective,
-    reward: 1500,
+    // for finishing it (once a day), and on top for meeting the objective
+    reward: 3000,
+    bonus: 1500,
   };
 }
 

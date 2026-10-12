@@ -49,7 +49,7 @@ export default {
   'tip.4': 'スタントを4秒以内につなげて<b>コンボ</b>倍率を上げよう。',
   'tip.5': 'ライバルの真後ろについて<b>スリップストリーム</b>に入り、一気に抜き去ろう。',
   'tip.6': '路面の光る矢印パッドを踏むと一気に加速します。',
-  'tip.7': 'デイリーチャレンジは毎日0時に更新。連続でクリアすると連続ボーナスが増えます。',
+  'tip.7': 'デイリーチャレンジは毎日0時に更新。走り切れば報酬がもらえ、毎日続けると連続ボーナスが増えます。',
   'tip.8': 'タイムアタックではベスト走行がゴーストとして保存され、自分自身と勝負できます。',
   'rotate.title': '端末を横向きにしてください',
   'rotate.sub': 'Midnight Overdrive は横画面でのプレイがおすすめです。',
@@ -189,7 +189,7 @@ export default {
   'set.noMotion': 'モーションセンサーが使えないため、スティックを使用します',
 
   // ---------------------------------------------------------------- daily challenge
-  'daily.objective': '目標',
+  'daily.objective': 'ボーナス目標',
   'daily.carProvided': '使用車両',
   'daily.reward': '報酬',
   'daily.streak': '連続',
@@ -228,7 +228,8 @@ export default {
   'res.newRecord': '新記録',
   'res.bestLap': 'ベストラップ',
   'res.dailyComplete': 'デイリークリア',
-  'res.dailyFailed': 'デイリー失敗 · {p}',
+  'res.dailyFailed': '目標未達成 · {p}',
+  'res.objectiveMet': '目標達成',
   'res.lap': 'ラップ {n}',
   'res.fastest': '最速',
   'res.style': 'スタイル',
@@ -246,6 +247,7 @@ export default {
   'rw.place': '{n}位',
   'rw.styleBonus': 'スタイルボーナス',
   'rw.streak': '連続ボーナス x{n}',
+  'rw.objective': '目標ボーナス',
   'race.buildFailed': 'コースを構築できませんでした',
 
   // ---------------------------------------------------------------- in race

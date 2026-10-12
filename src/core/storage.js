@@ -48,7 +48,7 @@ function defaultSave() {
     settings: { ...DEFAULT_SETTINGS },
     records: {},
     tt: {},
-    daily: { date: null, best: null, completed: false, streak: 0, lastCompleted: null },
+    daily: { date: null, best: null, completed: false, bonus: false, streak: 0, lastCompleted: null },
     stats: { races: 0, wins: 0, podiums: 0, nearMisses: 0, driftDistance: 0, bestCombo: 1, creditsEarned: 0, bestDrift: 0 },
     lastSetup: { trackId: 'district', reverse: false, mirror: false, weather: 'auto', laps: 3, difficulty: 'easy' },
     tutorialDone: false,
