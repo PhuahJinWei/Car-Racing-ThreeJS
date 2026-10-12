@@ -1,4 +1,4 @@
-import { Renderer, detectDefaultQuality } from './core/renderer.js';
+import { Renderer, detectDefaultQuality, lowerQuality } from './core/renderer.js';
 import { Input } from './core/input.js';
 import { AudioEngine } from './core/audio.js';
 import { Storage } from './core/storage.js';
@@ -14,7 +14,7 @@ import { clamp } from './core/math.js';
 import { setLanguage, t } from './core/i18n.js';
 import { DIFFICULTY } from './game/ai.js';
 import { CARS } from './car/car-defs.js';
-import { loadManifest, ensureCarAssets, previewModelFile } from './car/car-assets.js';
+import { loadManifest, ensureCarAssets, previewModelFile, setCarDetail } from './car/car-assets.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -35,6 +35,17 @@ export class App {
     this.street = null;
     this.ui = new UI(this);
     this._appliedQuality = null;
+    this._tick = (t) => this._frame(t);
+    // auto quality stepped down: keep it for this session (choosing AUTO again resets it; a new
+    // session starts from what the device looks capable of, so a passing slowdown never sticks),
+    // and the next race loads the lighter cars if this preset uses them
+    this._learnedQuality = null;
+    this.renderer.onQualityStep = (name) => {
+      this._learnedQuality = name;
+      this._appliedQuality = `auto:${name}`;
+      this.ui.setLite(name === 'low');
+      setCarDetail(this.renderer.preset.carDetail);
+    };
     this.applySettings();
     this.renderer.onResize = () => {
       if (this.race) this.race.resize(this.renderer.aspect);
@@ -69,18 +80,20 @@ export class App {
     this.street = new MenuStreet(this);
     this.street.syncCar(S.data.car, S.customFor(S.data.car));
     this.street.build();
-    // the rest load in the background
-    ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer).then(() => {
-      if (this.state === 'race' || !this.garage) return;
-      this.garage.setCar(this.garage.carId, S.ownsCar(this.garage.carId) ? S.customFor(this.garage.carId) : undefined);
-      this.street.syncCar(S.data.car, S.customFor(S.data.car), true);
-    });
+    // the rest load in the background, once the title screen is up and running smoothly
+    setTimeout(() => {
+      ensureCarAssets(CARS.map((c) => c.id), this.renderer.renderer).then(() => {
+        if (this.state === 'race' || !this.garage) return;
+        this.garage.setCar(this.garage.carId, S.ownsCar(this.garage.carId) ? S.customFor(this.garage.carId) : undefined);
+        this.street.syncCar(S.data.car, S.customFor(S.data.car), true);
+      });
+    }, 1500);
     this.street.setView('title');
     this.ui.hideLoading();
     this.state = 'title';
     this.ui.show('title');
     this.last = performance.now();
-    requestAnimationFrame((t) => this._frame(t));
+    requestAnimationFrame(this._tick);
   }
 
   // ------------------------------------------------------------------ navigation
@@ -328,12 +341,16 @@ export class App {
   // ------------------------------------------------------------------ settings
   applySettings(changed) {
     const s = this.settings;
-    const q = s.quality === 'auto' ? `auto:${detectDefaultQuality()}` : s.quality;
+    // AUTO starts from what the device looks capable of, or lower if it has already stepped down
+    if (changed === 'quality' && s.quality === 'auto') this._learnedQuality = null;
+    const auto = lowerQuality(detectDefaultQuality(this.renderer.renderer.getContext()), this._learnedQuality || 'high');
+    const q = s.quality === 'auto' ? `auto:${auto}` : s.quality;
     if (q !== this._appliedQuality) {
       this._appliedQuality = q;
-      if (s.quality === 'auto') this.renderer.setQuality(detectDefaultQuality(), true);
+      if (s.quality === 'auto') this.renderer.setQuality(auto, true);
       else this.renderer.setQuality(s.quality, false);
       this.ui.setLite(this.renderer.presetName === 'low');
+      setCarDetail(this.renderer.preset.carDetail);
     }
     this.audio.applyVolumes();
     this.input.autoAccel = s.autoAccel;
@@ -424,15 +441,13 @@ export class App {
 
   // ------------------------------------------------------------------ main loop
   _frame(now) {
-    requestAnimationFrame((t) => this._frame(t));
-    let dt = (now - this.last) / 1000;
+    requestAnimationFrame(this._tick);
+    const raw = (now - this.last) / 1000;
     this.last = now;
-    if (!(dt > 0)) dt = 1 / 60;
-    dt = Math.min(dt, 0.05);
+    const dt = raw > 0 ? Math.min(raw, 0.05) : 1 / 60;
     this.input.update(dt);
     this.ui.pollNav(this.input);
     if (this.state === 'race' && this.race) {
-      this.renderer.trackFrame(dt, now);
       if (this.input.consume('pause')) {
         if (this.race.paused) this.resume();
         else if (this.race.phase !== 'results') this.pause();
@@ -444,16 +459,20 @@ export class App {
         }
         return;
       }
+      const w0 = performance.now();
       this.race.update(dt);
       this.hud?.update(dt);
       this.touch?.update(this.race.hud);
       this.race.render();
+      // auto quality: the real frame time, and how much of it was the main thread's own work
+      this.renderer.trackFrame(raw, now, (performance.now() - w0) / 1000);
     } else if (this.garage && this.state !== 'loading') {
       this.input.clearEdges();
       const bg = this._backdrop();
-      if (bg === this.street) this.renderer.trackFrame(dt, now);
+      const w0 = performance.now();
       bg.update(dt);
       bg.render();
+      if (bg === this.street) this.renderer.trackFrame(raw, now, (performance.now() - w0) / 1000);
     }
   }
 }
