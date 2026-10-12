@@ -936,7 +936,7 @@ export class UI {
         icon: 'gamepad',
         html: () =>
           swRow('keyHints', t('set.keyHints'), t('set.keyHintsHint')) +
-          row(t('set.touch'), t('set.touchHint'), segS('controls', [['buttons', t('set.pads')], ['tilt', t('set.tilt')]])) +
+          row(t('set.touch'), t('set.touchHint'), segS('controls', [['buttons', t('set.stick')], ['tilt', t('set.tilt')]])) +
           swRow('autoAccel', t('set.autoAccel'), t('set.autoAccelHint')) +
           row(t('set.tiltSens'), '', range('tiltSensitivity', 0.5, 2, 0.05, (v) => `${Number(v).toFixed(2)}×`)) +
           swRow('haptics', t('set.haptics'), t('set.hapticsHint')) +

@@ -3660,44 +3660,103 @@ kbd.k-pill {
   pointer-events: none;
 }
 
-.touch .steer {
+/* steering: a thumb anywhere in the zone brings the stick up right under it */
+.touch .stick-zone {
   position: absolute;
-  left: calc(var(--sl) + 0.5rem);
-  bottom: calc(var(--sb) + 0.5rem);
-  width: min(36vw, 300px);
-  height: min(48vh, 220px);
+  left: 0;
+  bottom: 0;
+  width: min(48vw, 520px);
+  height: 78%;
   pointer-events: auto;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.6rem;
-  padding: 0.5rem;
+  touch-action: none;
 }
 
-.touch .pad {
-  flex: 1;
-  height: min(32vh, 132px);
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.82);
-  background: rgba(8, 9, 12, 0.26);
+.touch .stick {
+  --size: clamp(104px, 30vmin, 150px);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  /* the transform puts its centre on the thumb */
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(8, 9, 12, 0.12), rgba(8, 9, 12, 0.34));
   border: 1.5px solid rgba(255, 255, 255, 0.16);
-  transition:
-    background 0.08s,
-    border-color 0.08s,
-    transform 0.1s;
+  pointer-events: none;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+  will-change: transform;
 }
 
-.touch .pad svg {
-  width: 34%;
-  height: 34%;
+.touch .stick.on {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.26);
 }
 
-.touch .pad.on {
-  color: #fff;
-  background: rgba(255, 138, 42, 0.24);
-  border-color: rgba(255, 138, 42, 0.9);
-  transform: scale(0.97);
+.touch .stick .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  height: 42%;
+  margin: -21% 0 0 -21%;
+  border-radius: 50%;
+  background: rgba(243, 245, 248, 0.16);
+  border: 1.5px solid rgba(243, 245, 248, 0.6);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.touch .stick.l .knob,
+.touch .stick.r .knob {
+  background: rgba(255, 138, 42, 0.26);
+  border-color: var(--amber);
+}
+
+.touch .stick .arrow {
+  position: absolute;
+  width: 17%;
+  height: 17%;
+  display: grid;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.touch .stick .arrow svg {
+  width: 100%;
+  height: 100%;
+}
+
+.touch .stick .arrow.l {
+  left: 6%;
+  top: 41.5%;
+}
+
+.touch .stick .arrow.r {
+  right: 6%;
+  top: 41.5%;
+}
+
+.touch .stick .arrow.u {
+  top: 6%;
+  left: 41.5%;
+  transform: rotate(90deg);
+}
+
+.touch .stick .arrow.d {
+  bottom: 6%;
+  left: 41.5%;
+  transform: rotate(90deg);
+}
+
+/* up / down only mean something when they work the pedals (auto-accelerate off) */
+.touch .stick:not(.pedals) .arrow.u,
+.touch .stick:not(.pedals) .arrow.d {
+  display: none;
+}
+
+.touch .stick.l .arrow.l,
+.touch .stick.r .arrow.r {
+  color: var(--amber);
 }
 
 .touch .actions {
@@ -4547,8 +4606,9 @@ kbd.k-pill {
     align-items: start;
     overflow-y: auto;
   }
-  .touch .steer {
-    width: 54vw;
+  .touch .stick-zone {
+    width: 58vw;
+    height: min(36vh, 300px);
   }
   .touch .actions {
     width: 42vw;

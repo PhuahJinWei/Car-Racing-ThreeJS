@@ -23,7 +23,8 @@ export class Input {
     this.state = { steer: 0, throttle: 0, brake: 0, drift: false, nitroHeld: false };
     this.kbSteer = 0;
     this.device = 'keyboard';
-    this.touch = { steer: 0, drift: false, brake: false, active: false };
+    // from the on-screen controls: steer -1..1, throttle / brake 0..1 (the stick, with auto-accelerate off)
+    this.touch = { steer: 0, throttle: 0, brake: 0, drift: false, active: false };
     this.tilt = { enabled: false, raw: 0, neutral: 0, value: 0, has: false };
     this.autoAccel = true;
     this.tiltSensitivity = 1;
@@ -46,7 +47,8 @@ export class Input {
       this.keys.clear();
       this.touch.drift = false;
       this.touch.steer = 0;
-      this.touch.brake = false;
+      this.touch.throttle = 0;
+      this.touch.brake = 0;
     });
     window.addEventListener('gamepadconnected', () => (this.device = 'gamepad'));
   }
@@ -212,8 +214,8 @@ export class Input {
         s.steer = this.touch.steer;
       }
       s.drift = this.touch.drift;
-      s.brake = this.touch.brake ? 1 : 0;
-      s.throttle = this.autoAccel ? 1 : this.touch.throttle ? 1 : 0;
+      s.brake = this.touch.brake;
+      s.throttle = this.autoAccel ? 1 : this.touch.throttle;
     } else {
       s.steer = this.kbSteer;
       s.throttle = this.has('up') ? 1 : 0;

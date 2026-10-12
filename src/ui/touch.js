@@ -1,39 +1,50 @@
 import { el, $, ICONS } from './dom.js';
-import { clamp } from '../core/math.js';
 import { t } from '../core/i18n.js';
+
+// The steering stick: full lock this far out (a share of its radius); nothing inside the dead zone.
+const LOCK = 0.8;
+const DEAD = 0.07;
 
 /**
  * On-screen controls for phones/tablets (multi-touch via Pointer Events):
- *  - left: steering pads (slide for analog steering) or tilt steering
+ *  - left: a steering stick that comes up under the thumb wherever it lands in the left zone
+ *    (or tilt steering). With auto-accelerate off it works the pedals too: up to accelerate,
+ *    down to brake.
  *  - right: NITRO (tap) and DRIFT/BRAKE (hold) buttons
  */
 export class TouchControls {
   constructor(app) {
     this.app = app;
     this.input = app.input;
+    // up / down are the left / right chevrons turned a quarter (CSS)
+    const arrow = (dir) => `<span class="arrow ${dir}">${dir === 'l' || dir === 'u' ? ICONS.left : ICONS.right}</span>`;
     this.root = el(`
       <div class="touch">
-        <div class="steer">
-          <div class="pad l">${ICONS.left}</div>
-          <div class="pad r">${ICONS.right}</div>
-        </div>
+        <div class="stick-zone"></div>
+        <div class="stick">${arrow('l')}${arrow('r')}${arrow('u')}${arrow('d')}<span class="knob"></span></div>
         <div class="tilt-hint" style="display:none">${t('touch.tilt')}</div>
         <div class="actions">
           <div class="tbtn nitro"><span class="ring"></span><span class="ico">${ICONS.bolt}</span><span class="cnt">1</span><span class="lbl">${t('touch.nitro')}</span></div>
           <div class="tbtn drift"><span class="lbl">${t('touch.drift')}</span><span class="sub">${t('touch.driftSub')}</span></div>
         </div>
       </div>`);
-    this.steerEl = $(this.root, '.steer');
-    this.arrowL = $(this.root, '.pad.l');
-    this.arrowR = $(this.root, '.pad.r');
+    this.zone = $(this.root, '.stick-zone');
+    this.stick = $(this.root, '.stick');
+    this.knob = $(this.root, '.stick .knob');
     this.nitroEl = $(this.root, '.nitro');
     this.nitroCnt = $(this.root, '.nitro .cnt');
     this.driftEl = $(this.root, '.drift');
     this.tiltHint = $(this.root, '.tilt-hint');
-    this.steerPointer = null;
+    this.stickPointer = null;
+    this.center = { x: 0, y: 0 };
+    this.radius = 60;
     this.driftPointers = new Set();
     // Touch players get auto-acceleration straight away (until they use a keyboard / pad).
     if (this.input.device === 'keyboard' && this.input.keys.size === 0) this.input.device = 'touch';
+    this._onResize = () => {
+      if (this.stickPointer === null) this._rest();
+    };
+    window.addEventListener('resize', this._onResize);
     this._bind();
     this.setMode(app.settings.controls);
   }
@@ -41,7 +52,8 @@ export class TouchControls {
   setMode(mode) {
     this.mode = mode;
     const tilt = mode === 'tilt';
-    this.steerEl.style.display = tilt ? 'none' : '';
+    this.zone.style.display = tilt ? 'none' : '';
+    this.stick.style.display = tilt ? 'none' : '';
     this.tiltHint.style.display = tilt ? '' : 'none';
     if (tilt) {
       this.input.enableTilt().then((ok) => {
@@ -50,7 +62,7 @@ export class TouchControls {
           this.setMode('buttons');
           return;
         }
-        // No sensor data arriving (e.g. desktop / denied) -> fall back to the pads.
+        // No sensor data arriving (e.g. desktop / denied) -> fall back to the stick.
         setTimeout(() => {
           if (this.mode === 'tilt' && !this.input.tilt.has) {
             this.app.ui.toast(t('touch.noSensor'));
@@ -58,48 +70,99 @@ export class TouchControls {
           }
         }, 1500);
       });
-    } else this.input.disableTilt();
+    } else {
+      this.input.disableTilt();
+      this._rest();
+    }
   }
 
-  _steerFrom(e) {
-    const r = this.steerEl.getBoundingClientRect();
-    const u = (e.clientX - r.left) / r.width;
-    let s = 0;
-    if (u < 0.5) s = -clamp((0.5 - u) / 0.22, 0, 1);
-    else s = clamp((u - 0.5) / 0.22, 0, 1);
-    if (Math.abs(s) < 0.08) s = 0;
-    this.input.setTouch({ steer: s });
-    this.arrowL.classList.toggle('on', s < -0.05);
-    this.arrowR.classList.toggle('on', s > 0.05);
+  /** Where the stick waits, dimmed, for a thumb: the bottom corner of its zone. */
+  _rest() {
+    if (!this.root.isConnected) return;
+    const box = this.root.getBoundingClientRect();
+    const zone = this.zone.getBoundingClientRect();
+    const r = this.stick.offsetWidth / 2;
+    const gap = Math.max(14, r * 0.3);
+    this._place(zone.left - box.left + r + gap, zone.bottom - box.top - r - gap);
+    this._knob(0, 0);
+    this.stick.classList.remove('on', 'l', 'r');
+    this.stick.classList.toggle('pedals', !this.input.autoAccel);
+  }
+
+  _place(x, y) {
+    this.center.x = x;
+    this.center.y = y;
+    this.stick.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }
+
+  _knob(x, y) {
+    this.knob.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }
+
+  _local(e) {
+    const box = this.root.getBoundingClientRect();
+    return { x: e.clientX - box.left, y: e.clientY - box.top };
+  }
+
+  _stickMove(e) {
+    const p = this._local(e);
+    const r = this.radius;
+    const pedals = !this.input.autoAccel;
+    let dx = p.x - this.center.x;
+    let dy = pedals ? p.y - this.center.y : 0;
+    // past the rim the stick follows the thumb, so turning back answers at once
+    const len = Math.hypot(dx, dy);
+    if (len > r) {
+      const k = (len - r) / len;
+      this._place(this.center.x + dx * k, this.center.y + dy * k);
+      dx -= dx * k;
+      dy -= dy * k;
+    }
+    this._knob(dx, dy);
+    const axis = (v) => {
+      const a = Math.abs(v) / (r * LOCK);
+      return a <= DEAD ? 0 : Math.sign(v) * Math.min(1, (a - DEAD) / (1 - DEAD));
+    };
+    const steer = axis(dx);
+    const pedal = -axis(dy); // up accelerates, down brakes
+    this.input.setTouch({ steer, throttle: Math.max(0, pedal), brake: Math.max(0, -pedal) });
+    this.stick.classList.toggle('l', steer < -0.05);
+    this.stick.classList.toggle('r', steer > 0.05);
   }
 
   _bind() {
-    const st = this.steerEl;
-    st.addEventListener('pointerdown', (e) => {
+    // one thumb steers: the stick comes up where it lands, and that spot is straight ahead
+    const z = this.zone;
+    z.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      this.steerPointer = e.pointerId;
+      if (this.stickPointer !== null) return;
+      this.stickPointer = e.pointerId;
       try {
-        st.setPointerCapture(e.pointerId);
+        z.setPointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
-      this._steerFrom(e);
+      this.radius = this.stick.offsetWidth / 2;
+      const p = this._local(e);
+      this._place(p.x, p.y);
+      this.stick.classList.add('on');
+      this.stick.classList.toggle('pedals', !this.input.autoAccel);
+      this._stickMove(e);
     });
-    st.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== this.steerPointer) return;
+    z.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== this.stickPointer) return;
       e.preventDefault();
-      this._steerFrom(e);
+      this._stickMove(e);
     });
-    const endSteer = (e) => {
-      if (e.pointerId !== this.steerPointer) return;
-      this.steerPointer = null;
-      this.input.setTouch({ steer: 0 });
-      this.arrowL.classList.remove('on');
-      this.arrowR.classList.remove('on');
+    const endStick = (e) => {
+      if (e.pointerId !== this.stickPointer) return;
+      this.stickPointer = null;
+      this.input.setTouch({ steer: 0, throttle: 0, brake: 0 });
+      this._rest();
     };
-    st.addEventListener('pointerup', endSteer);
-    st.addEventListener('pointercancel', endSteer);
-    st.addEventListener('lostpointercapture', endSteer);
+    z.addEventListener('pointerup', endStick);
+    z.addEventListener('pointercancel', endStick);
+    z.addEventListener('lostpointercapture', endStick);
 
     const d = this.driftEl;
     d.addEventListener('pointerdown', (e) => {
@@ -155,15 +218,19 @@ export class TouchControls {
 
   mount(parent) {
     parent.appendChild(this.root);
+    this._rest();
   }
 
   reset() {
-    this.input.setTouch({ steer: 0, drift: false });
+    this.input.setTouch({ steer: 0, throttle: 0, brake: 0, drift: false });
     this.driftPointers.clear();
-    this.steerPointer = null;
+    this.driftEl.classList.remove('on');
+    this.stickPointer = null;
+    this._rest();
   }
 
   dispose() {
+    window.removeEventListener('resize', this._onResize);
     this.reset();
     this.root.remove();
   }
