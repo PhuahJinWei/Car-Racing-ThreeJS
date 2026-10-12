@@ -1255,7 +1255,7 @@ export class CarModel {
     }
     const m = this.bodyMat;
     if (this.isFactory) {
-      drawProjectedLivery(this.liveryCanvas, this.liveryLayout, c, this.opts.number ?? 7);
+      drawProjectedLivery(this.liveryCanvas, this.liveryLayout, c, c.number.value ?? this.opts.number ?? 7);
       this.liveryTex.needsUpdate = true;
       m.map = null;
       m.color.set(0xffffff);
@@ -1263,7 +1263,7 @@ export class CarModel {
       m.map = this.asset.paintMap || null;
       m.color.set(c.paint.color);
     } else {
-      drawLivery(this.liveryCanvas, c.livery.id, c.paint.color, c.accent.color, this.opts.number ?? 77);
+      drawLivery(this.liveryCanvas, c.livery.id, c.paint.color, c.accent.color, c.number.value ?? this.opts.number ?? 77);
       this.liveryTex.needsUpdate = true;
       m.map = this.liveryTex;
       m.color.set(0xffffff);
@@ -1317,6 +1317,23 @@ export class CarModel {
     this.glassMat.envMap = this.opts.envMap;
     this.rimMat.envMap = this.opts.envMap;
     if (this.windowMat) this.windowMat.envMap = this.opts.envMap;
+
+    // window film: the see-through glass hides more of the cabin; mirror films colour the
+    // reflections, on the opaque glass (far away, and on real models) as well
+    const tint = c.tint;
+    this._glassBase ??= { color: this.glassMat.color.clone(), metal: this.glassMat.metalness };
+    if (tint.mirror) {
+      this.glassMat.color.set(tint.color).multiplyScalar(0.35);
+      this.glassMat.metalness = 0.4 + tint.mirror * 0.5;
+    } else {
+      this.glassMat.color.copy(this._glassBase.color);
+      this.glassMat.metalness = this._glassBase.metal;
+    }
+    if (this.windowMat) {
+      this.windowMat.color.set(tint.color);
+      this.windowMat.opacity = tint.shade;
+      this.windowMat.metalness = tint.mirror ?? 0;
+    }
 
     // rims (shape swaps exist for generated wheels only)
     if (this.isFactory) {

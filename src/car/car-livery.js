@@ -50,7 +50,8 @@ function rng(seed) {
 
 /**
  * layout: { min: [x,y,z], max: [x,y,z], panels?, livery?, wheels? } (car space, metres)
- * custom: resolved customization ({ paint, accent, livery }); number: race number
+ * custom: resolved customization ({ paint, accent, livery, number }); number: the number to show
+ * in a door roundel (the Racer livery has one; a door number puts one on any livery)
  */
 export function drawProjectedLivery(canvas, layout, custom, number = 7) {
   const ctx = canvas.getContext('2d');
@@ -124,15 +125,6 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
         ctx.fill();
         poly([[z0 - 1, 0.325], [z1 + 1, 0.325], [z1 + 1, 0.335], [z0 - 1, 0.335]]);
         ctx.fill();
-        // number roundel
-        ctx.beginPath();
-        ctx.ellipse(door[0], door[1], 0.2, 0.2, 0, 0, Math.PI * 2);
-        ctx.fillStyle = '#f2f4f8';
-        ctx.fill();
-        ctx.lineWidth = 0.018;
-        ctx.strokeStyle = accent;
-        ctx.stroke();
-        ctx.fillStyle = accent;
       } else if (kind === 'top') {
         topPoly([[-0.04, z0 - 1], [0.04, z0 - 1], [0.04, z1 + 1], [-0.04, z1 + 1]]);
         ctx.fill();
@@ -166,6 +158,17 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
         ctx.fill();
       }
     });
+  } else if (id === 'lv_panda') {
+    // two-tone: the lower body (bumpers, sills, lower doors) in the accent colour, up to a line a
+    // design can set per view ({ side, front, rear }, or one height)
+    const p = meta.panda ?? shoulder * 0.78;
+    all((kind) => {
+      if (kind === 'top') return;
+      const line = typeof p === 'number' ? p : (p[kind] ?? p.side);
+      const [a, b] = kind === 'side' ? [z0 - 1, z1 + 1] : [-3, 3];
+      poly([[a, y0 - 1], [b, y0 - 1], [b, line], [a, line]]);
+      ctx.fill();
+    });
   } else if (id === 'lv_circuit') {
     const r = rng(number * 7919 + 13);
     const traces = [];
@@ -196,22 +199,38 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
     });
   }
 
-  // race number, drawn upright in canvas space so it reads correctly on both sides
-  if (id === 'lv_race') {
+  // side lettering, drawn upright in canvas space so it reads correctly on both sides (and widened
+  // by the side view's aspect, so it isn't squashed on the car)
+  const letter = (text, z, y, size, color, font) => {
     for (const k of ['L', 'R']) {
       const t = tileRect(k, W, H);
-      const px = k === 'L' ? t.x + ((z1 - door[0]) / len) * t.w : t.x + ((door[0] - z0) / len) * t.w;
-      const py = t.y + ((y1 - door[1]) / hgt) * t.h;
-      const size = (0.26 / hgt) * t.h;
+      const px = k === 'L' ? t.x + ((z1 - z) / len) * t.w : t.x + ((z - z0) / len) * t.w;
+      const py = t.y + ((y1 - y) / hgt) * t.h;
+      const sz = (size / hgt) * t.h;
       ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = '#0b0b10';
-      ctx.font = `900 ${Math.round(size)}px Orbitron, Arial Black, sans-serif`;
+      ctx.setTransform((t.w / len) / (t.h / hgt), 0, 0, 1, px, py);
+      ctx.fillStyle = color;
+      ctx.font = `${font} ${Math.round(sz)}px ${font === '900' ? 'Orbitron, ' : ''}Arial Black, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(number), px, py + size * 0.04);
+      ctx.fillText(text, 0, sz * 0.04);
       ctx.restore();
     }
+  };
+  // number roundel on the doors
+  if (id === 'lv_race' || custom.number?.value != null) {
+    all((kind) => {
+      if (kind !== 'side') return;
+      ctx.beginPath();
+      ctx.ellipse(door[0], door[1], 0.2, 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#f2f4f8';
+      ctx.fill();
+      ctx.lineWidth = 0.018;
+      ctx.strokeStyle = accent;
+      ctx.stroke();
+    });
+    const digits = String(number);
+    letter(digits, door[0], door[1], digits.length > 1 ? 0.2 : 0.26, '#0b0b10', '900');
   }
 
   // ---------------------------------------------------------------------------- panel gaps

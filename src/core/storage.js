@@ -38,6 +38,8 @@ function defaultSave() {
       paint: ['p_crimson', 'p_midnight', 'p_white'],
       finish: ['gloss'],
       livery: ['lv_none'],
+      number: ['n_none', 'n_7'],
+      tint: ['t_clear'],
       rims: ['r_split'],
       rimColor: ['rc_silver', 'rc_gunmetal'],
       underglow: ['ug_none', 'ug_cyan'],

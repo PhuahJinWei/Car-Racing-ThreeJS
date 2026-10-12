@@ -32,6 +32,7 @@ export const LIVERIES = [
   { id: 'lv_bolt', name: 'Side Bolt', price: 900 },
   { id: 'lv_split', name: 'Two-Tone', price: 1000 },
   { id: 'lv_circuit', name: 'Circuitry', price: 1800 },
+  { id: 'lv_panda', name: 'Panda', price: 1200 },
 ];
 
 export const RIMS = [
@@ -48,6 +49,32 @@ export const RIM_COLORS = [
   { id: 'rc_gold', name: 'Gold', color: '#c99a2e', price: 600 },
   { id: 'rc_neoncyan', name: 'Neon Cyan', color: '#00e5ff', glow: true, price: 1500 },
   { id: 'rc_neonpink', name: 'Neon Pink', color: '#ff2bd6', glow: true, price: 1500 },
+];
+
+/**
+ * Window film. `shade`: how much of the cabin it hides (0 clear .. 1 black); mirror films also
+ * colour the reflections.
+ */
+export const TINTS = [
+  { id: 't_clear', name: 'Factory', shade: 0.3, color: '#0b0e13', price: 0 },
+  { id: 't_light', name: 'Light Smoke', shade: 0.5, color: '#08090c', price: 300 },
+  { id: 't_dark', name: 'Dark Smoke', shade: 0.7, color: '#050608', price: 500 },
+  { id: 't_limo', name: 'Limo', shade: 0.9, color: '#020203', price: 800 },
+  { id: 't_blue', name: 'Blue Mirror', shade: 0.75, color: '#2b4a8c', mirror: 0.5, price: 1200 },
+  { id: 't_gold', name: 'Gold Mirror', shade: 0.75, color: '#a8833f', mirror: 0.5, price: 1200 },
+];
+
+/** Door numbers: a roundel on both doors (the Racer livery's own roundel shows it too). */
+export const NUMBERS = [
+  { id: 'n_none', name: 'None', value: null, price: 0 },
+  { id: 'n_7', name: '#7', value: 7, price: 0 },
+  { id: 'n_13', name: '#13', value: 13, price: 400 },
+  { id: 'n_27', name: '#27', value: 27, price: 400 },
+  { id: 'n_33', name: '#33', value: 33, price: 400 },
+  { id: 'n_55', name: '#55', value: 55, price: 400 },
+  { id: 'n_86', name: '#86', value: 86, price: 860 },
+  { id: 'n_99', name: '#99', value: 99, price: 400 },
+  { id: 'n_1', name: '#1', value: 1, price: 2500 },
 ];
 
 export const UNDERGLOWS = [
@@ -75,6 +102,8 @@ export const CATEGORIES = [
   { key: 'finish', name: 'FINISH', items: FINISHES },
   { key: 'livery', name: 'LIVERY', items: LIVERIES },
   { key: 'accent', name: 'ACCENT', items: PAINTS },
+  { key: 'number', name: 'NUMBER', items: NUMBERS },
+  { key: 'tint', name: 'WINDOW TINT', items: TINTS },
   { key: 'rims', name: 'RIMS', items: RIMS },
   { key: 'rimColor', name: 'RIM COLOR', items: RIM_COLORS },
   { key: 'underglow', name: 'UNDERGLOW', items: UNDERGLOWS },
@@ -87,6 +116,8 @@ export const OWNERSHIP_KEY = {
   accent: 'paint',
   finish: 'finish',
   livery: 'livery',
+  number: 'number',
+  tint: 'tint',
   rims: 'rims',
   rimColor: 'rimColor',
   underglow: 'underglow',
@@ -98,6 +129,8 @@ export const DEFAULT_CUSTOM = {
   finish: 'gloss',
   accent: 'p_white',
   livery: 'lv_none',
+  number: 'n_none',
+  tint: 't_clear',
   rims: 'r_split',
   rimColor: 'rc_silver',
   underglow: 'ug_none',
@@ -123,6 +156,8 @@ export function resolveCustom(custom) {
     finish: findItem('finish', c.finish),
     accent: findItem('accent', c.accent),
     livery: findItem('livery', c.livery),
+    number: findItem('number', c.number),
+    tint: findItem('tint', c.tint),
     rims: findItem('rims', c.rims),
     rimColor: findItem('rimColor', c.rimColor),
     underglow: findItem('underglow', c.underglow),
@@ -138,6 +173,7 @@ export function randomCustom(r) {
     finish: pick(['gloss', 'metallic', 'metallic', 'pearl', 'matte']),
     accent: pick(PAINTS).id,
     livery: pick(LIVERIES).id,
+    tint: pick(['t_clear', 't_clear', 't_light', 't_dark', 't_limo']),
     rims: pick(RIMS).id,
     rimColor: pick(RIM_COLORS).id,
     underglow: r() < 0.85 ? 'ug_none' : pick(UNDERGLOWS.slice(1, 7)).id,

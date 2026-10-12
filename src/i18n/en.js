@@ -123,6 +123,8 @@ export default {
   'cat.finish': 'FINISH',
   'cat.livery': 'LIVERY',
   'cat.accent': 'ACCENT',
+  'cat.number': 'NUMBER',
+  'cat.tint': 'WINDOW TINT',
   'cat.rims': 'RIMS',
   'cat.rimColor': 'RIM COLOR',
   'cat.underglow': 'UNDERGLOW',

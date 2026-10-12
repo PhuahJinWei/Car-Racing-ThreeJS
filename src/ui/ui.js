@@ -131,6 +131,7 @@ const LIVERY_ART = {
   lv_bolt: (a) => `<path d="M13.6 3.5L7.6 13h4.2l-1.4 7.5 6-9.6h-4.2z" fill="${a}"/>`,
   lv_split: (a) => `<path d="M2 14L22 7V22H2z" fill="${a}"/>`,
   lv_circuit: (a) => `<path d="M3 8h6l3 3h4l2-2h3M3 15h4l2 2h5l3-3h4M12 11v6" stroke="${a}" stroke-width="1.3" fill="none"/><circle cx="18" cy="9" r="1.1" fill="${a}"/><circle cx="9" cy="17" r="1.1" fill="${a}"/>`,
+  lv_panda: (a) => `<rect x="0" y="13.5" width="24" height="10.5" fill="${a}"/>`,
 };
 
 function swatchFor(cat, item, custom) {
@@ -159,6 +160,16 @@ function swatchFor(cat, item, custom) {
   if (cat === 'livery') {
     const art = (LIVERY_ART[item.id] || LIVERY_ART.lv_none)(custom.accent.color);
     return `<span class="sw art" style="--c:${paint}"><svg viewBox="0 0 24 24" aria-hidden="true">${art}</svg></span>`;
+  }
+  if (cat === 'number') {
+    if (item.value == null) return '<span class="sw none"></span>';
+    const n = String(item.value);
+    return `<span class="sw art" style="--c:#f2f4f8;box-shadow:inset 0 0 0 2px ${custom.accent.color},0 3px 8px rgba(0,0,0,0.5)"><svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="16.2" text-anchor="middle" font-size="${n.length > 1 ? 10.5 : 12.5}" font-weight="700" font-family="Rajdhani, sans-serif" fill="#111">${n}</text></svg></span>`;
+  }
+  if (cat === 'tint') {
+    // a lit cabin seen through the film (mirror films: their coloured sheen)
+    if (item.mirror) return `<span class="sw" style="background:linear-gradient(135deg, color-mix(in srgb, ${item.color} 70%, #fff) 0%, ${item.color} 38%, color-mix(in srgb, ${item.color} 30%, #000) 100%)"></span>`;
+    return `<span class="sw" style="background:linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 40%, transparent 60%), linear-gradient(rgba(5,6,8,${item.shade}), rgba(5,6,8,${item.shade})), linear-gradient(180deg, #9aa3b3 0%, #4a505b 55%, #2a2e35 100%)"></span>`;
   }
   if (cat === 'rims') {
     const spokes = (RIM_SPOKES[item.style] || RIM_SPOKES.split)();
@@ -760,7 +771,7 @@ export class UI {
 
     const renderItems = () => {
       // imported models keep their own paint scheme and wheels
-      const hidden = (k) => (k === 'livery' || k === 'rims') && hasOwnWheels(car().id);
+      const hidden = (k) => (k === 'livery' || k === 'number' || k === 'rims') && hasOwnWheels(car().id);
       if (hidden(cat)) cat = 'paint';
       for (const b of $$(root, '.dock-tabs button')) {
         b.classList.toggle('on', b.dataset.cat === cat);
