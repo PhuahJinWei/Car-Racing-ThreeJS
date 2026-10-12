@@ -1,6 +1,6 @@
 // Offline cache: network-first for pages, cache-first for (hashed) assets.
-const CACHE = 'midnight-overdrive-v1';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE = 'midnight-overdrive-v2';
+const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
