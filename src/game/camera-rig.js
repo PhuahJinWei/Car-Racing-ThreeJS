@@ -8,6 +8,11 @@ const MODES = {
   bumper: { dist: -1.9, height: 0.82, look: 0.7, ahead: 30, fov: 74, fovSpeed: 24 },
 };
 export const CAMERA_MODES = Object.keys(MODES);
+// the cameras are set for a car this tall and this long (the Volt GT): a taller or longer car gets
+// them raised and pulled back so the road still shows from as close ahead (see fitCar)
+const REF_HEIGHT = 1.16;
+const REF_HALF_LENGTH = 2.28;
+const MAX_RAISE = 0.75;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -43,6 +48,24 @@ export class CameraRig {
     this.hideCar = false;
     this._prevCine = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 60 };
     this.initialized = false;
+    // per chase camera: how much higher (h) and further back (d) it sits for this car
+    this.fit = { chase: { h: 0, d: 0 }, near: { h: 0, d: 0 }, bumper: { h: 0, d: 0 } };
+  }
+
+  /**
+   * Fit the chase cameras to the car: height = its highest point, halfLength = centre to tail (m).
+   * The line of sight over the car's top should reach the road as close ahead as it does over the
+   * Volt, so a tall car (a patrol car's light bar) doesn't hide the corners.
+   */
+  fitCar(height, halfLength) {
+    for (const mode of ['chase', 'near']) {
+      const cfg = MODES[mode];
+      const d = Math.max(0, halfLength - REF_HALF_LENGTH);
+      // where the sight line over the reference car meets the road, ahead of the car's centre
+      const reach = (cfg.dist * REF_HEIGHT) / (cfg.height - REF_HEIGHT);
+      const h = height + ((cfg.dist + d) * height) / reach;
+      this.fit[mode] = { h: clamp(h - cfg.height, 0, MAX_RAISE), d };
+    }
   }
 
   setMode(mode) {
@@ -100,6 +123,7 @@ export class CameraRig {
     this.time += dt;
     const cam = this.camera;
     const cfg = MODES[this.mode];
+    const fit = this.fit[this.mode];
     const top = t.topSpeed || 80;
     const sp = clamp(t.speed / top, 0, 1.5);
     const boost = t.boostLevel || 0;
@@ -139,8 +163,8 @@ export class CameraRig {
 
     // ---- base chase placement
     const P = t.position;
-    let dist = cfg.dist + (this.mode === 'bumper' ? 0 : this.surge - sp * 0.35);
-    let height = cfg.height - (this.mode === 'bumper' ? 0 : sp * 0.18);
+    let dist = cfg.dist + fit.d + (this.mode === 'bumper' ? 0 : this.surge - sp * 0.35);
+    let height = cfg.height + fit.h - (this.mode === 'bumper' ? 0 : sp * 0.18);
     if (!t.grounded && t.airTime > 0.25 && this.mode !== 'bumper') {
       dist += Math.min(2.5, t.airTime * 2.5);
       height += Math.min(1.2, t.airTime);
@@ -200,7 +224,7 @@ export class CameraRig {
           { p: [2.6, 0.45, 6.5], l: [0, 0.5, 0], fov: 38 },
           { p: [5.0, 0.9, 1.0], l: [0, 0.6, 0], fov: 44 },
           { p: [2.0, 2.6, -7.5], l: [0, 0.8, 2], fov: 52 },
-          { p: [0, cfg.height, -cfg.dist], l: [0, cfg.look, cfg.ahead], fov: cfg.fov },
+          { p: [0, cfg.height + fit.h, -cfg.dist - fit.d], l: [0, cfg.look, cfg.ahead], fov: cfg.fov },
         ];
         const seg = Math.min(keys.length - 2, Math.floor(u * (keys.length - 1)));
         const lu = easeInOutCubic(u * (keys.length - 1) - seg);

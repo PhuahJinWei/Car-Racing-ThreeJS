@@ -143,10 +143,16 @@ export class Race {
 
     // ---- racers
     const def = getCarDef(cfg.carId);
-    // a patrol car has a siren: off at the start of every race
+    // a patrol car has a siren, sounding from the start of every race
     this.playerPatrol = !!def.patrol;
-    this.siren = false;
+    this.siren = this.playerPatrol;
     this.player = this._makeRacer(def, cfg.custom, true, 'YOU', { number: 7 });
+    // the chase cameras rise over a tall car, so the road ahead stays in view
+    // (its highest point above the road: the model's parts start at the underbody, wheels come later)
+    const asset = this.player.model.asset;
+    let top = Math.max(...def.cabin.map((c) => c[4]));
+    if (asset?.lods?.lod0) top = Math.max(...asset.lods.lod0.map((p) => (p.geometry.boundingBox || (p.geometry.computeBoundingBox(), p.geometry.boundingBox)).max.y));
+    this.rig.fitCar(top, asset?.dims ? -asset.dims.rearZ : def.dims.length / 2);
     this.racers = [this.player];
     this.ais = [];
     if (cfg.mode !== 'timetrial') {
