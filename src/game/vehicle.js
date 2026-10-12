@@ -11,6 +11,7 @@ const REVERSE_ACC = 6;
 const REVERSE_MAX = 9; // ~32 km/h
 const REVERSE_DELAY = 0.45; // brake held at a standstill this long engages reverse
 const STOPPED = 0.05;
+const DRIFT_MIN = 17; // a drift needs this much speed; slower, the drift button only brakes
 // realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
 const SHIFT_CUT = 0.12; // torque gap of an upshift
@@ -144,9 +145,10 @@ export class Vehicle {
     let throttle = this.frozen ? 0 : inp.throttle;
     let brake = this.frozen ? 0 : inp.brake;
     const speedAbs = Math.hypot(this.vx, this.vz);
-    // Combined drift/brake button: steering -> drift, straight -> brake
+    // Combined drift/brake button: steering at speed -> drift, otherwise -> brake. Too slow to
+    // drift (or backing up) it always brakes, so a car reversing on it can still be steered
     const driftBtn = inp.drift && !this.frozen;
-    if (driftBtn && Math.abs(steer) < 0.25 && !this.drift.active) brake = Math.max(brake, 0.85);
+    if (driftBtn && !this.drift.active && (Math.abs(steer) < 0.25 || this.vf <= DRIFT_MIN)) brake = Math.max(brake, 0.85);
 
     // ---------------- boost bookkeeping
     if (this.boostTime > 0) this.boostTime = Math.max(0, this.boostTime - dt);
@@ -166,7 +168,7 @@ export class Vehicle {
 
     // drift state machine
     if (!D.active) {
-      if (driftBtn && Math.abs(steer) > 0.25 && fwdSpeed > 17 && this.grounded) {
+      if (driftBtn && Math.abs(steer) > 0.25 && fwdSpeed > DRIFT_MIN && this.grounded) {
         D.active = true;
         D.dir = Math.sign(steer);
         D.time = 0;

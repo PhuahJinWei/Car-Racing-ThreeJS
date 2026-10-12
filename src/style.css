@@ -3660,33 +3660,29 @@ kbd.k-pill {
   pointer-events: none;
 }
 
-/* steering: a thumb anywhere in the zone brings the stick up right under it */
+/* steering: a stick that stays put at the bottom left. The zone is its touch area, reaching a
+   little past the stick on every side so a thumb just off its edge still counts */
 .touch .stick-zone {
+  --size: clamp(112px, 32vmin, 160px);
+  --reach: calc(var(--size) * 0.4);
   position: absolute;
   left: 0;
   bottom: 0;
-  width: min(48vw, 520px);
-  height: 78%;
+  padding: var(--reach) var(--reach) calc(var(--sb) + 1.4rem) calc(var(--sl) + 1.75rem);
   pointer-events: auto;
   touch-action: none;
 }
 
 .touch .stick {
-  --size: clamp(104px, 30vmin, 150px);
-  position: absolute;
-  left: 0;
-  top: 0;
+  position: relative;
   width: var(--size);
   height: var(--size);
-  /* the transform puts its centre on the thumb */
-  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(8, 9, 12, 0.12), rgba(8, 9, 12, 0.34));
   border: 1.5px solid rgba(255, 255, 255, 0.16);
   pointer-events: none;
-  opacity: 0.45;
+  opacity: 0.55;
   transition: opacity 0.15s;
-  will-change: transform;
 }
 
 .touch .stick.on {
@@ -3708,7 +3704,9 @@ kbd.k-pill {
 }
 
 .touch .stick.l .knob,
-.touch .stick.r .knob {
+.touch .stick.r .knob,
+.touch .stick.u .knob,
+.touch .stick.d .knob {
   background: rgba(255, 138, 42, 0.26);
   border-color: var(--amber);
 }
@@ -3748,14 +3746,15 @@ kbd.k-pill {
   transform: rotate(90deg);
 }
 
-/* up / down only mean something when they work the pedals (auto-accelerate off) */
-.touch .stick:not(.pedals) .arrow.u,
-.touch .stick:not(.pedals) .arrow.d {
+/* down always brakes; up only means something when the stick works the throttle (auto-accelerate off) */
+.touch .stick:not(.pedals) .arrow.u {
   display: none;
 }
 
 .touch .stick.l .arrow.l,
-.touch .stick.r .arrow.r {
+.touch .stick.r .arrow.r,
+.touch .stick.u .arrow.u,
+.touch .stick.d .arrow.d {
   color: var(--amber);
 }
 
@@ -4605,10 +4604,6 @@ kbd.k-pill {
     grid-template-columns: 1fr;
     align-items: start;
     overflow-y: auto;
-  }
-  .touch .stick-zone {
-    width: 58vw;
-    height: min(36vh, 300px);
   }
   .touch .actions {
     width: 42vw;

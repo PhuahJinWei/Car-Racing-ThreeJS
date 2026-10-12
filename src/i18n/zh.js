@@ -154,11 +154,11 @@ export default {
   'set.keyHints': '按键提示',
   'set.keyHintsHint': '比赛中显示键盘和手柄的操作提示。按 H 键显示或隐藏操作卡。',
   'set.touch': '触屏转向',
-  'set.touchHint': '拇指按下处会出现摇杆，或倾斜设备转向。',
+  'set.touchHint': '左下角的摇杆，按住哪一侧就向哪一侧转。也可以倾斜设备转向。',
   'set.stick': '摇杆',
   'set.tilt': '重力',
   'set.autoAccel': '自动加速',
-  'set.autoAccelHint': '触屏模式下自动保持油门。关闭后，向上推摇杆加速，向下拉刹车。',
+  'set.autoAccelHint': '触屏模式下自动保持油门。关闭后，向上推摇杆加速。无论开关，向下拉摇杆都是刹车。',
   'set.tiltSens': '重力灵敏度',
   'set.haptics': '振动反馈',
   'set.hapticsHint': '碰撞和加速时振动。',
@@ -300,7 +300,7 @@ export default {
   'intro.kb3': '<b>C</b> 切换视角 · <b>R</b> 重置车辆 · <b>ESC</b> 暂停',
   'intro.touch1': '转向时按住<b>漂移</b>，松开获得涡轮加速',
   'intro.touch2': '点击<b>氮气</b>加速。漂移、擦身而过和大跳跃可补充氮气',
-  'intro.touch3': '不转向时按<b>漂移</b>即为刹车',
+  'intro.touch3': '向<b>下</b>拉摇杆刹车，持续按住即可倒车',
 
   // ---------------------------------------------------------------- catalogues (by id)
   'car.volt.class': 'GT跑车',

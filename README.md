@@ -33,7 +33,7 @@ A hyper-fast night-time street-racing game that runs in any modern browser, buil
   - HUD: segmented rev gauge with a shift light, live standings, lap splits against your best lap, and a minimap with a heading arrow.
   - Menus work with touch, mouse, keyboard or gamepad.
 - **Mobile support:**
-  - touch steering pad or tilt steering
+  - a touch steering stick (touch either side to turn, pull down to brake and reverse) or tilt steering
   - auto-accelerate
   - haptics on Android
   - automatic quality and dynamic resolution
@@ -71,9 +71,9 @@ npm run preview
 
 | Action | Keyboard | Touch | Gamepad |
 | --- | --- | --- | --- |
-| Steer | A/D or arrow keys | left pad (slide for analog), or tilt | left stick |
+| Steer | A/D or arrow keys | stick at the bottom left (touch the side you want to turn), or tilt | left stick |
 | Throttle | W or up arrow | automatic | RT |
-| Brake / reverse | S or down arrow | DRIFT button without steering | LT |
+| Brake / reverse | S or down arrow | pull the stick down (hold it to reverse), or DRIFT without steering | LT |
 | Drift | Space while steering | hold DRIFT while steering | X or B |
 | Nitro | Shift, N or E | NITRO button | A |
 | Camera | C | camera button | Y |
