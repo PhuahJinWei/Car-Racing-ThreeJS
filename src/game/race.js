@@ -654,7 +654,7 @@ export class Race {
           v.addNitro(razor ? 0.5 : 0.3);
           // a camera kick reads as a burst of speed, so only the closest passes get one
           if (razor) this.rig.kick(9);
-          this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d) });
+          this.app.audio?.play('whoosh', { side: Math.sign(a.d - v.d), razor });
           this.app.input.vibrate(18);
           if (razor && v.speed > 45 && (this._lastSlowmo ?? -99) < this.clock - 5) {
             this._lastSlowmo = this.clock;
@@ -758,7 +758,7 @@ export class Race {
           const f = v.frame;
           const hl = Math.hypot(f.rx, f.rz) || 1;
           this.effects.burst(e.x + (f.rx / hl) * side * 1.0, e.y, e.z + (f.rz / hl) * side * 1.0, v.velocity, n, [6, 3.2, 1.2], 9, 0.6);
-          this.app.audio?.play('crash', { strength: s });
+          this.app.audio?.play('crash', { strength: s, side });
           this.app.input.vibrate(Math.min(100, 25 + s * 4));
           if (s > 10) this.stunts.breakCombo();
           this._damage(P, (f.rx / hl) * side, (f.rz / hl) * side, s);
@@ -820,7 +820,9 @@ export class Race {
             if (r.isPlayer && idx < this.laps) {
               const isBest = lt <= r.bestLap;
               this.emit('lap', { lap: idx + 1, laps: this.laps, time: lt, best: isBest, final: idx + 1 === this.laps });
-              this.app.audio?.play('lap');
+              this.app.audio?.play('lap', { final: idx + 1 === this.laps });
+              // the music lifts for the last lap
+              if (idx + 1 === this.laps) this.app.audio?.setMusicIntensity(1.3);
             }
           }
         }

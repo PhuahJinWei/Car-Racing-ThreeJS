@@ -196,6 +196,7 @@ export class App {
     this.state = 'race';
     this.input.clearEdges();
     this.audio.startMusic('race');
+    this.audio.setMusicIntensity(1);
     this.audio.startEngine();
     this.audio.setPaused(false);
     race.resize(this.renderer.aspect);

@@ -205,7 +205,8 @@ export class HUD {
     const d = el(`<div class="${cls}">${p.label}${pts}${mult}</div>`);
     box.appendChild(d);
     setTimeout(() => d.remove(), 1600);
-    if (p.points) this.app.audio?.play('popup', { combo: p.combo });
+    if (p.points) this.app.audio?.play('popup', { combo: p.combo, big: p.big });
+    else if (p.kind === 'break') this.app.audio?.play('combo-lost');
   }
 
   _buildMap() {
