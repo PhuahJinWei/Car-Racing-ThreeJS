@@ -54,6 +54,17 @@
         "file": "marshal.m.glb",
         "v": "7cc85c6467"
       }
+    },
+    {
+      "id": "brawler",
+      "file": "brawler.glb",
+      "gz": true,
+      "factory": true,
+      "v": "aae231afd4",
+      "light": {
+        "file": "brawler.m.glb",
+        "v": "3f354fc9c4"
+      }
     }
   ]
 }

@@ -323,6 +323,8 @@ export default {
   'car.touge.blurb': '80年代的轻量掀背车，配有隐藏式大灯。马力不大，生来就为在山路上横着下山。',
   'car.marshal.class': '追缉轿车',
   'car.marshal.blurb': '配备防撞推杆和警灯的全尺寸追缉轿车。车身沉重，但后劲十足。',
+  'car.brawler.class': '肌肉车',
+  'car.brawler.blurb': '引擎盖上伸出机械增压器的70年代溜背车。直线上凶猛无比，弯道里难以驯服。',
   'track.lumen.tagline': '沉睡城市上空的高架快速路与长隧道。',
   'track.district.tagline': '午夜湿滑的城市街区。急弯密布，还有一处超大飞跃。',
   'track.circuit.tagline': '灯火通明的大奖赛赛道。薄雾、雨水与座无虚席的看台。',
