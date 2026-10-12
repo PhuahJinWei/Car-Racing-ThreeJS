@@ -5,6 +5,14 @@ import { t } from '../core/i18n.js';
 
 const TIER_CLASS = ['', 'turbo1', 'turbo2', 'turbo3'];
 const TIER_COLOR = ['#ffffff', '#a8d8ff', '#ffb466', '#ff7a6b'];
+// rev counter numbers (x1000 rpm) around the inside of the ring, which sweeps 270 degrees from
+// the bottom left; 7 and 8 sit in the red
+const REV_TICKS = Array.from({ length: 9 }, (_, k) => {
+  const a = ((-135 + k * 33.75) * Math.PI) / 180;
+  const x = (50 + 37.6 * Math.sin(a)).toFixed(2);
+  const y = (50 - 37.6 * Math.cos(a)).toFixed(2);
+  return `<span class="${k >= 7 ? 'red' : ''}" style="left:${x}%;top:${y}%">${k}</span>`;
+}).join('');
 
 /** In-race heads-up display. Reads race.hud every frame; reacts to race events. */
 export class HUD {
@@ -37,6 +45,7 @@ export class HUD {
           <div class="g-red"></div>
           <div class="g-track"></div>
           <div class="g-fill"></div>
+          <div class="g-ticks">${REV_TICKS}</div>
           <div class="g-center"><div class="num">0</div><div class="unit">KM/H</div></div>
           <div class="g-gear">1</div>
           <div class="nitro-bars"><i><b></b></i><i><b></b></i><i><b></b></i></div>

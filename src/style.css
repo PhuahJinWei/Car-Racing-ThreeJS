@@ -3107,6 +3107,15 @@ kbd.k-pill {
   transform: translateX(-50%);
 }
 
+/* smoked backing so the number and the ring read over a bright road (no backdrop blur in the HUD) */
+.gauge::before {
+  content: '';
+  position: absolute;
+  inset: -0.55rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(10, 12, 16, 0.66), rgba(10, 12, 16, 0.58) 82%, rgba(10, 12, 16, 0) 100%);
+}
+
 .g-track,
 .g-fill,
 .g-red {
@@ -3172,15 +3181,31 @@ kbd.k-pill {
   line-height: 0.85;
   letter-spacing: calc(-0.01em * var(--track));
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* the ring is a rev counter: numbered ticks say so */
+.g-ticks span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.g-ticks span.red {
+  color: #ff6a5f;
 }
 
 .g-center .unit {
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   padding-left: 0.3em;
   font-weight: 700;
-  font-size: 0.64rem;
+  font-size: 0.78rem;
   letter-spacing: calc(0.3em * var(--track));
-  color: var(--ink-2);
+  color: rgba(243, 245, 248, 0.82);
 }
 
 .g-gear {
@@ -3644,10 +3669,10 @@ kbd.k-pill {
   display: block;
 }
 
+/* just left of the nitro bars, clear of the start of the ring */
 .gauge .nitro-key {
-  right: auto;
-  bottom: 0.15rem;
-  left: calc(50% - 5.2rem);
+  right: calc(50% + 3.45rem);
+  bottom: 0.2rem;
 }
 
 .fps {
