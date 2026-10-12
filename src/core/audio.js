@@ -373,6 +373,16 @@ export class AudioEngine {
         this._noise(0.6, 'bandpass', 4200, 3800, 30, 0.07 * s, { delay: 0.03 });
         break;
       }
+      case 'glass': {
+        // the crack, then shards tinkling down
+        const s = clamp(o.strength ?? 0.6, 0.2, 1);
+        this._noise(0.1, 'highpass', 2600, 2600, 0.8, 0.32 * s);
+        for (let i = 0; i < 7; i++) {
+          const f = 4000 + Math.random() * 5000;
+          this._noise(0.04 + Math.random() * 0.07, 'bandpass', f, f * 0.8, 14, 0.07 * s, { delay: 0.03 + Math.random() * 0.4 });
+        }
+        break;
+      }
       case 'land': {
         const s = clamp((o.strength || 6) / 18, 0.2, 1);
         this._tone('sine', 70, 32, 0.35, 0.55 * s);

@@ -447,6 +447,60 @@ export class Effects {
     }
   }
 
+  /** Glass fragments glinting as they fall. */
+  glints(x, y, z, baseV, n, spread = 3) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = spread * (0.3 + Math.random());
+      const b = 0.9 + Math.random() * 0.8;
+      this.sparks.emit(
+        x + (Math.random() - 0.5) * 0.3,
+        y + (Math.random() - 0.5) * 0.15,
+        z + (Math.random() - 0.5) * 0.3,
+        baseV.x * 0.7 + Math.cos(a) * s,
+        0.5 + Math.random() * 2.5,
+        baseV.z * 0.7 + Math.sin(a) * s,
+        0.45 + Math.random() * 0.6,
+        0.024,
+        0.014,
+        1.3 * b,
+        1.45 * b,
+        1.65 * b,
+        1,
+        0.012,
+        1.2,
+        9,
+      );
+    }
+  }
+
+  /** Bits of plastic and carbon knocked off in a hard hit. */
+  debris(x, y, z, baseV, n, spread = 4) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = spread * (0.3 + Math.random());
+      const size = 0.04 + Math.random() * 0.05;
+      this.smoke.emit(
+        x + (Math.random() - 0.5) * 0.3,
+        y + (Math.random() - 0.5) * 0.2,
+        z + (Math.random() - 0.5) * 0.3,
+        baseV.x * 0.75 + Math.cos(a) * s,
+        1.5 + Math.random() * 3,
+        baseV.z * 0.75 + Math.sin(a) * s,
+        0.6 + Math.random() * 0.5,
+        size,
+        size,
+        0.035,
+        0.035,
+        0.04,
+        0.95,
+        0,
+        0.6,
+        14,
+      );
+    }
+  }
+
   puff(x, y, z, vx, vy, vz, color, alpha = 0.35, size0 = 0.8, size1 = 3.4, life = 1.2) {
     this.smoke.emit(x, y, z, vx, vy, vz, life * (0.8 + Math.random() * 0.4), size0, size1, color[0], color[1], color[2], alpha, 0, 1.8, -0.6);
   }

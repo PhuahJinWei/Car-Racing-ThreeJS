@@ -20,6 +20,9 @@ const TIER_LABELS = ['', 'MINI TURBO', 'SUPER TURBO', 'ULTRA TURBO'];
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _dv = new THREE.Vector3();
+const _dv2 = new THREE.Vector3();
+const _dq = new THREE.Quaternion();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
 
@@ -175,7 +178,15 @@ export class Race {
 
   _makeRacer(def, custom, isPlayer, name, opts) {
     const q = this.app.renderer.preset;
-    const model = new CarModel(def, custom, { envMap: this.world.envMap, hq: isPlayer ? q.carHQ : false, number: opts.number, liveryRes: isPlayer ? Math.min(1024, q.liveryRes ?? 1024) : 512, asset: getCarAsset(def.id) });
+    const model = new CarModel(def, custom, {
+      envMap: this.world.envMap,
+      hq: isPlayer ? q.carHQ : false,
+      number: opts.number,
+      liveryRes: isPlayer ? Math.min(1024, q.liveryRes ?? 1024) : 512,
+      asset: getCarAsset(def.id),
+      damage: true,
+      damageRes: isPlayer ? 512 : 256,
+    });
     this.scene.add(model.group);
     const r = {
       def,
@@ -497,10 +508,15 @@ export class Race {
           strength = Math.max(0, -rel);
         }
       }
+      // crash damage on both cars: contact normal from the player toward the rival, where they meet
+      const sideHit = penD < penS * 0.75;
+      const cs = sideHit ? Math.sign(dd) || 1 : ds > 0 ? 1 : -1;
+      const hx = (sideHit ? rhx : f.tx) * cs;
+      const hz = (sideHit ? rhz : f.tz) * cs;
+      const px = (v.x + a.position.x) / 2;
+      const pz = (v.z + a.position.z) / 2;
       if (strength > 2.5 && this._hitCooldown <= 0) {
         this._hitCooldown = 0.25;
-        const px = (v.x + a.position.x) / 2;
-        const pz = (v.z + a.position.z) / 2;
         const py = (v.y + a.y) / 2 + 0.55;
         this.effects.burst(px, py, pz, v.velocity, Math.min(40, 8 + strength * 2), [6, 3.5, 1.4], 7, 0.55);
         this.rig.addTrauma(Math.min(0.6, 0.12 + strength * 0.03));
@@ -508,25 +524,94 @@ export class Race {
         this.app.audio?.play('hit', { strength });
         this.app.input.vibrate(Math.min(80, 20 + strength * 4));
         if (strength > 9) this.stunts.breakCombo();
+        this._damage(P, hx, hz, strength, px, pz);
+        this._damage(r, -hx, -hz, strength, px, pz);
+      } else if (sideHit && Math.abs(v.vf - a.v) > 1.5) {
+        // rubbing door to door scuffs the paint
+        const rub = dt * clamp(Math.abs(v.vf - a.v) / 10, 0.2, 1.2);
+        this._scrape(P, hx, hz, rub, px, pz);
+        this._scrape(r, -hx, -hz, rub, px, pz);
       }
     }
     // AI vs AI separation
     for (let i = 0; i < this.ais.length; i++) {
       for (let j = i + 1; j < this.ais.length; j++) {
-        const a = this.ais[i].ai;
-        const b = this.ais[j].ai;
+        const ra = this.ais[i];
+        const rb = this.ais[j];
+        const a = ra.ai;
+        const b = rb.ai;
         const ds = tr.deltaS(b.s, a.s);
         const dd = b.d - a.d;
         if (Math.abs(ds) < LEN && Math.abs(dd) < WID) {
+          // closing speed, nose to tail or side by side, for the crash damage
+          const hit = Math.abs(ds) > Math.abs(dd) * 1.6 ? Math.abs(a.v - b.v) : Math.abs(a.vd - b.vd) + 1;
           const pen = WID - Math.abs(dd);
           const sgn = Math.sign(dd) || 1;
           a.d -= sgn * pen * 0.5;
           b.d += sgn * pen * 0.5;
           if (ds > 0 && a.v > b.v) a.v = lerp(a.v, b.v, 0.5);
           else if (ds < 0 && b.v > a.v) b.v = lerp(b.v, a.v, 0.5);
+          if (hit > 4 && this.clock - (ra.hitT ?? -9) > 0.4 && this.clock - (rb.hitT ?? -9) > 0.4) {
+            ra.hitT = rb.hitT = this.clock;
+            // contact normal from a toward b: along a's nose, or out of its side (right = (-fwd.z, fwd.x))
+            const nose = Math.abs(ds) > Math.abs(dd) * 1.6;
+            const cs = nose ? (ds > 0 ? 1 : -1) : sgn;
+            const hx = (nose ? a.fwd.x : -a.fwd.z) * cs;
+            const hz = (nose ? a.fwd.z : a.fwd.x) * cs;
+            const px = (a.position.x + b.position.x) / 2;
+            const pz = (a.position.z + b.position.z) / 2;
+            this._damage(ra, hx, hz, hit, px, pz);
+            this._damage(rb, -hx, -hz, hit, px, pz);
+          }
         }
       }
     }
+  }
+
+  /**
+   * Crash damage to racer r at `strength` m/s. (nx, nz): world direction from the car toward the
+   * hit; (mx, mz): where two cars meet (walls leave it out: whatever sticks out furthest hits).
+   */
+  _damage(r, nx, nz, strength, mx, mz) {
+    const m = r.model;
+    const dmg = m.damage;
+    if (!dmg) return;
+    const src = r.isPlayer ? r.vehicle : r.ai;
+    _dq.copy(src.quat).invert();
+    _dv.set(nx, 0, nz).applyQuaternion(_dq);
+    let events;
+    if (mx === undefined) events = dmg.hitToward(_dv.x, _dv.z, strength);
+    else {
+      _dv2.set(mx - src.position.x, 0, mz - src.position.z).applyQuaternion(_dq);
+      events = dmg.hitAt(_dv2, _dv.x, _dv.z, strength);
+    }
+    if (!events.length) return;
+    const d2 = m.group.position.distanceToSquared(this.camera.position);
+    if (d2 > 140 * 140) return;
+    const vel = r.isPlayer ? r.vehicle.velocity : r.ai.velocity;
+    m.group.updateMatrixWorld();
+    let glass = 0;
+    for (const e of events) {
+      _dv.copy(e.p).applyMatrix4(m.body.matrixWorld);
+      if (e.kind === 'debris') this.effects.debris(_dv.x, _dv.y, _dv.z, vel, e.n);
+      else {
+        this.effects.glints(_dv.x, _dv.y, _dv.z, vel, e.n);
+        if (e.kind === 'lamp') this.effects.debris(_dv.x, _dv.y, _dv.z, vel, 3);
+        glass = Math.max(glass, e.kind === 'glass' ? 1 : 0.6);
+      }
+    }
+    if (glass && d2 < 40 * 40) this.app.audio?.play('glass', { strength: glass * (r.isPlayer ? 1 : 0.6) });
+  }
+
+  /** Paint scraped toward world direction (nx, nz), around (mx, mz) if given; amount ~ seconds of hard contact. */
+  _scrape(r, nx, nz, amount, mx, mz) {
+    const dmg = r.model.damage;
+    if (!dmg) return;
+    const src = r.isPlayer ? r.vehicle : r.ai;
+    _dq.copy(src.quat).invert();
+    _dv.set(nx, 0, nz).applyQuaternion(_dq);
+    if (mx !== undefined) _dv2.set(mx - src.position.x, 0, mz - src.position.z).applyQuaternion(_dq);
+    dmg.scrapeToward(_dv.x, _dv.z, amount, mx === undefined ? null : _dv2);
   }
 
   _nm(r) {
@@ -663,6 +748,7 @@ export class Race {
           this.app.audio?.play('crash', { strength: s });
           this.app.input.vibrate(Math.min(100, 25 + s * 4));
           if (s > 10) this.stunts.breakCombo();
+          this._damage(P, (f.rx / hl) * side, (f.rz / hl) * side, s);
           break;
         }
         case 'land': {
@@ -810,13 +896,32 @@ export class Race {
           _v.copy(m.tailLightPos[k]).applyMatrix4(m.body.matrixWorld);
           fx.trails.push(tr, _v.x, _v.y, _v.z, time);
         } else tr.pts.length = 0;
-        tr.intensity = clamp((speed - 22) / 45, 0, 1) * (isP ? 1.0 : 0.8) + boost * 1.2;
+        tr.intensity = (clamp((speed - 22) / 45, 0, 1) * (isP ? 1.0 : 0.8) + boost * 1.2) * (m.damage ? m.damage.tailOn(k) : 1);
         tr.color.copy(m.trailColor).multiplyScalar(2.0);
         tr.width = (isP ? 0.055 : 0.045) * (1 + boost * 0.9);
       }
       if (!near) continue;
       const drifting = isP ? r.vehicle.drift.active && r.vehicle.grounded : Math.abs(r.ai.driftVis) > 0.18;
       const vel = isP ? r.vehicle.velocity : r.ai.velocity;
+      // a battered nose steams (not into the bumper camera)
+      const dmg = m.damage;
+      if (dmg && dmg.smoke > 0 && !(isP && this.rig.hideCar) && Math.random() < 0.3 + dmg.smoke * 0.6) {
+        const s = dmg.smoke;
+        _v.copy(dmg.smokePoint).applyMatrix4(m.body.matrixWorld);
+        fx.puff(
+          _v.x + (Math.random() - 0.5) * 0.4,
+          _v.y,
+          _v.z + (Math.random() - 0.5) * 0.4,
+          vel.x * 0.55 + (Math.random() - 0.5),
+          0.8 + Math.random() * 0.8,
+          vel.z * 0.55 + (Math.random() - 0.5),
+          [0.2, 0.2, 0.22],
+          0.1 + 0.2 * s,
+          0.3,
+          1.4 + s * 1.4,
+          1 + s * 0.6,
+        );
+      }
       // drift smoke from rear wheels (tinted neon by the underglow)
       if (drifting && speed > 12) {
         const ug = m.underglow.visible ? m.underglowMat.uniforms.uColor.value : _c.setRGB(0.6, 0.6, 0.7);
@@ -872,6 +977,7 @@ export class Race {
         const f = v.frame;
         const hl = Math.hypot(f.rx, f.rz) || 1;
         const side = v.wallSide || 1;
+        this._scrape(r, (f.rx / hl) * side, (f.rz / hl) * side, dt * v.wallContact * clamp(v.speed / 30, 0.2, 1.5));
         const n = Math.ceil(v.wallContact * 4);
         for (let i = 0; i < n; i++) {
           fx.spark(
@@ -1046,7 +1152,7 @@ export class Race {
       G.uHeadFwd.value[k].copy(src.fwd);
       G.uHeadUp.value[k].copy(src.up);
       const fade = r.isPlayer ? 1 : smoothstep(HEAD_FADE_FAR, HEAD_FADE_FAR * 0.65, Math.sqrt(r.camD2));
-      prm.set((r.isPlayer ? HEAD_POWER : HEAD_POWER_RIVAL) * fade, HEAD_RANGE, lamp.x, 0);
+      prm.set((r.isPlayer ? HEAD_POWER : HEAD_POWER_RIVAL) * fade, HEAD_RANGE, lamp.x, r.model.damage ? r.model.damage.headCode() : 0);
     }
   }
 

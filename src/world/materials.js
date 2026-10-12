@@ -13,7 +13,8 @@ export const globalUniforms = {
   uAmbient: { value: new THREE.Color(0x202040) },
   uSkyGlow: { value: new THREE.Color(0xff3fb4) },
   // headlights: lamp-pair centre, forward and up of each car, (power, range m, half spacing of
-  // the two lamps, -) - power 0 switches a slot off. Set every frame by the race.
+  // the two lamps, crash damage: left lamp 0-15 + 16 x right lamp 0-15) - power 0 switches a
+  // slot off. Set every frame by the race.
   uHeadPos: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3()) },
   uHeadFwd: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3(0, 0, 1)) },
   uHeadUp: { value: Array.from({ length: MAX_HEADLIGHTS }, () => new THREE.Vector3(0, 1, 0)) },
@@ -108,6 +109,13 @@ vec3 headlights(vec3 P, vec3 N, float road) {
     fall *= 1.0 - smoothstep(hp.y * 0.5, hp.y, dist);
     float ndl = max(dot(N, -d / dist), 0.0);
     float face = road > 0.5 ? 0.35 + 0.65 * sqrt(ndl) : ndl;
+    if (hp.w > 0.5) {
+      // a broken lamp: half the light, and close to the car its own side stays darker
+      float kl = 1.0 - mod(hp.w, 16.0) / 15.0;
+      float kr = 1.0 - floor(hp.w / 16.0) / 15.0;
+      float lat = dot(d, cross(uHeadFwd[i], uHeadUp[i]));
+      beam *= mix(0.5 * (kl + kr), mix(kl, kr, smoothstep(-1.2, 1.2, lat)), 0.6 * exp(-ahead * 0.04));
+    }
     sum += hp.x * beam * fall * face;
   }
   return sum * uHeadColor;

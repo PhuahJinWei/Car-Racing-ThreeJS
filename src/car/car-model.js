@@ -5,6 +5,7 @@ import { additive, globalUniforms } from '../world/materials.js';
 import { tyreGeometry, rimGeometry, discGeometry, caliperGeometry, isSharedWheelGeometry } from './wheels.js';
 import { AO_GLSL, withAO, makeCarbonMaterial, makeGrilleMaterial } from './car-materials.js';
 import { PROJ_TILES, drawProjectedLivery } from './car-livery.js';
+import { CarDamage, patchDamage } from './car-damage.js';
 
 // ------------------------------------------------------------------------------------------
 // Geometry helpers
@@ -1092,6 +1093,19 @@ export class CarModel {
     this.interiorMat = new THREE.MeshStandardMaterial({ color: 0x2c2c31, metalness: 0.05, roughness: 0.66 });
     this.windowMat = makeWindowMaterial(hq, this.streak);
     for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) m.envMap = env;
+    // crash damage (race cars only): every body material bends with the dents, wheels don't
+    if (this.opts.damage) {
+      this.damage = new CarDamage(asset, { layout: this.liveryLayout, res: this.opts.damageRes ?? 256 });
+      const u = this.damage.u;
+      patchDamage(this.bodyMat, u, 'body');
+      patchDamage(this.glassMat, u, 'glass');
+      patchDamage(this.windowMat, u, 'glass');
+      for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.interiorMat, this.exhaustGlowMat]) patchDamage(m, u, 'plain');
+      patchDamage(this.headMat, u, 'headBasic');
+      patchDamage(this.lensMat, u, 'headBasic');
+      patchDamage(this.tailMat, u, 'tailBasic');
+      patchDamage(this.tailLensMat, u, 'tailLens');
+    }
     const byRole = {
       paint: this.bodyMat,
       glass: this.glassMat,
@@ -1356,6 +1370,7 @@ export class CarModel {
       this.underglowMat.uniforms.uColor.value.setHSL((this.time * 0.25) % 1, 1, 0.5).multiplyScalar(2.2);
     }
     if (this.trailRainbow) this.trailColor.setHSL((this.time * 0.35) % 1, 1, 0.55);
+    if (this.damage) this.damage.update(dt);
   }
 
   /** Moving light streak reflections (phase advances with distance travelled). */
@@ -1422,5 +1437,6 @@ export class CarModel {
     });
     for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
+    if (this.damage) this.damage.dispose();
   }
 }

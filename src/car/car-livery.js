@@ -11,6 +11,33 @@ export const PROJ_TILES = {
   B: [0.5, 0.75, 0.5, 0.25],
 };
 
+const VIEW_KIND = { L: 'side', R: 'side', T: 'top', F: 'front', B: 'rear' };
+
+/** Pixel rectangle of atlas tile k on a W x H canvas. */
+export function tileRect(k, W, H) {
+  const t = PROJ_TILES[k];
+  return { x: t[0] * W, y: t[1] * H, w: t[2] * W, h: t[3] * H };
+}
+
+/**
+ * Point a 2D context at view k of the atlas: afterwards drawing commands use that view's car
+ * coordinates in metres - side (z, y), top (x, z), front / rear (x, y).
+ */
+export function setProjView(ctx, layout, k) {
+  const t = tileRect(k, ctx.canvas.width, ctx.canvas.height);
+  const [x0, y0, z0] = layout.min;
+  const [x1, y1, z1] = layout.max;
+  const len = z1 - z0;
+  const hgt = y1 - y0;
+  const wid = x1 - x0;
+  if (k === 'L') ctx.setTransform(-t.w / len, 0, 0, -t.h / hgt, t.x + (z1 * t.w) / len, t.y + (y1 * t.h) / hgt);
+  else if (k === 'R') ctx.setTransform(t.w / len, 0, 0, -t.h / hgt, t.x - (z0 * t.w) / len, t.y + (y1 * t.h) / hgt);
+  else if (k === 'T') ctx.setTransform(0, t.h / wid, -t.w / len, 0, t.x + (z1 * t.w) / len, t.y - (x0 * t.h) / wid);
+  else if (k === 'F') ctx.setTransform(t.w / wid, 0, 0, -t.h / hgt, t.x - (x0 * t.w) / wid, t.y + (y1 * t.h) / hgt);
+  else ctx.setTransform(-t.w / wid, 0, 0, -t.h / hgt, t.x + (x1 * t.w) / wid, t.y + (y1 * t.h) / hgt);
+  return t;
+}
+
 function rng(seed) {
   let s = seed >>> 0 || 1;
   return () => {
@@ -29,11 +56,10 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
   const H = canvas.height;
-  const [x0, y0, z0] = layout.min;
-  const [x1, y1, z1] = layout.max;
+  const [, y0, z0] = layout.min;
+  const [, y1, z1] = layout.max;
   const len = z1 - z0;
   const hgt = y1 - y0;
-  const wid = x1 - x0;
   const paint = custom.paint.color;
   const accent = custom.accent.color === custom.paint.color ? (custom.paint.color === '#e9edf3' ? '#0b0b10' : '#e9edf3') : custom.accent.color;
   const meta = layout.livery || {};
@@ -51,27 +77,16 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
   ctx.fillStyle = paint;
   ctx.fillRect(0, 0, W, H);
 
-  const tilePx = (k) => {
-    const t = PROJ_TILES[k];
-    return { x: t[0] * W, y: t[1] * H, w: t[2] * W, h: t[3] * H };
-  };
-  // canvas transform so that drawing commands use car coordinates (metres) of each view
-  const views = {
-    L: { px: tilePx('L'), set: (t) => ctx.setTransform(-t.w / len, 0, 0, -t.h / hgt, t.x + (z1 * t.w) / len, t.y + (y1 * t.h) / hgt), kind: 'side' },
-    R: { px: tilePx('R'), set: (t) => ctx.setTransform(t.w / len, 0, 0, -t.h / hgt, t.x - (z0 * t.w) / len, t.y + (y1 * t.h) / hgt), kind: 'side' },
-    T: { px: tilePx('T'), set: (t) => ctx.setTransform(0, t.h / wid, -t.w / len, 0, t.x + (z1 * t.w) / len, t.y - (x0 * t.h) / wid), kind: 'top' },
-    F: { px: tilePx('F'), set: (t) => ctx.setTransform(t.w / wid, 0, 0, -t.h / hgt, t.x - (x0 * t.w) / wid, t.y + (y1 * t.h) / hgt), kind: 'front' },
-    B: { px: tilePx('B'), set: (t) => ctx.setTransform(-t.w / wid, 0, 0, -t.h / hgt, t.x + (x1 * t.w) / wid, t.y + (y1 * t.h) / hgt), kind: 'rear' },
-  };
+  // drawing commands inside fn use the car coordinates (metres) of view k
   const inView = (k, fn) => {
-    const v = views[k];
+    const px = tileRect(k, W, H);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.beginPath();
-    ctx.rect(v.px.x, v.px.y, v.px.w, v.px.h);
+    ctx.rect(px.x, px.y, px.w, px.h);
     ctx.clip();
-    v.set(v.px);
-    fn(v.kind, k);
+    setProjView(ctx, layout, k);
+    fn(VIEW_KIND[k], k);
     ctx.restore();
   };
   const poly = (pts, close = true) => {
@@ -184,8 +199,7 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
   // race number, drawn upright in canvas space so it reads correctly on both sides
   if (id === 'lv_race') {
     for (const k of ['L', 'R']) {
-      const v = views[k];
-      const t = v.px;
+      const t = tileRect(k, W, H);
       const px = k === 'L' ? t.x + ((z1 - door[0]) / len) * t.w : t.x + ((door[0] - z0) / len) * t.w;
       const py = t.y + ((y1 - door[1]) / hgt) * t.h;
       const size = (0.26 / hgt) * t.h;
