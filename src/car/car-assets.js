@@ -9,8 +9,11 @@ import { CARS, getCarDef } from './car-defs.js';
 const BASE = 'models/cars/';
 let loader = null;
 let manifestPromise = null;
+// keyed by `${id}|${version}`: 'full', or 'light' (the phone file: a mid-detail near model)
 const assetPromises = new Map();
 const assets = new Map();
+// which version of each model to load and hand out (see setCarDetail)
+let detail = 'full';
 
 const RE = {
   wheel: /wheel|tire|tyre|rim\b|rims|felge|reifen|roue|rueda|llanta|caliper|brake[_ ]?disc|rotor/i,
@@ -82,6 +85,10 @@ export function loadManifest() {
         // `v` (written by the car factory) busts caches whenever a model is rebuilt
         const q = e.v ? `?v=${e.v}` : '';
         def.model = { ...e, url: BASE + e.file + q, gzUrl: e.gz ? BASE + e.file + '.gz' + q : null };
+        if (e.light?.file) {
+          const lq = e.light.v ? `?v=${e.light.v}` : '';
+          def.model.light = { url: BASE + e.light.file + lq, gzUrl: e.gz ? BASE + e.light.file + '.gz' + lq : null };
+        }
       }
       return list;
     });
@@ -98,9 +105,21 @@ export function hasOwnWheels(id) {
   return !!m && !m.factory;
 }
 
-/** Prepared asset for a car id, or null if it has no model / it isn't loaded yet. */
+/**
+ * 'full' or 'light': which version of the car models to load and use from now on. Light (for
+ * phones) has a mid-detail near model and downloads about 40% less; cars already built keep theirs.
+ */
+export function setCarDetail(d) {
+  detail = d === 'light' ? 'light' : 'full';
+}
+
+const versionOf = (def) => (detail === 'light' && def.model?.light ? 'light' : 'full');
+
+/** Prepared asset for a car id (the version in use, else the other one), or null if none is loaded. */
 export function getCarAsset(id) {
-  return assets.get(id) || null;
+  const def = getCarDef(id);
+  const want = versionOf(def);
+  return assets.get(`${id}|${want}`) || assets.get(`${id}|${want === 'light' ? 'full' : 'light'}`) || null;
 }
 
 /** Model bytes: the gzipped twin when the browser can unpack it, else the plain .glb. */
@@ -126,15 +145,17 @@ async function fetchModel(model) {
   return (await get(model.url)).buffer;
 }
 
-/** Load (and prepare) the models for the given car ids. Never throws. */
+/** Load (and prepare) the models for the given car ids, in the version in use. Never throws. */
 export async function ensureCarAssets(ids, renderer) {
   await loadManifest();
   await Promise.all(
     [...new Set(ids)].map((id) => {
       const def = getCarDef(id);
       if (!def.model) return null;
-      if (!assetPromises.has(id)) {
-        const p = Promise.all([getLoader(renderer), fetchModel(def.model)])
+      const version = versionOf(def);
+      const key = `${id}|${version}`;
+      if (!assetPromises.has(key)) {
+        const p = Promise.all([getLoader(renderer), fetchModel(version === 'light' ? def.model.light : def.model)])
           .then(
             ([ldr, buffer]) =>
               new Promise((resolve) => {
@@ -144,7 +165,7 @@ export async function ensureCarAssets(ids, renderer) {
                   (gltf) => {
                     try {
                       const asset = prepareAsset(gltf, def);
-                      assets.set(id, asset);
+                      assets.set(key, asset);
                       resolve(asset);
                     } catch (err) {
                       console.warn(`[cars] could not prepare ${def.model.url}`, err);
@@ -162,9 +183,9 @@ export async function ensureCarAssets(ids, renderer) {
             console.warn(`[cars] could not load ${def.model.url}`, err);
             return null;
           });
-        assetPromises.set(id, p);
+        assetPromises.set(key, p);
       }
-      return assetPromises.get(id);
+      return assetPromises.get(key);
     }),
   );
 }
@@ -180,8 +201,10 @@ export async function previewModelFile(file, carId, renderer, extra = {}) {
   const def = getCarDef(carId);
   def.model = { ...(def.model || {}), ...extra, file: file.name, url: null, preview: true };
   const asset = prepareAsset(gltf, def);
-  assets.set(carId, asset);
-  assetPromises.set(carId, Promise.resolve(asset));
+  for (const version of ['full', 'light']) {
+    assets.set(`${carId}|${version}`, asset);
+    assetPromises.set(`${carId}|${version}`, Promise.resolve(asset));
+  }
   const roles = {};
   for (const inf of asset.infos) for (const r of inf.roles) roles[r] = (roles[r] || 0) + 1;
   return { wheels: !!asset.wheels, roles, dims: asset.dims };

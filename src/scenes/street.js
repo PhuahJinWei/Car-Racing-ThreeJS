@@ -168,7 +168,7 @@ export class MenuStreet {
     const q = this.app.renderer.preset;
     this.carId = carId;
     this.customKey = key;
-    this.car = new CarModel(getCarDef(carId), custom, { envMap: this.world.envMap, hq: q.carHQ, number: 7, liveryRes: Math.min(1024, q.liveryRes ?? 1024), asset: getCarAsset(carId) });
+    this.car = new CarModel(getCarDef(carId), custom, { envMap: this.world.envMap, hq: q.carHQ, wheelHQ: q.carHQ && q.carDetail !== 'light', number: 7, liveryRes: Math.min(1024, q.liveryRes ?? 1024), asset: getCarAsset(carId) });
     this.car.group.position.copy(this.anchor.position);
     this.car.group.quaternion.copy(this.anchor.quaternion);
     // parked: no moving light streaks over the paint

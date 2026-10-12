@@ -186,6 +186,8 @@ export class Race {
     const model = new CarModel(def, custom, {
       envMap: this.world.envMap,
       hq: isPlayer ? q.carHQ : false,
+      // light detail (phones): the mid-detail model already rides on simpler wheels
+      wheelHQ: isPlayer && q.carHQ && q.carDetail !== 'light',
       number: opts.number,
       liveryRes: isPlayer ? Math.min(1024, q.liveryRes ?? 1024) : 512,
       asset: getCarAsset(def.id),

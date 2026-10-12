@@ -19,10 +19,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../../public/models/cars');
 const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter };
 
-// triangle targets: full detail (player car, garage) and a light version for distant opponents
+// triangle targets: full detail (player car, garage), a light version for distant opponents, and
+// a mid version that stands in for full detail on phones (medium / low quality). The mid version
+// ships in its own file (<id>.m.glb, with the far version), so phones download less.
 const LODS = [
   { name: 'lod0', tris: 90000, error: 0.002, normalWeight: 0.15 },
   { name: 'lod1', tris: 16000, error: 0.008, normalWeight: 0.04 },
+  { name: 'lodm', tris: 42000, error: 0.003, normalWeight: 0.1 },
 ];
 
 // how much each part's shading detail matters (hidden wheel wells and pocket walls matter least)
@@ -67,7 +70,7 @@ function merge(list) {
 }
 
 /** Add/refresh the model in cars.json; the content hash busts browser and service-worker caches. */
-function register(id, glb) {
+function register(id, glb, light) {
   const file = resolve(OUT, 'cars.json');
   let data = { cars: [] };
   try {
@@ -82,6 +85,8 @@ function register(id, glb) {
   e.gz = true;
   e.factory = true;
   e.v = createHash('sha1').update(glb).digest('hex').slice(0, 10);
+  // the phone version (see LODS), with its own cache-busting hash
+  e.light = { file: `${id}.m.glb`, v: createHash('sha1').update(light).digest('hex').slice(0, 10) };
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
 }
 
@@ -123,11 +128,12 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
   const groups = [];
   for (const lod of LODS) {
     const t2 = performance.now();
-    const parts = await buildParts(design.sdf, mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, stages: (lod.name === 'lod0' ? STAGES : FAR_STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
+    const far = lod.name === 'lod1';
+    const parts = await buildParts(design.sdf, mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, stages: (far ? FAR_STAGES : STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
     // the far LOD keeps opaque glass, so the cockpit behind it can go
-    if (lod.name !== 'lod0') delete parts[MAT.interior];
+    if (far) delete parts[MAT.interior];
     const list = Object.entries(parts).map(([m, p]) => ({ mat: +m, ...p }));
-    for (const [m, arr] of decalsFor(lod.name !== 'lod0')) list.push({ mat: m, ...merge(arr) });
+    for (const [m, arr] of decalsFor(far)) list.push({ mat: m, ...merge(arr) });
     const suffix = lod.name === 'lod0' ? '' : `_${lod.name}`;
     groups.push({
       name: lod.name,
@@ -141,12 +147,20 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
     console.log(`  ${lod.name}: ${total} tris (${tris}) ${secs(t2)}`);
   }
 
-  const glb = writeGLB(groups, { factory: 1, id, ...design.meta });
-  const file = resolve(OUT, `${id}.glb`);
-  writeFileSync(file, glb);
-  // gzipped twin: the game unpacks it with DecompressionStream (falls back to the plain file)
-  const gz = gzipSync(glb, { level: 9 });
-  writeFileSync(file + '.gz', gz);
-  register(id, glb);
-  console.log(`  wrote ${file} (${(glb.byteLength / 1024).toFixed(0)} KB, ${(gz.byteLength / 1024).toFixed(0)} KB gzipped) in ${secs(t0)}`);
+  // full file: lod0 + lod1; light file: the mid version as its near model (named lod0) + lod1
+  const byName = Object.fromEntries(groups.map((g) => [g.name, g]));
+  const write = (name, list) => {
+    const glb = writeGLB(list, { factory: 1, id, ...design.meta });
+    const file = resolve(OUT, name);
+    writeFileSync(file, glb);
+    // gzipped twin: the game unpacks it with DecompressionStream (falls back to the plain file)
+    const gz = gzipSync(glb, { level: 9 });
+    writeFileSync(file + '.gz', gz);
+    console.log(`  wrote ${file} (${(glb.byteLength / 1024).toFixed(0)} KB, ${(gz.byteLength / 1024).toFixed(0)} KB gzipped)`);
+    return glb;
+  };
+  const full = write(`${id}.glb`, [byName.lod0, byName.lod1]);
+  const light = write(`${id}.m.glb`, [{ ...byName.lodm, name: 'lod0' }, byName.lod1]);
+  register(id, full, light);
+  console.log(`  done in ${secs(t0)}`);
 }

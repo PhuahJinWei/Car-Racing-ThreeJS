@@ -70,7 +70,7 @@ tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, 
 The three cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
 
 ```bash
-npm run build:cars                              # all cars, final quality (~1.5 min)
+npm run build:cars                              # all cars, final quality (~1.5 min each)
 node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview (~10 s)
 ```
 
@@ -82,12 +82,15 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Meshing: sparse surface nets, with the borders between materials straightened.
   - Simplification: meshoptimizer, guided by the surface normals.
     - Hidden parts such as wheel wells and the underbody get coarser first.
-    - Two levels of detail: about 97k and 16k triangles.
+    - Three levels of detail: about 97k (full), 49k (light, for phones) and 16k (far) triangles.
   - Baking: normals and ambient occlusion from the field.
 - **Separate geometry:** thin details are generated on their own (LED strips, projector lenses and glass panes), laid onto the skin by ray marching.
-- **Output:** each build writes `<id>.glb`, a gzipped `<id>.glb.gz` (about 1.2 MB, which the game prefers) and updates `cars.json` with a cache-busting hash.
+- **Output:** each build writes two models, each with a gzipped twin that the game prefers, and updates `cars.json` with cache-busting hashes:
+  - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
+  - `<id>.m.glb`: the light and far versions (about 0.76 MB gzipped), used on medium and low quality, so phones download and draw less.
 - **In game:**
-  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers.
+  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once.
+  - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { resolveCustom } from './customization.js';
 import { additive, globalUniforms } from '../world/materials.js';
-import { tyreGeometry, rimGeometry, discGeometry, caliperGeometry, isSharedWheelGeometry } from './wheels.js';
+import { tyreGeometry, rimGeometry, discGeometry, caliperGeometry, isSharedWheelGeometry, wheelSet } from './wheels.js';
 import { AO_GLSL, withAO, makeCarbonMaterial, makeGrilleMaterial } from './car-materials.js';
 import { PROJ_TILES, drawProjectedLivery } from './car-livery.js';
 import { CarDamage, patchDamage } from './car-damage.js';
@@ -659,6 +659,9 @@ function wheelBlurTexture() {
   return blurTex;
 }
 
+// The light (far) model: parts that read alike at range share one material and one mesh
+const FAR_ROLE = { window: 'glass', carbon: 'trim', grille: 'trim', exhaust: 'trim', head: 'chrome', lens: 'drl' };
+
 // ------------------------------------------------------------------------------------------
 // Car model
 // ------------------------------------------------------------------------------------------
@@ -1035,6 +1038,8 @@ export class CarModel {
   /** Build from a car-factory model: body + lights from the .glb, detailed wheels generated here. */
   _buildFromFactory(asset) {
     const hq = this.opts.hq;
+    // finely tessellated wheels with brake discs and calipers (opts.wheelHQ, default: hq)
+    this.wheelHQ = this.opts.wheelHQ ?? hq;
     const meta = asset.meta;
     const dims = asset.dims;
     const env = this.opts.envMap;
@@ -1122,15 +1127,29 @@ export class CarModel {
       interior: this.interiorMat,
       window: this.windowMat,
     };
-    // far away the glass turns opaque (the light model has no cockpit behind it)
+    // Parts with the same material become one mesh. Far away, parts that read alike at range share
+    // a material as well (the glass turns opaque: the light model has no cockpit behind it), so a
+    // distant car costs 7 draw calls instead of 13. Merged geometry is kept on the asset and
+    // shared by every car built from it.
     const build = (parts, far = false) => {
       const g = new THREE.Group();
+      const byMat = new Map();
       for (const p of parts) {
-        this.sharedGeometries.add(p.geometry);
-        const mat = far && p.role === 'window' ? this.glassMat : byRole[p.role] || this.trimMat;
-        const mesh = new THREE.Mesh(p.geometry, mat);
-        if (p.role === 'window' && !far) mesh.renderOrder = 4;
-        g.add(mesh);
+        const role = (far && FAR_ROLE[p.role]) || (byRole[p.role] ? p.role : 'trim');
+        if (!byMat.has(role)) byMat.set(role, []);
+        byMat.get(role).push(p);
+      }
+      const merged = asset.merged || (asset.merged = new Map());
+      for (const [role, list] of byMat) {
+        const key = `${far ? 'far' : 'near'}|${role}`;
+        if (list.length > 1 && !merged.has(key)) merged.set(key, mergeGeometries(list.map((p) => p.geometry)));
+        const geos = list.length > 1 && merged.get(key) ? [merged.get(key)] : list.map((p) => p.geometry);
+        for (const geo of geos) {
+          this.sharedGeometries.add(geo);
+          const mesh = new THREE.Mesh(geo, byRole[role]);
+          if (role === 'window') mesh.renderOrder = 4;
+          g.add(mesh);
+        }
       }
       return g;
     };
@@ -1145,47 +1164,50 @@ export class CarModel {
     } else if (lod === 'far' && lods.lod1) this.body.add(build(lods.lod1, true));
     else this.body.add(build(lods.lod0));
 
-    // ---- wheels
+    // ---- wheels: each part of all four wheels is one skinned mesh (see wheelSet), so a car draws
+    // each wheel material once. Every wheel has a steering pivot bone with a rolling spin bone.
     this.wheels = [];
     this.blurMat = new THREE.MeshStandardMaterial({ map: wheelBlurTexture(), transparent: true, opacity: 0, metalness: 0.7, roughness: 0.45, depthWrite: false, envMap: env });
-    const blurGeos = new Map();
-    const blurGeo = (w) => {
-      const k = `${w.r}|${w.w}`;
-      if (!blurGeos.has(k)) {
-        const g = new THREE.CircleGeometry(w.r - 0.104, 40);
-        g.rotateY(Math.PI / 2);
-        g.translate(w.w / 2 - 0.006, 0, 0);
-        blurGeos.set(k, g);
-      }
-      return blurGeos.get(k);
-    };
+    const bones = [];
+    this.wheelLayout = [];
     for (const [key, front] of [
       ['front', true],
       ['rear', false],
     ]) {
       const w = meta.wheels[key];
       for (const side of [1, -1]) {
-        const pivot = new THREE.Group();
+        const pivot = new THREE.Bone();
         pivot.position.set(side * w.x, w.y, w.z);
-        const mirror = new THREE.Group();
-        mirror.scale.x = side;
-        pivot.add(mirror);
-        const spin = new THREE.Group();
-        mirror.add(spin);
-        const rim = new THREE.Mesh(rimGeometry('split', w.r, w.w, hq), this.rimMat);
-        spin.add(new THREE.Mesh(tyreGeometry(w.r, w.w, hq), this.tireMat), rim);
-        // motion-blurred spokes fade in over the real ones at speed
-        const blur = new THREE.Mesh(blurGeo(w), this.blurMat);
-        blur.visible = false;
-        mirror.add(blur);
-        if (hq) {
-          spin.add(new THREE.Mesh(discGeometry(w.r, w.w), this.brakeMat));
-          mirror.add(new THREE.Mesh(caliperGeometry(w.r, w.w), this.caliperMat));
-        }
+        const spin = new THREE.Bone();
+        pivot.add(spin);
         this.group.add(pivot);
-        this.wheels.push({ pivot, spin, rim, blur, r: w.r, w: w.w, front, side });
+        bones.push(pivot, spin);
+        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, side });
+        this.wheels.push({ pivot, spin, r: w.r, w: w.w, front, side });
       }
     }
+    this.group.updateMatrixWorld(true);
+    this.wheelSkeleton = new THREE.Skeleton(bones);
+    const set = wheelSet(this.wheelLayout, 'split', this.wheelHQ);
+    // culled as a whole: a sphere round all four wheels at rest (they only roll and steer in place)
+    const bound = set.tyre.boundingSphere.clone();
+    bound.radius += 0.1;
+    const skinned = (geo, mat) => {
+      const m = new THREE.SkinnedMesh(geo, mat);
+      this.group.add(m);
+      m.bind(this.wheelSkeleton);
+      m.boundingSphere = bound;
+      return m;
+    };
+    this.tyreMesh = skinned(set.tyre, this.tireMat);
+    this.rimMesh = skinned(set.rim, this.rimMat);
+    if (this.wheelHQ) {
+      skinned(set.disc, this.brakeMat);
+      skinned(set.caliper, this.caliperMat);
+    }
+    // motion-blurred spokes fade in over the real ones at speed
+    this.blurMesh = skinned(set.blur, this.blurMat);
+    this.blurMesh.visible = false;
     this.wheelR = meta.wheels.rear.r;
 
     // ---- lights, exhaust flames, underglow
@@ -1298,7 +1320,7 @@ export class CarModel {
 
     // rims (shape swaps exist for generated wheels only)
     if (this.isFactory) {
-      for (const w of this.wheels) w.rim.geometry = rimGeometry(c.rims.style, w.r, w.w, hq);
+      this.rimMesh.geometry = wheelSet(this.wheelLayout, c.rims.style, this.wheelHQ).rim;
     } else if (!this.isAsset) {
       const rimGeo = legacyRimGeometry(c.rims.style, this.def.dims.wheelR * 0.74);
       for (const w of this.wheels) {
@@ -1340,6 +1362,7 @@ export class CarModel {
       if (w.front) w.pivot.rotation.y = -(state.steer || 0) * 0.42;
       if (w.blur) w.blur.visible = blurA > 0.01;
     }
+    if (this.blurMesh) this.blurMesh.visible = blurA > 0.01;
     // brake discs glow after hard stops from speed
     if (this.isFactory && this.brakeMat) {
       const sp = Math.abs(state.speed || 0);
@@ -1438,5 +1461,6 @@ export class CarModel {
     for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
+    this.wheelSkeleton?.dispose();
   }
 }

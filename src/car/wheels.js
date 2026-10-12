@@ -323,3 +323,99 @@ export function caliperGeometry(r, w) {
     return finish(g, (x) => 0.75 + 0.25 * smooth(c - 0.04, c + 0.04, x));
   });
 }
+
+// ------------------------------------------------------------------------------- all four wheels
+/** Motion-blur disc over the spokes: a flat circle on the outer face (it carries uvs, no AO). */
+export function blurGeometry(r, w) {
+  return cached(`blur|${r}|${w}`, () => {
+    const g = new THREE.CircleGeometry(r - 0.104, 40);
+    g.rotateY(Math.PI / 2);
+    g.translate(w / 2 - 0.006, 0, 0);
+    return g.toNonIndexed();
+  });
+}
+
+/**
+ * One part of all four wheels baked into a single geometry for a skinned mesh, so a car draws
+ * each wheel material once instead of once per wheel. Every vertex follows one bone of its wheel:
+ * `boneOf(k)` (each wheel k has a steering pivot bone 2k and a rolling spin bone 2k + 1). Left
+ * wheels are baked mirrored, with their triangles turned back to face out, so no bone ever
+ * scales negatively. wheels: [{ x, y, z, r, w, side }] at rest, in car space.
+ */
+function bakeWheels(wheels, partOf, boneOf) {
+  const srcs = wheels.map(partOf);
+  const count = srcs.reduce((s, g) => s + g.attributes.position.count, 0);
+  const uv = !!srcs[0].attributes.uv;
+  const color = !!srcs[0].attributes.color;
+  const pos = new Float32Array(count * 3);
+  const nor = new Float32Array(count * 3);
+  const col = color ? new Float32Array(count * 3) : null;
+  const tex = uv ? new Float32Array(count * 2) : null;
+  const skinIndex = new Uint16Array(count * 4);
+  const skinWeight = new Float32Array(count * 4);
+  let o = 0;
+  wheels.forEach((wh, k) => {
+    const g = srcs[k];
+    const P = g.attributes.position.array;
+    const N = g.attributes.normal.array;
+    const C = color ? g.attributes.color.array : null;
+    const U = uv ? g.attributes.uv.array : null;
+    const n = g.attributes.position.count;
+    const m = wh.side < 0 ? -1 : 1;
+    const bone = boneOf(k);
+    for (let t = 0; t < n; t += 3) {
+      for (let j = 0; j < 3; j++) {
+        const s = t + (m < 0 && j > 0 ? 3 - j : j);
+        const d = o + t + j;
+        pos[d * 3] = P[s * 3] * m + wh.x;
+        pos[d * 3 + 1] = P[s * 3 + 1] + wh.y;
+        pos[d * 3 + 2] = P[s * 3 + 2] + wh.z;
+        nor[d * 3] = N[s * 3] * m;
+        nor[d * 3 + 1] = N[s * 3 + 1];
+        nor[d * 3 + 2] = N[s * 3 + 2];
+        if (col) {
+          col[d * 3] = C[s * 3];
+          col[d * 3 + 1] = C[s * 3 + 1];
+          col[d * 3 + 2] = C[s * 3 + 2];
+        }
+        if (tex) {
+          tex[d * 2] = U[s * 2];
+          tex[d * 2 + 1] = U[s * 2 + 1];
+        }
+        skinIndex[d * 4] = bone;
+        skinWeight[d * 4] = 1;
+      }
+    }
+    o += n;
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  if (tex) geo.setAttribute('uv', new THREE.BufferAttribute(tex, 2));
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * Geometry for all four wheels of a car (see bakeWheels), shared between every car with the same
+ * wheels: { tyre, rim, blur } plus { disc, caliper } in high quality. Tyres, rims and discs roll
+ * with the spin bones; calipers and the blur disc only steer.
+ */
+export function wheelSet(wheels, style, hq) {
+  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w}`).join('|')}|${style}|${hq}`;
+  const spin = (k) => 2 * k + 1;
+  const pivot = (k) => 2 * k;
+  const set = {
+    tyre: cached(`${key}|tyre`, () => bakeWheels(wheels, (w) => tyreGeometry(w.r, w.w, hq), spin)),
+    rim: cached(`${key}|rim`, () => bakeWheels(wheels, (w) => rimGeometry(style, w.r, w.w, hq), spin)),
+    blur: cached(`${key}|blur`, () => bakeWheels(wheels, (w) => blurGeometry(w.r, w.w), pivot)),
+  };
+  if (hq) {
+    set.disc = cached(`${key}|disc`, () => bakeWheels(wheels, (w) => discGeometry(w.r, w.w), spin));
+    set.caliper = cached(`${key}|caliper`, () => bakeWheels(wheels, (w) => caliperGeometry(w.r, w.w), pivot));
+  }
+  return set;
+}
