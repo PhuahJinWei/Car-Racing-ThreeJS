@@ -116,6 +116,8 @@ export default {
   'garage.need': 'NEED {n}',
   'garage.buyEquip': 'BUY & EQUIP',
   'garage.hint': 'Tap a style to try it on',
+  'garage.reset': 'RESET TO DEFAULT',
+  'garage.resetDone': 'Default look restored',
   'garage.unlocked': '{car} UNLOCKED',
   'garage.carSelected': '{car} SELECTED',
   'garage.purchased': '{item} PURCHASED',

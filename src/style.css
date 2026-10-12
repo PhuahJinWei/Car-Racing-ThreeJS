@@ -2129,6 +2129,23 @@ output {
   color: var(--ink-3);
 }
 
+/* back to the car's stock look */
+.buy-box .reset-look {
+  align-self: flex-start;
+  margin-top: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: 0.72rem;
+  padding: 0.5em 0.9em;
+  white-space: nowrap;
+}
+
+.buy-box .reset-look svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
 .buy-box.active {
   animation: fadeUp 0.35s var(--ease);
 }

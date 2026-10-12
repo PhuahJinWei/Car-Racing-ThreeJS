@@ -2,7 +2,7 @@ import { el, $, $$, delegate, fitText, ICONS } from './dom.js';
 import { TRACKS, getTrackDef, BOOST_PADS_ON } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
-import { CATEGORIES, findItem, PAINTS, resolveCustom, itemFits } from '../car/customization.js';
+import { CATEGORIES, findItem, PAINTS, resolveCustom, itemFits, DEFAULT_CUSTOM, DEFAULT_CUSTOM_BY_CAR } from '../car/customization.js';
 import { getDaily, msUntilTomorrow } from '../game/daily.js';
 import { hasOwnWheels } from '../car/car-assets.js';
 import { formatTime, formatNumber, clamp } from '../core/math.js';
@@ -810,10 +810,18 @@ export class UI {
       fitSoon();
     };
 
+    // the car's stock look, and whether it's wearing it
+    const stockLook = () => DEFAULT_CUSTOM_BY_CAR[car().id] || DEFAULT_CUSTOM;
+    const isStock = () => {
+      const now = resolveCustom(equippedCustom());
+      const stock = resolveCustom(stockLook());
+      return Object.keys(stock).every((k) => now[k].id === stock[k].id);
+    };
+
     const renderBuyBar = () => {
       const box = $(root, '.buy-box');
       const info = $(box, '.info');
-      const btn = $(box, 'button');
+      const btn = $(box, '[data-action="buy"]');
       box.classList.toggle('active', !!pending);
       box.style.display = owned() ? '' : 'none';
       if (pending) {
@@ -823,7 +831,7 @@ export class UI {
         btn.disabled = short > 0;
         btn.textContent = short > 0 ? t('garage.need', { n: formatNumber(short) }) : t('garage.buyEquip');
       } else {
-        info.innerHTML = `<span class="hint">${t('garage.hint')}</span>`;
+        info.innerHTML = `<span class="hint">${t('garage.hint')}</span><button class="btn ghost small reset-look" data-action="resetlook" ${isStock() ? 'disabled' : ''}>${ICONS.restart}${t('garage.reset')}</button>`;
         btn.style.display = 'none';
       }
     };
@@ -898,6 +906,20 @@ export class UI {
         previewCustom();
         renderItems();
         renderBuyBar();
+      },
+      // back to the car's stock look (everything bought stays owned; the stock items come with the car)
+      resetlook: () => {
+        if (!owned()) return;
+        const stock = stockLook();
+        for (const [cat, id] of Object.entries(stock)) S.grant(cat, id);
+        S.data.custom[car().id] = { ...stock };
+        S.save();
+        pending = null;
+        previewCustom();
+        renderItems();
+        renderBuyBar();
+        app.audio?.play('ui');
+        this.toast(t('garage.resetDone'));
       },
       buy: () => {
         if (!pending) return;

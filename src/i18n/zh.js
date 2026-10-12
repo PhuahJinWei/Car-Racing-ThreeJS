@@ -111,6 +111,8 @@ export default {
   'garage.need': '还差 {n}',
   'garage.buyEquip': '购买并装备',
   'garage.hint': '点击即可试装',
+  'garage.reset': '恢复默认',
+  'garage.resetDone': '已恢复默认外观',
   'garage.unlocked': '已解锁 {car}',
   'garage.carSelected': '已选择 {car}',
   'garage.purchased': '已购买 {item}',

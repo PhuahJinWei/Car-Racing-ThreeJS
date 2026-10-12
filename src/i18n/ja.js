@@ -111,6 +111,8 @@ export default {
   'garage.need': 'あと {n}',
   'garage.buyEquip': '購入して装着',
   'garage.hint': 'タップして試着',
+  'garage.reset': 'デフォルトに戻す',
+  'garage.resetDone': '標準の外観に戻しました',
   'garage.unlocked': '{car} を入手！',
   'garage.carSelected': '{car} を選択',
   'garage.purchased': '{item} を購入',
