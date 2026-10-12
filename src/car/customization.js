@@ -154,6 +154,8 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   brawler: { ...DEFAULT_CUSTOM, paint: 'p_orange', accent: 'p_black', livery: 'lv_stripes' },
   // a tuner's purple, clean, on silver mesh wheels
   ronin: { ...DEFAULT_CUSTOM, paint: 'p_violet', accent: 'p_black', rims: 'r_mesh' },
+  // rally white with red stripes and a door number, on gold wheels
+  sidewinder: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_crimson', livery: 'lv_race', rims: 'r_turbine', rimColor: 'rc_gold' },
 };
 
 /** Whether an item is on offer for a car (some are made for one car). */

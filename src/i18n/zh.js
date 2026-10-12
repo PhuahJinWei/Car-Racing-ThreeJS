@@ -333,6 +333,8 @@ export default {
   'car.brawler.blurb': '引擎盖上伸出机械增压器的70年代溜背车。直线上凶猛无比，弯道里难以驯服。',
   'car.ronin.class': '涡轮轿跑',
   'car.ronin.blurb': '背着环形尾翼的90年代末双涡轮轿跑。各种路况都很均衡，氮气加速全场最强。',
+  'car.sidewinder.class': '拉力掀背车',
+  'car.sidewinder.blurb': '引擎盖上装着灯组的80年代拉力特别版。四轮驱动，起步干脆、处处抓地，却不爱侧滑。',
   'track.lumen.tagline': '沉睡城市上空的高架快速路与长隧道。',
   'track.district.tagline': '午夜湿滑的城市街区。急弯密布，还有一处超大飞跃。',
   'track.circuit.tagline': '灯火通明的大奖赛赛道。薄雾、雨水与座无虚席的看台。',

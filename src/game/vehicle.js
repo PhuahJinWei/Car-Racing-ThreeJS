@@ -231,9 +231,10 @@ export class Vehicle {
     this.braking = false;
     if (!pedalBrake || Math.abs(vf) > STOPPED) this.stopHold = 0;
     if (throttle > 0.1 && !pedalBrake) this.reversing = false;
-    // flooring it from low speed spins the driven tyres for a moment (more so in the wet)
+    // flooring it from low speed spins the driven tyres for a moment (more so in the wet; hardly at
+    // all when all four wheels are driven)
     const launching = this.grounded && throttle > 0.5 && !pedalBrake && vf > -1 && vf < SPIN_SPEED;
-    const spinT = launching ? Math.pow(1 - Math.max(vf, 0) / SPIN_SPEED, 1.5) * (this.wet ? 1 : 0.75) : 0;
+    const spinT = launching ? Math.pow(1 - Math.max(vf, 0) / SPIN_SPEED, 1.5) * (this.wet ? 1 : 0.75) * (this.def.awd ? 0.25 : 1) : 0;
     this.wheelspin = damp(this.wheelspin, spinT, spinT > this.wheelspin ? 14 : 4, dt);
     this.shiftCut = Math.max(0, this.shiftCut - dt);
     if (throttle < 0.1 || pedalBrake) this.driveDebt = 0;

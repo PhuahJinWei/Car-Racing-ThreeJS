@@ -67,7 +67,7 @@ tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, 
 
 ## The car factory
 
-The seven cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
+The eight cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
 
 ```bash
 npm run build:cars                              # all cars, final quality (~1.5 min each)
@@ -110,7 +110,7 @@ Put `.glb` files in `public/models/cars/` and list them in `public/models/cars/c
 }
 ```
 
-- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
+- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`, `sidewinder`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
 - **Optional fields:**
   - `rotateY` (degrees) if the car faces the wrong way
   - `length` (metres) or `scale` if auto-scaling picks the wrong size

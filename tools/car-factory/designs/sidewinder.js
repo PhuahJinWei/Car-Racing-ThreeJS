@@ -290,11 +290,11 @@ export function buildSidewinder() {
       acc.cut(pocket(sdRoundBox(x, y - 0.29, 0, 0.5, 0.055, 1, 0.025), S.bP, 0.06, po), po.wall ? MAT.trim : MAT.grille, 0.008);
     }
     // black tail band: the big lamps at its ends (red over a clear reverse lamp), the plate between
-    // them
+    // them (cut from the skin: the tail leans back, away from the plan outline)
     if (z < -1.85 && y > 0.58 && y < 0.84 && ax < 0.84) {
       const band = sdRoundBox(x, y - 0.71, 0, 0.8, 0.09, 1, 0.012);
-      acc.cut(pocket(band, S.bP, 0.018, po), !po.wall && ax < 0.165 && Math.abs(y - 0.71) < 0.078 ? MAT.paint : MAT.trim, 0.004);
-      if (ax > 0.44) acc.add(Math.max(band, 0.47 - ax, S.bP + 0.004, -(S.bP + 0.02)), y > 0.665 ? MAT.tail : MAT.reverse, 0.002);
+      acc.cut(pocket(band, sh, 0.018, po), !po.wall && ax < 0.165 && Math.abs(y - 0.71) < 0.078 ? MAT.paint : MAT.trim, 0.004);
+      if (ax > 0.44) acc.add(Math.max(band, 0.47 - ax, sh + 0.004, -(sh + 0.02)), y > 0.665 ? MAT.tail : MAT.reverse, 0.002);
     }
     // wheel arches (open to the side, black liners inside)
     if (ax > 0.55 && y < 0.9) {
@@ -366,7 +366,7 @@ export function buildSidewinder() {
       },
       // `plate`: the licence plate painted into the middle of the tail band (rear view, metres)
       livery: {
-        door: [0.0, 0.58],
+        door: [0.0, 0.64],
         shoulder: 0.8,
         cabin: { x: 0.66, z0: -1.85, z1: 0.95 },
         plate: { x: 0, y: 0.71, w: 0.3, h: 0.15, text: 'GRB 86' },
