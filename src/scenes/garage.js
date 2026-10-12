@@ -138,6 +138,9 @@ export class Garage {
     this.carId = carId;
     this.car = new CarModel(def, custom, { envMap: this.envRT.texture, hq: true, number: 7, beams: false, liveryRes: this.app.renderer.preset?.liveryRes ?? 1024, asset: getCarAsset(carId) });
     this.car.group.position.y = 0.12;
+    // the studio's own softboxes do the reflections here; the moving street-light streaks are a
+    // racing effect and, frozen in place, they turn the glass into a chrome band
+    this.car.setStreaks(0, 0.05);
     this.scene.add(this.car.group);
     this.spin = 1; // little showroom spin when switching cars
   }
