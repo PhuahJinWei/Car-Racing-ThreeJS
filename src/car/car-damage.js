@@ -6,13 +6,17 @@ import { setProjView, tileRect } from './car-livery.js';
 //    reflections bent and creased - so every car keeps sharing one copy of its geometry
 //  - scuffs: paint scraped to primer / bare metal in a mask laid out like the livery atlas
 //  - bumper corners that sag and a bonnet buckled into a ridge
-//  - cracked glass, lamps that flicker after a knock and go dark once broken
+//  - cracked glass; headlights that flicker after a knock and steady again (a car always needs its
+//    lights at night), tail lamps that go dark once broken
 // Everything is driven by uniforms shared by the car's materials, and costs nothing until the
 // car is first hit.
 
 export const MAX_DENTS = 8;
 const MAX_CRACKS = 4;
 const MAX_DEPTH = 0.12; // m
+// headlights never go below this (flickering hard), and are back to full in about 10 s
+const HEAD_MIN = 0.15;
+const HEAD_RECOVER = 0.1; // per second
 
 // ------------------------------------------------------------------------------------------
 // Shaders
@@ -683,7 +687,15 @@ export class CarDamage {
       if (!lp || this.hp[k] <= 0) continue;
       const dist = lp.distanceTo(p);
       if (dist > 0.8) continue;
-      this.hp[k] = Math.max(0, this.hp[k] - (e * 1.6 + 0.08) * (1 - dist / 0.8));
+      const before = this.hp[k];
+      const hp = before - (e * 1.6 + 0.08) * (1 - dist / 0.8);
+      // a headlight's lens can shatter, but the lamp keeps going
+      if (k < 2) {
+        this.hp[k] = Math.max(HEAD_MIN, hp);
+        if (before > HEAD_MIN && hp <= 0) ev.push({ kind: 'lamp', p: lp.clone(), n: 12 });
+        continue;
+      }
+      this.hp[k] = Math.max(0, hp);
       if (this.hp[k] <= 0) ev.push({ kind: 'lamp', p: lp.clone(), n: 12 });
     }
     // big hits crack the glass nearby (a screen flexes even when the hit is at the bumper)
@@ -728,6 +740,7 @@ export class CarDamage {
   /** Lamp flicker + uploading the scuff mask (at most ~8 times a second). */
   update(dt) {
     for (let k = 0; k < 4; k++) {
+      if (k < 2 && this.hp[k] < 1) this.hp[k] = Math.min(1, this.hp[k] + HEAD_RECOVER * dt);
       const hp = this.hp[k];
       let on = 1;
       if (hp <= 0) on = 0;
