@@ -90,7 +90,7 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
   - `<id>.m.glb`: the light and far versions (about 0.76 MB gzipped), used on medium and low quality, so phones download and draw less.
 - **In game:**
-  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once.
+  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once. A design can ask for whitewall tyres by setting `whitewall` (the white band's width, in metres) in its wheel layout, as the JUKEBOX and the DEUCE do.
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.

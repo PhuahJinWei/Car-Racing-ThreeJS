@@ -38,10 +38,10 @@
       "file": "touge.glb",
       "gz": true,
       "factory": true,
-      "v": "14aa632932",
+      "v": "b100d4abe8",
       "light": {
         "file": "touge.m.glb",
-        "v": "71768ea46d"
+        "v": "659cfac1b3"
       }
     },
     {
@@ -126,10 +126,10 @@
       "file": "jukebox.glb",
       "gz": true,
       "factory": true,
-      "v": "119e4b1d2e",
+      "v": "af1a19e510",
       "light": {
         "file": "jukebox.m.glb",
-        "v": "69c66b52f7"
+        "v": "b424d781a0"
       }
     },
     {
@@ -137,10 +137,10 @@
       "file": "cabbie.glb",
       "gz": true,
       "factory": true,
-      "v": "ed4a159b37",
+      "v": "9f65098d3d",
       "light": {
         "file": "cabbie.m.glb",
-        "v": "0cb59af066"
+        "v": "c903a106fd"
       }
     },
     {
@@ -170,10 +170,10 @@
       "file": "deuce.glb",
       "gz": true,
       "factory": true,
-      "v": "578fe905ae",
+      "v": "8c5db74160",
       "light": {
         "file": "deuce.m.glb",
-        "v": "81a3250195"
+        "v": "ade74c5c2e"
       }
     },
     {

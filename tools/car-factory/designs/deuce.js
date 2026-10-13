@@ -9,9 +9,10 @@ import { MAT, Acc, pocket } from '../parts.js';
 import { VIEW } from '../decals.js';
 
 export function buildDeuce() {
+  // (whitewalls filling a like share of the skinny fronts' and fat rears' sidewalls)
   const WH = {
-    front: { z: 1.55, y: 0.31, x: 0.68, r: 0.31, w: 0.16, rim: 0.2 },
-    rear: { z: -1.15, y: 0.37, x: 0.76, r: 0.37, w: 0.32, rim: 0.2 },
+    front: { z: 1.55, y: 0.31, x: 0.68, r: 0.31, w: 0.16, rim: 0.2, whitewall: 0.04 },
+    rear: { z: -1.15, y: 0.37, x: 0.76, r: 0.37, w: 0.32, rim: 0.2, whitewall: 0.07 },
   };
 
   // ------------------------------------------------------------------ main volumes

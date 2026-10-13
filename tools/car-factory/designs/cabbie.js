@@ -1,7 +1,9 @@
-// CABBIE - a 2000s city taxi. A big, soft-cornered four-door saloon: a lit TAXI sign on the roof,
-// large headlamps either side of a chrome-ringed grille, amber corner lamps, black rub strips along
-// the doors and across the bumpers, a red reflector band across the trunk between tall tail lamps,
-// and a single exhaust. Left-hand drive.
+// CABBIE - a 2000s city taxi. A big four-door saloon: a lit TAXI sign on the roof and a radio whip on
+// the trunk, clear headlamp units (chrome reflectors round the bulbs) either side of a chrome grille
+// with three bars and a blank badge, amber corner lamps and side repeaters, fog lamps, wipers, black
+// window frames and belt moulding, black rub strips along the doors and across the bumpers, a fuel
+// flap, tall tail lamps (amber, red and clear) either side of a red reflector band, a chrome garnish
+// over the plate, a third brake lamp behind the rear glass and a single exhaust. Left-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
@@ -178,11 +180,12 @@ export function buildCabbie() {
     const s = sec(y);
     const bP = bodyPlan.sample(ax / s, z) * s;
     const bS = bodySide.sample(z, y);
-    const dBody = smax(bS, bP, 0.08);
+    // (edges crisper than a soft toy's: 5 cm)
+    const dBody = smax(bS, bP, 0.05);
     const tilt = Math.max(0, y - 0.9) * 0.3;
     const cP = cabPlan.sample(ax + tilt, z);
     const cS = cabSide.sample(z, y);
-    const dCab = smax(cS, cP, 0.06);
+    const dCab = smax(cS, cP, 0.05);
     S.bS = bS;
     S.bP = bP;
     S.dBody = dBody;
@@ -195,11 +198,18 @@ export function buildCabbie() {
   const acc = new Acc();
   const po = { wall: false };
   const arch = (ax, y, z, w) => Math.max(Math.hypot(y - w.y, z - w.z) - (w.r + GAP), w.x - w.w / 2 - 0.04 - ax);
+  // two wipers parked along the foot of the windshield: points on the glass (x across, at height
+  // y, `off` out from it)
+  const onWindshield = (x, y, off) => [x, y + 0.787 * off, 1.0 - 1.2745 * (y - 0.87) + 0.617 * off];
+  const WIPERS = [
+    [onWindshield(0.42, 0.892, 0.012), onWindshield(-0.08, 0.908, 0.012)],
+    [onWindshield(-0.12, 0.892, 0.012), onWindshield(-0.6, 0.908, 0.012)],
+  ];
 
   function sdf(x, y, z, out) {
     const ax = Math.abs(x);
     const sh = shell(x, y, z);
-    const { dBody, dCab, cS, cP } = S;
+    const { dBody, dCab, cS, cP, bP } = S;
     acc.set(sh, MAT.paint);
 
     // ---------------------------------------------------------------- add-ons
@@ -227,6 +237,11 @@ export function buildCabbie() {
     if (z < -2.4 && y < 0.34 && x < -0.4 && x > -0.72) {
       acc.add(sdCylZ(x + 0.56, y - 0.24, z + 2.64, 0.032, 0.08), MAT.chrome, 0.004);
       acc.cut(sdCylZ(x + 0.56, y - 0.24, z + 2.64, 0.024, 0.2), MAT.exhaust);
+    }
+    // the radio whip on the right of the trunk, raked back, on a little base
+    if (x < -0.5 && x > -0.6 && y > 0.88 && y < 1.5 && z < -2.18 && z > -2.4) {
+      acc.add(sdCapsule(x, y, z, -0.55, 0.92, -2.25, -0.55, 1.45, -2.33, 0.0065), MAT.trim, 0.003);
+      acc.add(sdRoundBox(x + 0.55, y - 0.93, z + 2.25, 0.02, 0.012, 0.02, 0.008), MAT.trim, 0.006);
     }
 
     // ---------------------------------------------------------------- cuts
@@ -256,26 +271,59 @@ export function buildCabbie() {
       acc.cut(pocket(reg, sh, 0.045, po), MAT.trim, 0.003);
       reg = Math.max(rearGlass.sample(ax, z), top);
       acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
+      // the third brake lamp behind the foot of the rear glass
+      if (z < -1.45 && ax < 0.24) acc.cut(pocket(Math.max(ax - 0.2, Math.abs(z + 1.505) - 0.012, top), sh, 0.01, po), MAT.tail, 0.002);
     }
-    // a chrome-ringed grille between big headlamps, amber lamps in the corners, an intake low down
-    if (z > 2.4 && y > 0.28 && y < 0.74 && ax < 0.96) {
+    // wipers, a hub at each pivot (after the glass, whose cut would take them away)
+    if (z > 0.95 && z < 1.06 && y > 0.86 && y < 0.94 && ax < 0.66) {
+      for (const [a, b] of WIPERS) {
+        acc.add(sdCapsule(x, y, z, a[0], a[1], a[2], b[0], b[1], b[2], 0.0075), MAT.trim, 0.003);
+        acc.add(Math.hypot(x - a[0], y - a[1], z - a[2]) - 0.015, MAT.trim, 0.004);
+      }
+    }
+    // a chrome-ringed grille with three bars and a blank badge plate between clear headlamp units
+    // (chrome reflectors behind the glass, a deeper bowl round each bulb), amber lamps in the corners,
+    // an intake low down with a fog lamp either side
+    if (z > 2.4 && y > 0.26 && y < 0.74 && ax < 0.96) {
       const grille = sdRoundBox(x, y - 0.6, 0, 0.36, 0.07, 1, 0.05);
       acc.cut(pocket(grille, sh, 0.04, po), po.wall ? MAT.chrome : MAT.grille, 0.006);
       acc.add(Math.hypot(grille, sh + 0.006) - 0.011, MAT.chrome, 0.003);
-      acc.add(Math.hypot(y - 0.6, sh + 0.014, Math.max(ax - 0.34, 0)) - 0.009, MAT.chrome, 0.002);
-      acc.cut(pocket(sdRoundBox(ax - 0.64, y - 0.605, 0, 0.21, 0.072, 1, 0.035), sh, 0.03, po), po.wall ? MAT.chrome : MAT.head, 0.004);
+      for (const yb of [0.565, 0.6, 0.635]) acc.add(Math.hypot(y - yb, sh + 0.014, Math.max(ax - 0.34, 0)) - 0.008, MAT.chrome, 0.002);
+      acc.add(edge(sdRoundBox(x, y - 0.6, 0, 0.05, 0.026, 1, 0.012), Math.max(sh - 0.003, -(sh + 0.02))), MAT.chrome, 0.002);
+      acc.cut(pocket(sdRoundBox(ax - 0.64, y - 0.605, 0, 0.21, 0.072, 1, 0.035), sh, 0.03, po), MAT.chrome, 0.004);
+      for (const [u, r] of [
+        [0.55, 0.058],
+        [0.73, 0.062],
+      ]) {
+        acc.cut(pocket(Math.hypot(ax - u, y - 0.605) - r, sh, 0.05, po), MAT.chrome, 0.004);
+      }
       acc.cut(pocket(sdRoundBox(ax - 0.9, y - 0.6, 0, 0.05, 0.05, 1, 0.02), sh, 0.012, po), po.wall ? MAT.trim : MAT.amber, 0.003);
       acc.cut(pocket(sdRoundBox(x, y - 0.32, 0, 0.5, 0.03, 1, 0.02), sh, 0.025, po), po.wall ? MAT.trim : MAT.grille, 0.004);
+      const fog = Math.hypot(ax - 0.7, y - 0.31) - 0.034;
+      acc.cut(pocket(fog, sh, 0.02, po), po.wall ? MAT.chrome : MAT.head, 0.003);
+      acc.add(edge(Math.abs(fog + 0.002) - 0.005, Math.max(sh - 0.004, -(sh + 0.01))), MAT.chrome, 0.002);
     }
-    // tall tail lamps in the rear corners, a red reflector band across the trunk between them
+    // tall tail lamps in the rear corners (an unlit amber indicator at the top, the red lamp level
+    // with the reflector band, a clear reverse lamp at the bottom), a red reflector band across the
+    // trunk between them
     if (z < -2.4 && y > 0.5 && y < 0.9 && ax < 0.96) {
-      acc.cut(pocket(sdRoundBox(ax - 0.82, y - 0.7, 0, 0.12, 0.14, 1, 0.03), sh, 0.02, po), po.wall ? MAT.trim : y > 0.6 ? MAT.tail : MAT.reverse, 0.003);
+      acc.cut(pocket(sdRoundBox(ax - 0.82, y - 0.7, 0, 0.12, 0.14, 1, 0.03), sh, 0.02, po), po.wall ? MAT.trim : y > 0.79 ? MAT.indicator : y > 0.63 ? MAT.tail : MAT.reverse, 0.003);
       acc.cut(pocket(sdRoundBox(x, y - 0.74, 0, 0.66, 0.04, 1, 0.01), sh, 0.012, po), po.wall ? MAT.trim : MAT.tail, 0.003);
     }
     // licence plate recess in the tail panel above the bumper's rub strip (the livery paints the
-    // plate; lower down it hung off the bottom of the bumper)
-    if (z < -2.4 && y > 0.46 && y < 0.65 && ax < 0.2) {
+    // plate; lower down it hung off the bottom of the bumper), a chrome garnish with the trunk lock
+    // between it and the reflector band
+    if (z < -2.4 && y > 0.46 && y < 0.69 && ax < 0.32) {
       acc.cut(pocket(sdRoundBox(x, y - 0.555, 0, 0.155, 0.075, 1, 0.02), sh, 0.012, po), po.wall ? MAT.trim : MAT.paint, 0.003);
+      acc.add(roundEdge(Math.max(sh - 0.005, -(sh + 0.015)), sdRoundBox(x, y - 0.66, 0, 0.3, 0.014, 1, 0.008), 0.003), MAT.chrome, 0.003);
+      acc.cut(pocket(Math.hypot(x, y - 0.66) - 0.011, sh - 0.005, 0.008, po), MAT.trim, 0.002);
+    }
+    // amber side repeaters on the front fenders, and a fuel flap in the right rear quarter
+    if (ax > 0.9 && z > 1.03 && z < 1.17 && y > 0.68 && y < 0.76) {
+      acc.cut(pocket(sdRoundBox(z - 1.1, y - 0.72, 0, 0.026, 0.011, 1, 0.01), bP, 0.004, po), po.wall ? MAT.trim : MAT.indicator, 0.002);
+    }
+    if (x < -0.9 && z > -2.06 && z < -1.84 && y > 0.66 && y < 0.84) {
+      acc.cut(pocket(sdRoundBox(z + 1.95, y - 0.75, 0, 0.06, 0.055, 1, 0.02), bP, 0.003, po), MAT.paint, 0.002);
     }
     // wheel arches (open to the side, black liners inside)
     if (ax > 0.55 && y < 0.85) {
@@ -292,7 +340,15 @@ export function buildCabbie() {
     }
 
     // ---------------------------------------------------------------- material zones
-    if (acc.m === MAT.paint && y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+    if (acc.m === MAT.paint) {
+      if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+      else if (y > 0.84 && y < 1.42 && ax > 0.78 && z > -1.62 && z < 0.98) {
+        // black frames round the side glass, and a black belt moulding along its foot from just under
+        // the body's top edge (which rises toward the tail)
+        const frame = Math.min(sideWin[0].sample(z, y), sideWin[1].sample(z, y), sideWin[2].sample(z, y));
+        if ((frame > 0 && frame < 0.015 && cS - cP + 0.01 < 0) || (y < 0.955 && y > 0.868 - 0.0233 * z)) acc.m = MAT.trim;
+      }
+    }
     out.m = acc.m;
     return acc.d;
   }
@@ -305,18 +361,20 @@ export function buildCabbie() {
   decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: WINDSHIELD, depth: 0.006, rings: 8 });
   for (const sx of [1, -1]) {
     for (const [u, r] of [
-      [0.55, 0.045],
-      [0.73, 0.05],
+      [0.55, 0.042],
+      [0.73, 0.046],
     ]) {
-      decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [u * sx, 0.605], radius: r, depth: 0.026, segments: 24 });
+      // (each lens fills most of its chrome bowl: in the dark the chrome reads black, and smaller
+      // bulbs looked like dots in a black box)
+      decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [u * sx, 0.605], radius: r, depth: 0.03, segments: 24 });
     }
     decals.push({
       kind: 'ribbon',
       mat: MAT.tailglow,
       view: VIEW.rear,
       path: [
-        [0.76 * sx, 0.78],
-        [0.9 * sx, 0.78],
+        [0.76 * sx, 0.71],
+        [0.9 * sx, 0.71],
       ],
       width: 0.03,
       depth: 0.012,
@@ -344,6 +402,16 @@ export function buildCabbie() {
           [[-0.82, 1.06], [0.82, 1.06], [0.9, 1.7], [0.86, 2.55], [-0.86, 2.55], [-0.9, 1.7], [-0.82, 1.06]],
           [[-0.72, -1.68], [0.72, -1.68], [0.8, -2.55], [-0.8, -2.55], [-0.72, -1.68]],
         ],
+        // the hood's front edge and the bumper's top over the rub strip; the trunk lid's edge and
+        // the rear bumper's top
+        front: [
+          [[-0.86, 0.71], [0.86, 0.71]],
+          [[-0.96, 0.5], [0.96, 0.5]],
+        ],
+        rear: [
+          [[-0.68, 0.86], [0.68, 0.86]],
+          [[-0.96, 0.465], [0.96, 0.465]],
+        ],
       },
       // `taxi`: where the taxi livery's checker band runs (side view); `plate`: the licence plate
       // painted into its recess on the tail panel (rear view, metres)
@@ -355,8 +423,8 @@ export function buildCabbie() {
         plate: { x: 0, y: 0.555, w: 0.3, h: 0.15, text: 'TX 2004' },
       },
       tailLights: [
-        [0.82, 0.74, -2.7],
-        [-0.82, 0.74, -2.7],
+        [0.82, 0.71, -2.7],
+        [-0.82, 0.71, -2.7],
       ],
       headLights: [
         [0.64, 0.605, 2.69],

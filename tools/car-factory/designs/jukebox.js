@@ -6,7 +6,7 @@
 // carrying twin bullet tail lamps in chrome rings, a chrome grille across the tail echoing the front
 // one, and whitewall tyres. Left-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
-import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule, sdEllipsoid } from '../sdf.js';
+import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCapsule, sdEllipsoid } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
 import { VIEW } from '../decals.js';
 
@@ -324,8 +324,10 @@ export function buildJukebox() {
       if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
       // a chrome edge along the top and trailing edge of each fin
       else if (ax > 0.82 && y > 0.92 && z < -1.7 && z > -2.75 && finSide.sample(z, y) > -0.016) acc.m = MAT.chrome;
-      // chrome frames round the glass: side windows, windshield and rear window
-      else if (y > 0.86 && z < 1.12 && z > -1.52) {
+      // chrome frames round the glass: side windows, windshield (up the pillars and across the top:
+      // along the cowl the frame's border with the hood cost the far model 1.5k triangles) and rear
+      // window
+      else if (y > 0.86 && z < 0.99 && z > -1.52) {
         const side = cS - cP + 0.01 < 0;
         const ring = (d) => d > 0 && d < 0.015;
         if (side ? ring(Math.min(doorWin.sample(z, y), quarterWin.sample(z, y))) : ring(windshield.sample(ax, z)) || ring(rearGlass.sample(ax, z))) acc.m = MAT.chrome;
@@ -345,7 +347,7 @@ export function buildJukebox() {
       if (ax > 0.85 && y < 0.82 && Math.abs(Math.hypot(y - WH.front.y, z - WH.front.z) - 0.42) < 0.03) return MAT.paint; // front arch trims
       if (ax > 0.85 && y > 0.35 && y < 0.4 && Math.abs(z - WH.rear.z) < 0.42) return MAT.paint; // skirt strips
       if (ax > 0.82 && y > 0.9 && z < -1.7 && z > -2.66) return MAT.paint; // fin edges
-      if (y > 0.88 && y < 1.4 && z > -1.55 && z < 1.12) return MAT.trim; // window frames
+      if (y > 0.78 && y < 1.4 && z > -1.55 && z < 1.15 && ax < 0.9) return MAT.trim; // window frames (the windshield's along the cowl too)
     }
     if (z < -2.55 && y > 0.45 && y < 0.68 && ax < 0.88 && (m === MAT.grille || m === MAT.reverse)) return MAT.chrome;
     return m;

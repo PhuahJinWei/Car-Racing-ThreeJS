@@ -1,8 +1,10 @@
 // TOUGE - an 80s lightweight hatchback that lives on mountain passes. A long flat hood with the
 // pop-up headlights raised on its front corners, a wedge nose over a slim grille slot with amber
-// lamps, a tall glasshouse with black window frames ending in a liftback with a lip spoiler, black
-// arch trims round small wheels on tall tyres, a full-width tail-light band, and a rub strip down
-// the flanks at the two-tone line. Right-hand drive.
+// lamps, wipers, an antenna mast on the right front fender, a tall glasshouse with black window
+// frames ending in a liftback with a lip spoiler and a wiper, black door handles, black arch trims
+// round small wheels on tall tyres, a fuel flap, a full-width tail-light band (red lamps with amber
+// and clear sections inboard, a ribbed black panel between them), the plate in the rear bumper,
+// and a rub strip down the flanks at the two-tone line. Right-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdBox, sdRoundBox, sdCylZ, sdCapsule } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
@@ -199,6 +201,23 @@ export function buildTouge() {
   const acc = new Acc();
   const po = { wall: false };
   const arch = (ax, y, z, w) => Math.max(Math.hypot(y - w.y, z - w.z) - (w.r + GAP), w.x - w.w / 2 - 0.04 - ax);
+  // exact distance outside the corner where two fields meet (a plain max reads too close there, and
+  // the AO bake paints a dark box round the part)
+  const edge = (a, b) => (a > 0 && b > 0 ? Math.hypot(a, b) : Math.max(a, b));
+  // wipers: points on the windshield (x across, at height y) and on the liftback glass (x across,
+  // at z), `off` out from the glass; two parked at the foot of the windshield toward the left (a
+  // right-hand-drive car), one along the foot of the liftback glass
+  const onWindshield = (x, y, off) => [x, y + 0.824 * off, 0.82 - 1.4545 * (y - 0.8) + 0.567 * off];
+  const onHatch = (x, z, off) => [x, 0.995 + (z + 1.65) * 0.339 + 0.947 * off, z - 0.32 * off];
+  const WIPERS = [
+    [onWindshield(-0.36, 0.836, 0.012), onWindshield(0.08, 0.851, 0.012)],
+    [onWindshield(0.1, 0.836, 0.012), onWindshield(0.47, 0.851, 0.012)],
+    [onHatch(0.0, -1.86, 0.012), onHatch(0.42, -1.795, 0.012)],
+  ];
+  // the tail band's sections: red lamps outboard, amber and clear sections inboard of them, a black
+  // ribbed panel in the middle
+  const LAMP_IN = 0.31;
+  const LAMP_SPLIT = 0.48;
 
   function sdf(x, y, z, out) {
     const ax = Math.abs(x);
@@ -225,6 +244,15 @@ export function buildTouge() {
       acc.add(sdCylZ(x + 0.45, y - 0.2, z + 2.05, 0.042, 0.08), MAT.chrome, 0.004);
       acc.cut(sdCylZ(x + 0.45, y - 0.2, z + 2.05, 0.032, 0.2), MAT.exhaust);
     }
+    // an antenna mast on the right front fender, beside the windshield, raked back a little
+    if (x < -0.72 && x > -0.83 && y > 0.7 && y < 1.4 && z > 0.86 && z < 1.03) {
+      acc.add(sdCapsule(x, y, z, -0.775, 0.74, 0.98, -0.775, 1.36, 0.9, 0.0055), MAT.chrome, 0.003);
+      acc.add(sdCapsule(x, y, z, -0.775, 0.735, 0.98, -0.775, 0.765, 0.977, 0.012), MAT.chrome, 0.004);
+    }
+    // black pull handles at the top rear of the doors
+    if (ax > 0.74 && y > 0.77 && y < 0.83 && z > -0.38 && z < -0.22) {
+      acc.add(edge(sdRoundBox(0, y - 0.8, z + 0.3, 1, 0.012, 0.055, 0.008), Math.max(sh - 0.006, -(sh + 0.012))), MAT.trim, 0.003);
+    }
 
     // ---------------------------------------------------------------- cuts
     // cockpit: hollow the glasshouse and the tub below it, then furnish it (right-hand drive)
@@ -247,6 +275,13 @@ export function buildTouge() {
       reg = Math.max(rearGlass.sample(ax, z), top);
       acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
     }
+    // wipers, a hub at each pivot (after the glass, whose cuts would take them away)
+    if ((z > 0.74 && z < 0.86 && y > 0.82 && y < 0.88 && ax < 0.52) || (z < -1.76 && z > -1.9 && y > 0.9 && y < 0.98 && ax < 0.46)) {
+      for (const [a, b] of WIPERS) {
+        acc.add(sdCapsule(x, y, z, a[0], a[1], a[2], b[0], b[1], b[2], 0.0075), MAT.trim, 0.003);
+        acc.add(Math.hypot(x - a[0], y - a[1], z - a[2]) - 0.015, MAT.trim, 0.004);
+      }
+    }
     // lamp faces on the front of the pods
     if (z > POD.zf - 0.05 && y > 0.62 && y < 0.82 && ax > 0.48 && ax < 0.82) {
       const reg = Math.max(Math.abs(ax - POD.x) - 0.12, Math.abs(y - 0.715) - 0.058);
@@ -265,11 +300,24 @@ export function buildTouge() {
       const reg = Math.max(0.6 - ax, Math.abs(y - 0.395) - 0.03, 1.9 - z);
       acc.cut(pocket(reg, sh, 0.015, po), po.wall ? MAT.trim : MAT.amber, 0.003);
     }
-    // tail-light band: lamps at the sides, a black garnish between them
+    // tail-light band: red lamps outboard, an unlit amber indicator over a clear reverse lamp inboard
+    // of each, and a black panel between them ribbed across (the ribs stand on its floor)
     if (z < -1.9 && y > 0.6 && y < 0.88) {
       const band = Math.max(ax - 0.765, Math.abs(y - 0.745) - 0.062);
       const d = pocket(band, sh, 0.024, po);
-      acc.cut(d, po.wall ? MAT.trim : ax > 0.31 ? MAT.tail : MAT.trim, 0.003);
+      const lamp = ax < LAMP_IN ? MAT.trim : ax > LAMP_SPLIT ? MAT.tail : y > 0.745 ? MAT.indicator : MAT.reverse;
+      acc.cut(d, po.wall ? MAT.trim : lamp, 0.003);
+      for (const yr of [0.715, 0.745, 0.775]) {
+        acc.add(edge(Math.max(ax - (LAMP_IN - 0.005), Math.abs(y - yr) - 0.005), Math.max(sh + 0.004, -(sh + 0.03))), MAT.trim, 0.002);
+      }
+    }
+    // licence plate recess in the middle of the rear bumper (the livery paints the plate, over the
+    // two-tone's black), and a fuel flap in the left rear quarter
+    if (z < -2.0 && y > 0.32 && y < 0.53 && ax < 0.2) {
+      acc.cut(pocket(sdRoundBox(x, y - 0.425, 0, 0.158, 0.078, 1, 0.02), sh, 0.012, po), po.wall ? MAT.trim : MAT.paint, 0.003);
+    }
+    if (x > 0.7 && z > -1.7 && z < -1.54 && y > 0.58 && y < 0.72) {
+      acc.cut(pocket(sdRoundBox(z + 1.62, y - 0.65, 0, 0.055, 0.05, 1, 0.02), bP, 0.003, po), MAT.paint, 0.002);
     }
     // black trims round the wheel arches, standing a little proud of the fenders
     if (ax > 0.6 && y > 0.25 && y < 0.72) {
@@ -301,6 +349,19 @@ export function buildTouge() {
     }
     out.m = acc.m;
     return acc.d;
+  }
+
+  // the far model (distant rivals): every material border keeps its full-resolution edge through
+  // simplification, and this one ran to 19k triangles. Far away the rub strips are body colour (the
+  // two-tone line still shows), the grille slot and the intake are plain black, the tail lamps' inner
+  // sections join the red, and the underbody joins the paint along the bottom edges
+  function farMat(x, y, z, m) {
+    const ax = Math.abs(x);
+    if (m === MAT.trim && y > 0.44 && y < 0.51 && Math.abs(z) < 1.75 && ax > 0.7) return MAT.paint;
+    if (z > 1.95 && (m === MAT.grille || m === MAT.head) && ((y > 0.52 && y < 0.6 && ax < 0.77) || (y > 0.25 && y < 0.35 && ax < 0.44))) return MAT.trim;
+    if (z < -1.9 && y > 0.68 && y < 0.81 && (m === MAT.indicator || m === MAT.reverse)) return MAT.tail;
+    if (m === MAT.trim && y < 0.168) return MAT.paint;
+    return m;
   }
 
   // ------------------------------------------------------------------ glass, lamps, light strips
@@ -346,7 +407,7 @@ export function buildTouge() {
         mat: MAT.tailglow,
         view: VIEW.rear,
         path: [
-          [0.35 * sx, v],
+          [(LAMP_SPLIT + 0.02) * sx, v],
           [0.73 * sx, v],
         ],
         width: 0.014,
@@ -359,6 +420,7 @@ export function buildTouge() {
     id: 'touge',
     sdf,
     shell,
+    farMat,
     decals,
     bounds: { min: [-1.1, 0.0, -2.3], max: [1.1, 1.45, 2.3] },
     meta: {
@@ -378,10 +440,17 @@ export function buildTouge() {
         front: [[[-0.8, 0.505], [0.8, 0.505]]],
         rear: [[[-0.8, 0.585], [0.8, 0.585]]],
       },
-      livery: { door: [0.12, 0.675], shoulder: 0.72, cabin: { x: 0.6, z0: -1.9, z1: 0.8 }, panda: { side: 0.475, front: 0.51, rear: 0.59 } },
+      // `plate`: the licence plate painted into the rear bumper's recess (rear view, metres)
+      livery: {
+        door: [0.12, 0.675],
+        shoulder: 0.72,
+        cabin: { x: 0.6, z0: -1.9, z1: 0.8 },
+        panda: { side: 0.475, front: 0.51, rear: 0.59 },
+        plate: { x: 0, y: 0.425, w: 0.3, h: 0.15, text: 'GUNMA 86' },
+      },
       tailLights: [
-        [0.55, 0.745, -2.05],
-        [-0.55, 0.745, -2.05],
+        [0.62, 0.745, -2.05],
+        [-0.62, 0.745, -2.05],
       ],
       headLights: [
         [0.65, 0.715, 2.075],
