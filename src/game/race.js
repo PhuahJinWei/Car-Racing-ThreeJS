@@ -349,8 +349,6 @@ export class Race {
     }
     this.emit('countdown', { value: 'GO' });
     this.app.audio?.play('go');
-    // a low shot off the front corner as the lights go out, whipping round to the chase camera
-    this.rig.carShot([2.1, 0.42, 4.4], [0, 0.5, 0.4], 48, 0.4, 0.55);
     // let go just before GO: perfect; well before: a late start; still holding: wait for the release
     if (!this.launchHeld) {
       this._launchTip();

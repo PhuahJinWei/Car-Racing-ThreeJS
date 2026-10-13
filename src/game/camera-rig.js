@@ -105,14 +105,6 @@ export class CameraRig {
     this.cine = { type: 'tv', t: 0, spot: null };
   }
 
-  /**
-   * A shot from beside the car - p and l (where it looks) in car space [left, up, fwd] - held for
-   * `duration`, then blended back to the chase camera over `blendOut`.
-   */
-  carShot(p, l, fov, duration, blendOut = 0.5) {
-    this.cine = { type: 'car', t: 0, p, l, fov, duration, blendOut };
-  }
-
   /** A shot from a fixed point (world) that follows the car, framing about `frame` m around it. */
   spotShot(p, frame = 6, duration = 3) {
     this.cine = { type: 'spot', t: 0, p: p.clone(), frame, duration };
@@ -288,12 +280,6 @@ export class CameraRig {
         finalLook = new THREE.Vector3().copy(P).addScaledVector(_up, 0.6);
         finalFov = 48;
         finalRoll = 0;
-      } else if (c.type === 'car') {
-        finalPos = new THREE.Vector3().copy(P).addScaledVector(left, c.p[0]).addScaledVector(t.up, c.p[1]).addScaledVector(t.fwd, c.p[2]);
-        finalLook = new THREE.Vector3().copy(P).addScaledVector(left, c.l[0]).addScaledVector(t.up, c.l[1]).addScaledVector(t.fwd, c.l[2]);
-        finalFov = c.fov;
-        finalRoll = 0;
-        if (c.t >= c.duration) this.endCinematic(c.blendOut);
       } else if (c.type === 'spot') {
         finalPos = c.p.clone();
         finalLook = new THREE.Vector3().copy(P).addScaledVector(_up, 0.55);
