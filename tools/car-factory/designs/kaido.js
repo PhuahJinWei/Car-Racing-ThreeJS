@@ -1,7 +1,10 @@
 // KAIDO - a 70s Japanese touring coupe dressed as a street racer. A crisp, boxy hardtop with a
-// "surf line" crease running down each side, black bolt-on over-fenders, a deep black chin spoiler,
-// round headlamps inside a full-width grille, thin chrome bumpers, mirrors out on the front fenders,
-// quad round tail lamps, a ducktail on the trunk and twin exhausts. Left-hand drive.
+// "surf line" crease running down each side, black over-fenders bolted on with a row of chrome
+// bolts, a raked black chin spoiler with an intake, a full-width chrome grille of thin bars with
+// round headlamps in chrome rings at its ends, amber lamps under the front bumper, thin chrome
+// bumpers with overriders, mirrors out on the front fenders, wipers, chrome drip rails, window
+// frames and sills, amber side repeaters, a chrome racing fuel cap, quad round tail lamps, a chrome
+// trunk lock, a ducktail and twin exhausts. Left-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
@@ -184,29 +187,71 @@ export function buildKaido() {
   const acc = new Acc();
   const po = { wall: false };
   const arch = (ax, y, z, w) => Math.max(Math.hypot(y - w.y, z - w.z) - (w.r + GAP), w.x - w.w / 2 - 0.04 - ax);
+  // the over-fenders' bolts: eight round the upper half of each flare, near its outer edge, on its
+  // flat outer face (x 0.9)
+  const BOLTS = [];
+  for (const w of [WH.front, WH.rear]) {
+    for (let i = 0; i < 8; i++) {
+      const t = ((10 + i * 22.5) * Math.PI) / 180;
+      BOLTS.push([w.z + (w.r + 0.148) * Math.cos(t), w.y + (w.r + 0.148) * Math.sin(t)]);
+    }
+  }
+  // wipers parked along the foot of the windshield: points on the glass (x across, at height y,
+  // `off` out from it)
+  const onWindshield = (x, y, off) => [x, y + 0.758 * off, 0.93 - 1.1622 * (y - 0.79) + 0.652 * off];
+  const WIPERS = [
+    [onWindshield(0.38, 0.812, 0.012), onWindshield(-0.08, 0.828, 0.012)],
+    [onWindshield(-0.12, 0.812, 0.012), onWindshield(-0.52, 0.828, 0.012)],
+  ];
+  // the chin spoiler's front leans forward toward its foot (how far it stands out of the plan, by
+  // height)
+  const chinOut = (y) => 0.02 + 0.05 * smoothstep(0.26, 0.15, y);
 
   function sdf(x, y, z, out) {
     const ax = Math.abs(x);
     const sh = shell(x, y, z);
-    const { dBody, dCab, cS, cP } = S;
+    const { dBody, dCab, cS, cP, bP } = S;
     acc.set(sh, MAT.paint);
 
     // ---------------------------------------------------------------- add-ons
-    // black bolt-on over-fenders round the upper half of every arch
-    if (ax > 0.7 && y > 0.18 && y < 0.62) {
+    // black bolt-on over-fenders round the upper half of every arch, their tops kept under the
+    // beltline crease (reaching over it, they cut raggedly into the shoulder)
+    if (ax > 0.7 && y > 0.18 && y < 0.78) {
       for (const w of [WH.front, WH.rear]) {
         if (Math.abs(z - w.z) > 0.52) continue;
         const ring = Math.abs(Math.hypot(y - w.y, z - w.z) - (w.r + 0.1)) - 0.065;
-        acc.add(roundEdge(Math.max(ring, w.y - 0.06 - y, 0.76 - ax), ax - 0.9, 0.012), MAT.trim, 0.008);
+        acc.add(roundEdge(Math.max(ring, w.y - 0.06 - y, 0.76 - ax, y - 0.745), ax - 0.9, 0.012), MAT.trim, 0.008);
       }
     }
-    // a deep black chin spoiler
+    // a deep black chin spoiler, its front raked forward to its foot, an intake across its middle
     if (z > 1.8 && y > 0.1 && y < 0.3) {
-      acc.add(Math.max(roundEdge(bodyPlan.sample(ax, z) - 0.07, Math.abs(y - 0.19) - 0.055, 0.012), 1.85 - z), MAT.trim, 0.01);
+      const plan = bodyPlan.sample(ax, z);
+      acc.add(Math.max(roundEdge(plan - chinOut(y), Math.abs(y - 0.2) - 0.05, 0.01), 1.85 - z), MAT.trim, 0.01);
+      acc.cut(pocket(sdRoundBox(x, y - 0.195, 0, 0.3, 0.022, 1, 0.01), plan - chinOut(y), 0.03, po), MAT.grille, 0.004);
     }
-    // thin chrome bumpers wrapping round the corners
+    // thin chrome bumpers wrapping round the corners, a pair of overriders standing up on each
     if (Math.abs(z) > 1.85 && y > 0.32 && y < 0.5) {
       acc.add(Math.max(roundEdge(bodyPlan.sample(ax, z) - 0.035, Math.abs(y - 0.41) - 0.026, 0.01), 1.95 - Math.abs(z)), MAT.chrome, 0.008);
+      if (Math.abs(ax - 0.42) < 0.05 && Math.abs(z) > 2.15) acc.add(sdRoundBox(ax - 0.42, y - 0.405, Math.abs(z) - 2.232, 0.022, 0.07, 0.03, 0.015), MAT.chrome, 0.006);
+    }
+    // the over-fenders' chrome bolts
+    if (ax > 0.86 && ax < 0.93 && y > 0.25 && y < 0.8) {
+      let b = 1;
+      for (const [zb, yb] of BOLTS) b = Math.min(b, Math.hypot(ax - 0.9, y - yb, z - zb) - 0.01);
+      acc.add(b, MAT.chrome, 0.003);
+    }
+    // a chrome sill strip between the flares
+    if (ax > 0.7 && y > 0.25 && y < 0.33 && z > -0.84 && z < 0.86) {
+      acc.add(roundEdge(Math.max(bP - 0.005, -(bP + 0.015)), sdRoundBox(z - 0.01, y - 0.29, 0, 0.8, 0.02, 1, 0.01), 0.004), MAT.chrome, 0.003);
+    }
+    // a ducktail: the trunk's tail kicks up into a lip
+    if (ax < 0.8 && y > 0.8 && y < 0.98 && z < -1.8 && z > -2.16) {
+      const top = (y - (0.875 + (-1.85 - z) * 0.26)) / Math.hypot(1, 0.26);
+      acc.add(smax(smax(top, ax - 0.76, 0.012), smax(-2.115 - z, 0.82 - y, 0.01), 0.008), MAT.paint, 0.015);
+    }
+    // a chrome racing fuel cap on the right rear fender, above the crease
+    if (x < -0.7 && y > 0.76 && y < 0.88 && z > -1.68 && z < -1.52) {
+      acc.add(edge(Math.hypot(z + 1.6, y - 0.815) - 0.042, Math.max(bP - 0.006, -(bP + 0.012))), MAT.chrome, 0.003);
     }
     // mirrors out on the front fenders, on thin stalks
     if (z > 1.5 && z < 1.85 && y > 0.7 && y < 0.92 && ax > 0.5 && ax < 0.8) {
@@ -245,18 +290,41 @@ export function buildKaido() {
       reg = Math.max(rearGlass.sample(ax, z), top);
       acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
     }
-    // the surf line: a fine crease pressed into each side
-    if (ax > 0.7 && y > 0.5 && y < 0.75 && z > -2.15 && z < 2.05) {
-      acc.cut(pocket(surf(z, y) - 0.006, S.bP, 0.005, po), MAT.paint, 0.003);
+    // wipers, a hub at each pivot (after the glass, whose cut would take them away)
+    if (z > 0.85 && z < 0.97 && y > 0.79 && y < 0.86 && ax < 0.6) {
+      for (const [a, b] of WIPERS) {
+        acc.add(sdCapsule(x, y, z, a[0], a[1], a[2], b[0], b[1], b[2], 0.0075), MAT.trim, 0.003);
+        acc.add(Math.hypot(x - a[0], y - a[1], z - a[2]) - 0.015, MAT.trim, 0.004);
+      }
     }
-    // a full-width grille: the round headlamps in chrome rings at its ends, a mesh with two thin
-    // chrome bars between them
+    // the surf line: a crease pressed into each side (wide and deep enough to read: finer, it
+    // vanished), kept to the skin: the over-fenders pass over it (cut through them, it left a slit)
+    if (ax > 0.7 && y > 0.5 && y < 0.75 && z > -2.15 && z < 2.05) {
+      acc.cut(Math.max(pocket(surf(z, y) - 0.008, S.bP, 0.008, po), S.bP - 0.004), MAT.paint, 0.003);
+    }
+    // a full-width chrome grille: a chrome surround, five thin chrome bars across a dark mesh with a
+    // blank badge on them, and the round headlamps in chrome rings at its ends
     if (z > 2.0 && y > 0.44 && y < 0.7 && ax < 0.76) {
-      acc.cut(pocket(sdRoundBox(x, y - 0.56, 0, 0.72, 0.085, 1, 0.02), S.bP, 0.035, po), po.wall ? MAT.chrome : MAT.grille, 0.006);
-      for (const yb of [0.535, 0.585]) acc.add(Math.hypot(y - yb, S.bP + 0.012, Math.max(ax - 0.44, 0)) - 0.007, MAT.chrome, 0.002);
+      const grille = sdRoundBox(x, y - 0.56, 0, 0.72, 0.085, 1, 0.02);
+      acc.cut(pocket(grille, S.bP, 0.035, po), po.wall ? MAT.chrome : MAT.grille, 0.006);
+      acc.add(edge(Math.abs(grille + 0.004) - 0.006, Math.max(S.bP - 0.004, -(S.bP + 0.012))), MAT.chrome, 0.002);
+      for (const yb of [0.5, 0.53, 0.56, 0.59, 0.62]) acc.add(Math.hypot(y - yb, S.bP + 0.012, Math.max(ax - 0.46, 0)) - 0.0065, MAT.chrome, 0.002);
+      acc.add(edge(sdRoundBox(x, y - 0.56, 0, 0.05, 0.02, 1, 0.01), Math.max(S.bP + 0.002, -(S.bP + 0.02))), MAT.chrome, 0.002);
       const r = Math.hypot(ax - 0.57, y - 0.56);
-      acc.add(Math.max(r - 0.072, S.bP + 0.03, -(S.bP + 0.035)), MAT.head, 0.003);
-      acc.add(Math.hypot(r - 0.074, S.bP + 0.006) - 0.009, MAT.chrome, 0.003);
+      acc.add(Math.max(r - 0.08, S.bP + 0.03, -(S.bP + 0.035)), MAT.head, 0.003);
+      acc.add(Math.hypot(r - 0.083, S.bP + 0.006) - 0.01, MAT.chrome, 0.003);
+    }
+    // amber lamps under the front bumper; amber repeaters on the front fenders; the trunk lock in a
+    // chrome escutcheon over the tail panel
+    if (z > 2.1 && y > 0.28 && y < 0.36 && ax > 0.45 && ax < 0.66) {
+      acc.cut(pocket(sdRoundBox(ax - 0.55, y - 0.32, 0, 0.07, 0.022, 1, 0.01), S.bP, 0.012, po), po.wall ? MAT.trim : MAT.amber, 0.003);
+    }
+    if (ax > 0.75 && z > 1.9 && z < 2.0 && y > 0.42 && y < 0.48) {
+      acc.cut(pocket(sdRoundBox(z - 1.95, y - 0.45, 0, 0.03, 0.012, 1, 0.01), bP, 0.004, po), po.wall ? MAT.trim : MAT.indicator, 0.002);
+    }
+    if (z < -2.05 && y > 0.76 && y < 0.83 && ax < 0.06) {
+      acc.add(edge(sdRoundBox(x, y - 0.795, 0, 0.032, 0.014, 1, 0.008), Math.max(sh - 0.005, -(sh + 0.012))), MAT.chrome, 0.003);
+      acc.cut(pocket(Math.hypot(x, y - 0.795) - 0.006, sh - 0.005, 0.006, po), MAT.trim, 0.002);
     }
     // quad round tail lamps in a black panel, the plate between them (the livery paints it)
     if (z < -2.0 && y > 0.56 && y < 0.8 && ax < 0.76) {
@@ -283,7 +351,15 @@ export function buildKaido() {
     }
 
     // ---------------------------------------------------------------- material zones
-    if (acc.m === MAT.paint && y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+    if (acc.m === MAT.paint) {
+      if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+      else if (y > 0.84 && z < 0.96 && z > -1.4 && ax > 0.4) {
+        // chrome drip rails along the roof's edges over the side glass, and chrome frames round it
+        const side = cS - cP + 0.01 < 0;
+        const frame = Math.min(doorWin.sample(z, y), quarterWin.sample(z, y));
+        if ((z < 0.4 && z > -0.66 && cS > -0.03 && cP > -0.03) || (side && frame > 0 && frame < 0.012)) acc.m = MAT.chrome;
+      }
+    }
     out.m = acc.m;
     return acc.d;
   }
@@ -296,7 +372,9 @@ export function buildKaido() {
   decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: WINDSHIELD, depth: 0.006, rings: 8 });
   const ring = (cx, cy, r) => Array.from({ length: 33 }, (_, i) => [cx + Math.cos((i / 32) * Math.PI * 2) * r, cy + Math.sin((i / 32) * Math.PI * 2) * r]);
   for (const sx of [1, -1]) {
-    decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [0.57 * sx, 0.56], radius: 0.045, depth: 0.025, segments: 28 });
+    // (the lens stands a centimetre in front of the dark housing: at the housing's own depth, the
+    // housing hid most of it and the lamps read as small dim lights)
+    decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [0.57 * sx, 0.56], radius: 0.056, depth: 0.012, segments: 28 });
     decals.push({ kind: 'ribbon', mat: MAT.tailglow, view: VIEW.rear, path: ring(0.6 * sx, 0.67, 0.036), width: 0.012, depth: 0.001 });
   }
 
