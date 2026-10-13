@@ -28,7 +28,7 @@ const _sv2 = new THREE.Vector3();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
 // per-frame scratch: car model state, and effect colours (emitters copy them straight away)
-const _modelState = { speed: 0, steer: 0, brake: false, boost: 0, drift: false, reverse: false };
+const _modelState = { speed: 0, steer: 0, brake: false, boost: 0, drift: false, reverse: false, burn: 0 };
 const _smokeCol = [0, 0, 0];
 const STEAM = [0.2, 0.2, 0.22];
 const SPIN_WET = [0.74, 0.77, 0.83];
@@ -508,8 +508,8 @@ export class Race {
     const steps = Math.min(10, Math.max(1, Math.ceil(dt / (1 / 120))));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) v.step(h, ctrl);
-    // on the start line (from the intro on) a held gas revs the engine
-    const onLine = this.phase === 'intro' || this.phase === 'countdown' || this.awaitRelease;
+    // on the start line (from the 3 of the countdown on) a held gas revs the engine
+    const onLine = this.phase === 'countdown' || this.awaitRelease;
     this.revving = onLine && input.state.rev;
     this.startRev = this.revving ? Math.min(1, this.startRev + dtReal * 2.5) : Math.max(0, this.startRev - dtReal * 3);
     if (onLine) v.rpm = 0.22 + this.startRev * 0.7;
@@ -1015,9 +1015,15 @@ export class Race {
     const m = P.model;
     m.group.position.copy(v.position);
     m.group.quaternion.copy(v.quat);
-    m.setBodyTilt(v.roll, v.pitch, v.squirm);
+    // revving on the start line: the rear squats, the body shakes with the engine, the driven tyres
+    // spin (and smoke, see _emitEffects) and the exhaust pops now and then
+    const rev = this.startRev;
+    const shake = rev > 0.01 ? rev * (0.0018 * Math.sin(this.clock * 47) + 0.0011 * Math.sin(this.clock * 71)) : 0;
+    m.setBodyTilt(v.roll + shake * 0.6, v.pitch - 0.012 * rev + shake, v.squirm);
+    if (rev > 0.95 && Math.random() < dt * 0.25) m.triggerBackfire();
     this._castShadow(m, v.frame.i, v.x, v.y, v.z, v.y - v.groundPrev);
     const st = _modelState;
+    st.burn = rev;
     st.speed = v.vf;
     st.steer = this.app.input.state.steer * (P.finished ? 0 : 1);
     st.brake = v.braking;
@@ -1038,6 +1044,7 @@ export class Race {
       this._castShadow(r.model, a.frame.i, a.position.x, a.position.y, a.position.z, a.y - a.groundPrev);
       r.model.setBodyTilt(clamp(-a.driftVis * 0.08, -0.05, 0.05), 0);
       st.speed = a.v;
+      st.burn = 0;
       st.steer = clamp(-a.vd * 0.15 + a.driftVis, -1, 1);
       st.brake = false;
       st.boost = a.boostLevel;
@@ -1095,7 +1102,7 @@ export class Race {
       }
       // tyre smoke while the driven wheels spin off the line (rivals: as they pull away)
       let spin = 0;
-      if (isP) spin = r.vehicle.wheelspin;
+      if (isP) spin = Math.max(r.vehicle.wheelspin, this.startRev * 0.22);
       else {
         if (!r.ai.frozen && r.ai.v > 0.3 && r.ai.v > (r.prevV ?? 0)) spin = clamp(1 - r.ai.v / 11, 0, 1) * 0.55;
         r.prevV = r.ai.v;

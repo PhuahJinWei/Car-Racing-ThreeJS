@@ -1400,15 +1400,19 @@ export class CarModel {
     this.caliperMat?.color.set(c.accent.color === c.paint.color ? '#d01020' : c.accent.color);
   }
 
-  /** Visual-only update. state: { speed, steer, brake, boost, drift } */
+  /**
+   * Visual-only update. state: { speed, steer, brake, boost, drift, burn } - burn (0..1) spins the
+   * driven wheels on the spot (revving on the start line)
+   */
   update(dt, state) {
     this.time += dt;
     const spinRate = (state.speed || 0) / (this.wheelR || this.def.dims.wheelR);
     this.wheelSpin = (this.wheelSpin + spinRate * dt) % (Math.PI * 2);
+    this.burnSpin = ((this.burnSpin || 0) + (state.burn || 0) * 22 * dt) % (Math.PI * 2);
     const blurA = this.blurMat ? Math.min(1, Math.max(0, (Math.abs(spinRate) - 14) / 40)) : 0;
     if (this.blurMat) this.blurMat.opacity = blurA * 0.9;
     for (const w of this.wheels) {
-      w.spin.rotation.x = this.wheelSpin;
+      w.spin.rotation.x = this.wheelSpin + (w.front && !this.def.awd ? 0 : this.burnSpin);
       if (w.front) w.pivot.rotation.y = -(state.steer || 0) * 0.42;
       if (w.blur) w.blur.visible = blurA > 0.01;
     }
