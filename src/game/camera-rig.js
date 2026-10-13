@@ -9,10 +9,12 @@ const MODES = {
 };
 export const CAMERA_MODES = Object.keys(MODES);
 // the cameras are set for a car this tall and this long (the Volt GT): a taller or longer car gets
-// them raised and pulled back so the road still shows from as close ahead (see fitCar)
+// them raised and pulled back so the road still shows from as close ahead (see fitCar). The raise
+// has a ceiling only for safety: held to 0.75 m, the JUGGERNAUT (2.1 m to the top of its light bar,
+// needing 1.4 m) hid the road for 75 m ahead
 const REF_HEIGHT = 1.16;
 const REF_HALF_LENGTH = 2.28;
-const MAX_RAISE = 0.75;
+const MAX_RAISE = 1.8;
 // the widest the chase view gets: held at speed / on nitro, and briefly with a kick (degrees)
 const FOV_MAX = 84;
 const FOV_KICK_MAX = 92;

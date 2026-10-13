@@ -934,7 +934,6 @@ export class Race {
           if (this._airSlowmo) {
             this._airSlowmo = false;
             if (this.timeScaleTarget < 1) this.timeScaleTarget = 1;
-            if (this.rig.cine?.type === 'spot') this.rig.endCinematic(0.25);
           }
           break;
         }
@@ -955,10 +954,6 @@ export class Race {
       this._airSlowmo = true;
       this.timeScaleTarget = 0.55;
       this.slowmo = 0.7;
-      // a low trackside shot of the car flying past (on the far side of the road from it), back to
-      // the chase camera on landing
-      const side = v.d >= 0 ? -1 : 1;
-      this.rig.spotShot(this.track.pointAt(v.s + Math.max(v.vf, 10) * 0.9, side * (this.track.halfWidth - 0.5), _v, 1.3), 6, 1.8);
     }
     for (const r of this.ais) r.ai.events.length = 0;
   }

@@ -18,6 +18,17 @@ const DRIFT_MIN = 17; // a drift needs this much speed; slower, the drift button
 // with the gas automatic (touch), the gas a drift eases to while steering fully into it (0: off
 // the gas entirely, as a keyboard player lets go of it)
 const AUTO_LIFT = 0;
+// ...and it does the slowing a keyboard player does on the brakes: a flick of the brakes as the
+// drift starts (for FLICK_TIME seconds), then a little drag while it's held, both scaled by how
+// hard it's steered into (m/s^2 at full lock: from racing speed, the flick takes about 55 km/h off
+// and a held drift keeps scrubbing, so the slow corners of a twisty track can be made). Both fade
+// out between SCRUB_FULL and SCRUB_NONE (m/s), around the speed corners are taken at, so a drift
+// never drags a car to a crawl
+const FLICK_TIME = 0.6;
+const FLICK_DECEL = 26;
+const HOLD_DRAG = 7;
+const SCRUB_FULL = 55;
+const SCRUB_NONE = 32;
 // realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
 const SHIFT_CUT = 0.12; // torque gap of an upshift
@@ -287,7 +298,13 @@ export class Vehicle {
       if (this.boostLevel > 0.02 && vf < vmax * 1.02) drive += 24 * this.boostLevel;
       resist += 0.0007 * vf * vf;
       if (throttle < 0.1 && !pedalBrake) resist += COAST;
-      if (D.active) resist += 2.2 * clamp(D.slip, 0, 1);
+      if (D.active) {
+        resist += 2.2 * clamp(D.slip, 0, 1);
+        if (inp.autoGas) {
+          const scrub = clamp((Math.abs(vf) - SCRUB_NONE) / (SCRUB_FULL - SCRUB_NONE), 0, 1);
+          resist += clamp(steer * D.dir, 0, 1) * scrub * (D.time < FLICK_TIME ? FLICK_DECEL : HOLD_DRAG);
+        }
+      }
       if (vf > vmax && this.boostLevel < 0.05) resist = Math.max(resist, drive + (vf - vmax) * 0.9);
       // hills: gravity along the road under the car (ramps are left to the jump physics). Added
       // after the top-speed limit, so a downhill carries the car a little past it as an uphill
