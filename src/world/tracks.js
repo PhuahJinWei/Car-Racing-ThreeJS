@@ -235,7 +235,7 @@ export const TRACKS = [
   {
     id: 'ring',
     name: 'METRO RING',
-    tagline: 'A wide ring road above the city. Flat-out sweepers and one huge banked turn.',
+    tagline: 'A ring road through the harbour: over the bay, along the quay under the cranes and through the container yard.',
     theme: 'tunnel',
     difficulty: 1,
     width: 18,
@@ -249,34 +249,39 @@ export const TRACKS = [
       ['S', 400], // 2
       ['L', 35, 260], // 3 flat-out S
       ['R', 35, 260], // 4
-      ['S', 500], // 5
-      ['R', 150, 200], // 6 the Bowl: banked turnaround at the highest point
-      ['S', 630], // 7
-      ['L', 40, 240], // 8 jog
-      ['S', 300], // 9
-      ['R', 40, 240], // 10
-      ['S', 400], // 11
+      ['S', 500], // 5 out onto the bridge over the bay
+      ['R', 150, 200], // 6 the Bowl: banked turnaround on the bridge, at the highest point
+      ['S', 630], // 7 down to the quay
+      ['L', 40, 240], // 8 onto the quay
+      ['S', 300], // 9 along the quay, under the cranes
+      ['R', 40, 240], // 10 into the container yard
+      ['S', 400], // 11 through the yard, then up onto the expressway
       ['R', 80, 210], // 12 long sweeper
       ['S', 325], // 13
       ['R', 60, 280], // 14 last sweeper
     ],
+    // the expressway 20 m over the city, up to 24 m on the bridge for the Bowl, down to the
+    // ground along the quay and through the yard, and back up
     elevation: [
-      [0.0, 0],
-      [0.15, 4],
-      [0.3, 8],
-      [0.41, 14],
-      [0.5, 16],
-      [0.6, 8],
-      [0.72, 2],
-      [0.85, 6],
-      [0.95, 2],
+      [0.0, 20],
+      [0.3, 21],
+      [0.46, 24],
+      [0.655, 0],
+      [0.8, 0],
+      [0.97, 20],
     ],
     sections: [
       { type: 'tunnel', from: [2, 0.2], to: [5, 0.4] },
-      { type: 'tunnel', from: [9, 0.0], to: [11, 0.5] },
-      { type: 'open', from: [5, 0.4], to: [9, 0.0] },
-      { type: 'open', from: [11, 0.5], to: [2, 0.2] },
+      { type: 'open', from: [5, 0.4], to: [2, 0.2] },
+      // over the bay, on the bridge
+      { type: 'water', from: [6, 0.0], to: [6, 1.0] },
+      // at ground level along the quay
+      { type: 'quay', from: [9, 0.0], to: [9, 1.0] },
     ],
+    // a container port the road drives through: the quay 18 m out from the road along it (the
+    // road between the cranes' legs), the yard 320 m deep behind it with stacks lining the road
+    // through it, the city beyond (see decor-harbour.js)
+    harbour: { quayOffset: 18, reach: 200, yardDepth: 320 },
     // no corner is tight, so every long straight has room for a pad
     boostPads: [
       { at: [0, 0.06], offset: 0 },

@@ -6,6 +6,7 @@ import { buildTrackSurfaces, buildPillars, buildBoostPads, buildRamps, buildStar
 import { buildLamps, buildChevrons, buildGantries, buildSignGantries, buildTerrain, createGroundMaterial, hillField, hillGround } from './decor-common.js';
 import { buildCity } from './decor-city.js';
 import { buildStadium } from './decor-stadium.js';
+import { planHarbour, buildHarbour } from './decor-harbour.js';
 import { createEnvironment, createEnvMap } from './environment.js';
 import { globalUniforms, setCover } from './materials.js';
 import { CoverMap } from './cover-map.js';
@@ -60,11 +61,24 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     light: 0.75,
     portalColor: 0x4c4e54,
   });
+  // a harbour's land: the road along the quay runs at ground level, just above it; the sea is 3 m
+  // below the land
+  let landY = null;
+  if (def.harbour) {
+    const quay = track.sections.find((s) => s.type === 'quay');
+    landY = Infinity;
+    if (quay) track.forEachInSections('quay', (i) => (landY = Math.min(landY, track.py[i])));
+    landY = (Number.isFinite(landY) ? landY : track.bounds.minY) - 0.35;
+  }
   if (def.theme === 'tunnel') {
-    groundY = track.bounds.minY - 70;
+    // (over a harbour, the ground is the water)
+    groundY = landY !== null ? landY - 3 : track.bounds.minY - 70;
     Object.assign(style, {
       groundY,
       skirt: 1.6,
+      // where the road comes down to the harbour, retaining walls to the sea floor under it (a
+      // causeway over the water); higher up, the piers
+      ...(landY !== null && { skirtTo: { y: groundY - 1, within: 14 } }),
       road: { lanes: 3, edgeColor: '#f0f0f0', edgeGlow: 0.06, laneColor: '#e6e6e6', laneGlow: 0.03, grid: true, brightness: 2.6, sheen: '#0a0c12' },
       wall: { albedo: 0x6a6c72, height: 1.1, brightness: 2.6 },
       neon: studs(0.8, 1.1),
@@ -100,10 +114,14 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
   const cover = new CoverMap(track.bounds);
 
   if (def.theme === 'tunnel') {
+    // a harbour: the bay, the quay and the container port where the plan puts them; the city's
+    // towers only inland of them
+    const port = def.harbour ? planHarbour(track, { ...def.harbour, density, landY }, rand) : null;
+    const inland = port && ((i) => notTunnel(i) && port.toUV(track.px[i], track.pz[i])[1] > port.cityFrom);
     // towers rising from the city far below, alongside the elevated expressway
     const towers = buildCity(track, baker, palette, rand, {
       density,
-      groundY,
+      groundY: port ? landY : groundY,
       signs: false,
       shops: false,
       rows: [
@@ -111,6 +129,7 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
         { setback: 60, dMin: 18, dMax: 32, hMin: -10, hMax: 110, gap: [10, 30] },
         { setback: 120, dMin: 22, dMax: 40, hMin: 10, hMax: 170, gap: [12, 36] },
       ],
+      ...(port && { filter: inland }),
     });
     decor.add(towers);
     const gantries = buildSignGantries(track, baker, { spacing: 430, filter: notTunnel });
@@ -119,9 +138,13 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     if (lamps) decor.add(lamps);
     const pillars = buildPillars(track, groundY, { spacing: 40, minHeight: 4 });
     if (pillars) decor.add(pillars);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000).rotateX(-Math.PI / 2), createGroundMaterial(palette, 'carpet'));
-    ground.position.set((track.bounds.minX + track.bounds.maxX) / 2, groundY, (track.bounds.minZ + track.bounds.maxZ) / 2);
-    decor.add(ground);
+    if (port) {
+      decor.add(buildHarbour(track, palette, rand, { plan: port, seaY: groundY, landY, lampHeads: lamps?.userData.heads, detail: density >= 0.8 }));
+    } else {
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000).rotateX(-Math.PI / 2), createGroundMaterial(palette, 'carpet'));
+      ground.position.set((track.bounds.minX + track.bounds.maxX) / 2, groundY, (track.bounds.minZ + track.bounds.maxZ) / 2);
+      decor.add(ground);
+    }
   } else if (def.theme === 'city') {
     // a town on a hill: the ground is one hill under the roads, and the blocks are an old town's,
     // narrow and mid-rise. The rows behind the street front stand on their own ground, so the town

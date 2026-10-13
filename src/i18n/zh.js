@@ -392,7 +392,7 @@ export default {
   'track.lumen.tagline': '沉睡城市上空的高架快速路与长隧道。',
   'track.district.tagline': '午夜湿滑的城市街区。急弯密布，还有一处超大飞跃。',
   'track.circuit.tagline': '灯火通明的大奖赛赛道。薄雾、雨水与座无虚席的看台。',
-  'track.ring.tagline': '城市上空的宽阔环路。全油门高速弯，还有一个巨大的倾斜弯。',
+  'track.ring.tagline': '穿越港口的环路：跨过海湾，沿着起重机下的码头飞驰，再冲过集装箱堆场。',
   'track.heights.tagline': '午夜的山坡街道。看不见落点的坡顶飞跃，还有老城区里的发夹弯。',
   'track.park.tagline': '泛光灯下的紧凑俱乐部赛道。减速弯、发夹弯，让人喘不过气。',
   'item.p_crimson': '绯红',

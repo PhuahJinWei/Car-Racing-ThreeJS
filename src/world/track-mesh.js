@@ -24,7 +24,8 @@ export function barrierFaceOffset(h, height = 1.1) {
 /**
  * Sweep cross-section polylines along the track.
  * polylines: [[ [d, h, u?], ... ], ...] or fn(row, i, s) returning the same topology.
- * h may be 'ground' to drop the point vertically to opts.groundY.
+ * h may be 'ground' to drop the point vertically to opts.groundY, or 'base' to drop it to
+ * opts.base(i, y) (a height per sample, from the point's own height y at h = 0).
  */
 export function sweep(track, i0, rows, polylines, opts = {}) {
   const getPL = typeof polylines === 'function' ? polylines : () => polylines;
@@ -54,6 +55,7 @@ export function sweep(track, i0, rows, polylines, opts = {}) {
         let y = py[i] + ry[i] * d;
         let z = pz[i] + rz[i] * d;
         if (h === 'ground') y = groundY;
+        else if (h === 'base') y = opts.base(i, y);
         else {
           x += ux[i] * h;
           y += uy[i] * h;
@@ -207,7 +209,12 @@ export function buildTrackSurfaces(track, style, baker, group) {
     joints: style.wall?.joints ?? 6,
   });
   const skirt = style.skirt ?? 'ground';
-  const skirtBottom = skirt === 'ground' ? 'ground' : -skirt;
+  // style.skirtTo { y, within }: wherever the road is less than `within` above y, the skirts reach
+  // all the way down to y, a retaining wall under a ramp (or a causeway into the water); higher
+  // up they keep their own depth, over the piers
+  const skirtTo = style.skirtTo ?? null;
+  const skirtBottom = skirtTo ? 'base' : skirt === 'ground' ? 'ground' : -skirt;
+  const skirtBase = skirtTo && ((i, y) => (y - skirtTo.y < skirtTo.within ? skirtTo.y : y - (typeof skirt === 'number' ? skirt : 1.6)));
   // F-shape profile: the road-side face slopes back from its foot, the outer face leans in a little
   const face = (h) => wallIn + barrierFaceOffset(h, wallH);
   const topIn = face(wallH);
@@ -226,7 +233,7 @@ export function buildTrackSurfaces(track, style, baker, group) {
     [[W + 1.3, 0], [W + 1.3, skirtBottom]],
   ];
   forChunks(track, 0, n, CHUNK, (i0, rows) => {
-    const g = sweep(track, i0, rows, wallPolys, { groundY });
+    const g = sweep(track, i0, rows, wallPolys, { groundY, base: skirtBase });
     baker.bake(g);
     const m = new THREE.Mesh(g, wallMat);
     m.name = 'walls';

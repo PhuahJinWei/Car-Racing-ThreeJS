@@ -37,7 +37,7 @@ const TRACK_SHOTS = {
   district: { src: districtShot, focus: '74% 55%' },
   lumen: { src: lumenShot, focus: '52% 55%' },
   circuit: { src: circuitShot, focus: '70% 55%' },
-  ring: { src: ringShot, focus: '42% 55%' },
+  ring: { src: ringShot, focus: '50% 55%' },
   heights: { src: heightsShot, focus: '50% 55%' },
   park: { src: parkShot, focus: '48% 55%' },
 };

@@ -392,7 +392,7 @@ export default {
   'track.lumen.tagline': '眠る街の上を走る高架の高速道路と、長いトンネル。',
   'track.district.tagline': '深夜の濡れた市街地。タイトなコーナーと、巨大なジャンプがひとつ。',
   'track.circuit.tagline': '照明に照らされたグランプリサーキット。もやと雨、満員のグランドスタンド。',
-  'track.ring.tagline': '街の上を巡る広い環状道路。全開の高速コーナーと、巨大なバンクがひとつ。',
+  'track.ring.tagline': '港を抜ける環状道路。湾を渡り、クレーンの下の岸壁を走り、コンテナヤードを駆け抜ける。',
   'track.heights.tagline': '深夜の坂の街。見通しのきかない頂上ジャンプと、旧市街のヘアピン。',
   'track.park.tagline': '投光器に照らされたタイトなクラブサーキット。シケインにヘアピン、息つく暇もない。',
   'item.p_crimson': 'クリムゾン',

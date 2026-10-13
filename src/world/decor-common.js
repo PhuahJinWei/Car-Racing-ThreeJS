@@ -188,7 +188,7 @@ export function buildLamps(track, baker, opts = {}) {
     const hp = headLocal.clone().applyMatrix4(_m);
     hm.makeScale(1.7, 1.7, 1.7).setPosition(hp);
     halos.setMatrixAt(n, hm);
-    heads.push({ i: it.i, px: _m.elements[12], py: _m.elements[13], pz: _m.elements[14] });
+    heads.push({ i: it.i, px: _m.elements[12], py: _m.elements[13], pz: _m.elements[14], hx: hp.x, hy: hp.y, hz: hp.z });
     // pool of light under the lamp head, baked onto the road
     baker.addPoint(hp.x, hp.y, hp.z, color, opts.intensity ?? 1.0, opts.radius ?? 24, it.i);
   });
@@ -201,6 +201,8 @@ export function buildLamps(track, baker, opts = {}) {
   for (const m of [poles, panels, halos]) m.computeBoundingSphere();
   const g = new THREE.Group();
   g.add(poles, panels, halos);
+  // where the lamp heads are (for their light on water)
+  g.userData.heads = heads.map((h) => ({ x: h.hx, y: h.hy, z: h.hz }));
   return g;
 }
 
