@@ -3800,6 +3800,28 @@ kbd.k-pill {
   animation: fadeIn 0.3s;
 }
 
+.launch.full {
+  padding: 0.7rem 1.2rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.launch kbd {
+  margin: 0 0.15em;
+  vertical-align: middle;
+  font-size: 0.8em;
+}
+
+.launch b {
+  font-weight: 700;
+  color: var(--ice);
+}
+
+/* held: when to let go */
+.launch.held {
+  color: var(--amber);
+}
+
 .countdown.go {
   color: var(--good);
   letter-spacing: calc(0.06em * var(--track));
@@ -4268,6 +4290,21 @@ kbd.k-pill {
 .tbtn.nitro.on {
   transform: scale(0.92);
   background: rgba(168, 216, 255, 0.42);
+}
+
+/* on the start line until the launch is learned: hold me */
+.tbtn.nitro.prompt {
+  animation: holdPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes holdPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 216, 255, 0.5);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 0.9rem rgba(168, 216, 255, 0);
+  }
 }
 
 .touch .tilt-hint {

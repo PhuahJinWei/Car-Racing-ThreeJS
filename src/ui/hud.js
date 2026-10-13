@@ -376,6 +376,15 @@ export class HUD {
       .join('');
   }
 
+  /** The control that launches on this device: a key, a trigger, or the touch NITRO button. */
+  _launchKey() {
+    const input = this.app.input;
+    if (input.revBy === 'nitro') return `<b>${t('touch.nitro')}</b>`;
+    if (input.device === 'gamepad') return '<kbd class="k-pill">RT</kbd>';
+    if (input.device === 'touch' || input.device === 'tilt') return `<b>${t('start.gas')}</b>`;
+    return '<kbd>W</kbd> / <kbd>↑</kbd>';
+  }
+
   _set(key, node, value, prop = 'textContent') {
     if (this.cache[key] === value) return;
     this.cache[key] = value;
@@ -408,9 +417,16 @@ export class HUD {
       this._setNum('suf', $.suf, place, fmtSuf);
       this._setNum('of', $.of, h.total || 0, fmtOf);
     }
-    // how to launch, on the start line until the gas is held
-    $.launch.classList.toggle('on', !!h.launch && !h.launchHeld);
-    if (h.launch) this._set('launch', $.launch, this.app.input.revBy === 'nitro' ? t('start.holdNitro') : t('start.holdGas'));
+    // how to launch: in full, from the intro on, until the first perfect start, then a small line on
+    // the start line for a few more races (see race.js); while held, when to let go
+    const full = h.launchLevel > 1;
+    const show = !!h.launch && h.launchLevel > 0 && (h.launch === 'line' || full);
+    $.launch.classList.toggle('on', show);
+    if (show) {
+      $.launch.classList.toggle('full', full);
+      $.launch.classList.toggle('held', h.revving);
+      this._set('launch', $.launch, h.revving ? t('start.release') : t('start.hold', { key: this._launchKey() }), 'innerHTML');
+    }
     this._setNum('l', $.l, h.lap || 1, fmtLap);
     this._setNum('ls', $.ls, h.laps || 1, fmtLaps);
     this._set('time', $.time, formatTime(h.time || 0));

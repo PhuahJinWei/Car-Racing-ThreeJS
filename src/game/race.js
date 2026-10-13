@@ -94,6 +94,11 @@ export function pickRivals(count, seed) {
 // an ordinary start.
 const LAUNCH_WINDOW = 0.2;
 const EARLY_DELAY = 0.8;
+// how to launch is shown in full (with the control to hold, from the intro on) until the first
+// perfect start, then as a small line until LAUNCH_LEARNED of them; a race started without holding
+// gets a tip afterwards, up to LAUNCH_TIPS times before the first perfect start
+const LAUNCH_LEARNED = 3;
+const LAUNCH_TIPS = 3;
 
 export class Race {
   constructor(app, cfg) {
@@ -128,6 +133,8 @@ export class Race {
     this.stall = 0;
     this.awaitRelease = false;
     this.startRev = 0;
+    const learned = app.storage.data.launch.perfect;
+    this.launchLevel = learned === 0 ? 2 : learned < LAUNCH_LEARNED ? 1 : 0;
   }
 
   on(evt, fn) {
@@ -343,7 +350,10 @@ export class Race {
     this.emit('countdown', { value: 'GO' });
     this.app.audio?.play('go');
     // let go just before GO: perfect; well before: a late start; still holding: wait for the release
-    if (!this.launchHeld) return;
+    if (!this.launchHeld) {
+      this._launchTip();
+      return;
+    }
     const v = this.player.vehicle;
     if (this.launchReleased === null) {
       v.frozen = true;
@@ -356,6 +366,20 @@ export class Race {
     }
   }
 
+  /** After a start without holding: how to launch, a few times until it's been done once. */
+  _launchTip() {
+    const S = this.app.storage;
+    const L = S.data.launch;
+    // (the first race's own tips cover the start)
+    if (!S.data.tutorialDone || L.perfect > 0 || L.tips >= LAUNCH_TIPS) return;
+    L.tips++;
+    S.save();
+    const msg = t(this.app.input.revBy === 'nitro' ? 'tip.launchTouch' : 'tip.launch');
+    setTimeout(() => {
+      if (this.app.race === this && !this.paused) this.app.ui.tip(msg);
+    }, 1600);
+  }
+
   _missedLaunch(label) {
     this.emit('popup', { kind: 'fail', label: t(label), points: 0, combo: 1 });
     this.app.audio?.play('error');
@@ -365,6 +389,8 @@ export class Race {
   _perfectStart() {
     if (this.perfectStart) return;
     this.perfectStart = true;
+    this.app.storage.data.launch.perfect++;
+    this.app.storage.save();
     const v = this.player.vehicle;
     v.giveBoost(1.4, 'start');
     this.stunts.add('perfectStart', 300, t('pop.perfectStart'), { big: true });
@@ -482,10 +508,11 @@ export class Race {
     const steps = Math.min(10, Math.max(1, Math.ceil(dt / (1 / 120))));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) v.step(h, ctrl);
-    // on the start line a held gas revs the engine
-    const revving = (this.phase === 'countdown' || this.awaitRelease) && input.state.rev;
-    this.startRev = revving ? Math.min(1, this.startRev + dtReal * 2.5) : Math.max(0, this.startRev - dtReal * 3);
-    if (this.phase === 'countdown' || this.awaitRelease) v.rpm = 0.22 + this.startRev * 0.7;
+    // on the start line (from the intro on) a held gas revs the engine
+    const onLine = this.phase === 'intro' || this.phase === 'countdown' || this.awaitRelease;
+    this.revving = onLine && input.state.rev;
+    this.startRev = this.revving ? Math.min(1, this.startRev + dtReal * 2.5) : Math.max(0, this.startRev - dtReal * 3);
+    if (onLine) v.rpm = 0.22 + this.startRev * 0.7;
 
     // ---- AI
     const ctx = this._aiCtx || (this._aiCtx = { racers: this.racers, player: P });
@@ -1398,9 +1425,10 @@ export class Race {
     h.slipstream = v.slipstream;
     h.timeScale = this.timeScale;
     h.mode = this.cfg.mode;
-    // (on the start line: the hint, and the touch NITRO button reads REV)
-    h.launch = this.phase === 'countdown' || this.awaitRelease;
-    h.launchHeld = this.launchHeld;
+    // on the start line: how to launch (see LAUNCH_LEARNED), and the touch NITRO button revs
+    h.launch = this.phase === 'intro' ? 'intro' : this.phase === 'countdown' || this.awaitRelease ? 'line' : null;
+    h.launchLevel = this.launchLevel;
+    h.revving = !!this.revving;
   }
 
   /** Minimap data: track polyline + cars. */

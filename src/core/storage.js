@@ -52,6 +52,8 @@ function defaultSave() {
     stats: { races: 0, wins: 0, podiums: 0, nearMisses: 0, driftDistance: 0, bestCombo: 1, creditsEarned: 0, bestDrift: 0 },
     lastSetup: { trackId: 'district', reverse: false, mirror: false, weather: 'auto', laps: 3, difficulty: 'easy' },
     tutorialDone: false,
+    // the launch start (see race.js): perfect starts made, and "hold the gas" tips shown
+    launch: { perfect: 0, tips: 0 },
   };
 }
 
@@ -130,6 +132,7 @@ export class Storage {
     for (const k of Object.keys(saved.custom || {})) out.custom[k] = { ...(base.custom[k] || {}), ...saved.custom[k] };
     out.stats = { ...base.stats, ...(saved.stats || {}) };
     out.daily = { ...base.daily, ...(saved.daily || {}) };
+    out.launch = { ...base.launch, ...(saved.launch || {}) };
     out.lastSetup = { ...base.lastSetup, ...(saved.lastSetup || {}) };
     return out;
   }

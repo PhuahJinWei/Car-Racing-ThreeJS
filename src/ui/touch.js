@@ -202,12 +202,15 @@ export class TouchControls {
   }
 
   update(hud) {
-    // on the start line the button revs the engine
-    const rev = hud.launch && this.input.revBy === 'nitro';
-    if (rev !== this._lastRev) {
-      this._lastRev = rev;
-      $(this.nitroEl, '.lbl').textContent = rev ? t('touch.rev') : t('touch.nitro');
+    // on the start line the button revs the engine: HOLD it (pulsing until the first perfect start),
+    // REV while held
+    const line = !!hud.launch && this.input.revBy === 'nitro';
+    const lbl = !line ? 'touch.nitro' : hud.revving || !hud.launchLevel ? 'touch.rev' : 'touch.hold';
+    if (lbl !== this._lastLbl) {
+      this._lastLbl = lbl;
+      $(this.nitroEl, '.lbl').textContent = t(lbl);
     }
+    this.nitroEl.classList.toggle('prompt', line && hud.launchLevel > 1 && !hud.revving);
     const nitro = hud.nitro || 0;
     const c = Math.floor(nitro);
     if (c !== this._lastN) {
