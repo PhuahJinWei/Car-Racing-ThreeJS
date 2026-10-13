@@ -22,11 +22,14 @@ export class Input {
   constructor() {
     this.keys = new Set();
     this.edges = new Set();
-    this.state = { steer: 0, throttle: 0, brake: 0, drift: false, nitroHeld: false };
+    // rev: held to rev the engine on the start line - the gas, or NITRO where the gas is automatic
+    // (revBy says which)
+    this.state = { steer: 0, throttle: 0, brake: 0, drift: false, nitroHeld: false, rev: false };
+    this.revBy = 'gas';
     this.kbSteer = 0;
     this.device = 'keyboard';
     // from the on-screen controls: steer -1..1, throttle / brake 0..1 (the stick, with auto-accelerate off)
-    this.touch = { steer: 0, throttle: 0, brake: 0, drift: false, active: false };
+    this.touch = { steer: 0, throttle: 0, brake: 0, drift: false, nitro: false, active: false };
     this.tilt = { enabled: false, raw: 0, neutral: 0, value: 0, has: false };
     this.autoAccel = true;
     this.tiltSensitivity = 1;
@@ -215,6 +218,8 @@ export class Input {
       s.throttle = gp.throttle;
       s.brake = gp.brake;
       s.drift = gp.drift;
+      s.rev = gp.throttle > 0.5;
+      this.revBy = 'gas';
     } else if (dev === 'touch' || dev === 'tilt') {
       if (this.tilt.enabled && this.tilt.has) {
         const v = (this.tilt.raw - this.tilt.neutral) / (22 / this.tiltSensitivity);
@@ -226,11 +231,15 @@ export class Input {
       s.drift = this.touch.drift;
       s.brake = this.touch.brake;
       s.throttle = this.autoAccel ? 1 : this.touch.throttle;
+      s.rev = this.autoAccel ? this.touch.nitro : this.touch.throttle > 0.5;
+      this.revBy = this.autoAccel ? 'nitro' : 'gas';
     } else {
       s.steer = this.kbSteer;
       s.throttle = this.has('up') ? 1 : 0;
       s.brake = this.has('down') ? 1 : 0;
       s.drift = this.has('drift');
+      s.rev = s.throttle > 0;
+      this.revBy = 'gas';
     }
     s.nitroHeld = this.has('nitro');
     return s;

@@ -88,6 +88,13 @@ export function pickRivals(count, seed) {
  * cfg: { trackId, variant: {reverse, mirror, weather}, mode: 'race'|'timetrial'|'daily',
  *        laps, difficulty, carId, custom, opponents, rivals (car id per opponent), ghost }
  */
+// The start: hold the gas (or NITRO, where the gas is automatic) during the countdown and release it
+// on GO. Released within LAUNCH_WINDOW of GO: a perfect start. Released earlier: the car sits for
+// EARLY_DELAY after GO. Still held after the window: the car waits until it's released. Never held:
+// an ordinary start.
+const LAUNCH_WINDOW = 0.2;
+const EARLY_DELAY = 0.8;
+
 export class Race {
   constructor(app, cfg) {
     this.app = app;
@@ -114,7 +121,13 @@ export class Race {
     this._autoCtrl = { steer: 0, throttle: 0, brake: 0, drift: false };
     this._noCtrl = { steer: 0, throttle: 0, brake: 0, drift: false };
     this.perfectStart = null;
-    this.startPressTime = null;
+    // the start (see LAUNCH_WINDOW): whether it was held, when it was let go (s before GO), how long
+    // the car still sits, whether it waits for a release, and the engine revs it's held at (0..1)
+    this.launchHeld = false;
+    this.launchReleased = null;
+    this.stall = 0;
+    this.awaitRelease = false;
+    this.startRev = 0;
   }
 
   on(evt, fn) {
@@ -329,8 +342,24 @@ export class Race {
     }
     this.emit('countdown', { value: 'GO' });
     this.app.audio?.play('go');
-    // perfect start window: pressed nitro within [-0.3, +0.25] s of GO
-    if (this.startPressTime !== null && this.startPressTime > -0.32) this._perfectStart();
+    // let go just before GO: perfect; well before: a late start; still holding: wait for the release
+    if (!this.launchHeld) return;
+    const v = this.player.vehicle;
+    if (this.launchReleased === null) {
+      v.frozen = true;
+      this.awaitRelease = true;
+    } else if (this.launchReleased <= LAUNCH_WINDOW) this._perfectStart();
+    else {
+      v.frozen = true;
+      this.stall = EARLY_DELAY;
+      this._missedLaunch('pop.tooEarly');
+    }
+  }
+
+  _missedLaunch(label) {
+    this.emit('popup', { kind: 'fail', label: t(label), points: 0, combo: 1 });
+    this.app.audio?.play('error');
+    this.app.input.vibrate(90);
   }
 
   _perfectStart() {
@@ -393,15 +422,26 @@ export class Race {
         this.emit('countdown', { value: c });
         app.audio?.play('count');
       }
-      if (input.consume('nitro')) {
-        this.startPressTime = -remain;
-        if (remain > 0.32) this.emit('popup', { kind: 'fail', label: t('pop.tooEarly'), points: 0, combo: 1 });
-      }
+      // holding the gas (or NITRO, where the gas is automatic) revs the engine; NITRO doesn't fire here
+      input.consume('nitro');
+      if (input.state.rev) {
+        this.launchHeld = true;
+        this.launchReleased = null;
+      } else if (this.launchHeld && this.launchReleased === null) this.launchReleased = remain;
       if (remain <= 0) this._go();
     } else if (this.phase === 'racing' && !P.finished) {
       this.time += dt;
-      if (this.phaseTime < 0.25 && input.consume('nitro') && !this.perfectStart) this._perfectStart();
-      else if (input.consume('nitro')) {
+      if (this.stall > 0) {
+        this.stall -= dt;
+        if (this.stall <= 0) v.frozen = false;
+      }
+      if (this.awaitRelease && !input.state.rev) {
+        this.awaitRelease = false;
+        v.frozen = false;
+        if (this.phaseTime <= LAUNCH_WINDOW) this._perfectStart();
+        else this._missedLaunch('pop.tooLate');
+      }
+      if (input.consume('nitro')) {
         if (v.fireNitro()) this._onNitro();
         else this.emit('popup', { kind: 'fail', label: t('pop.noNitro'), points: 0, combo: 1 });
       }
@@ -442,6 +482,10 @@ export class Race {
     const steps = Math.min(10, Math.max(1, Math.ceil(dt / (1 / 120))));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) v.step(h, ctrl);
+    // on the start line a held gas revs the engine
+    const revving = (this.phase === 'countdown' || this.awaitRelease) && input.state.rev;
+    this.startRev = revving ? Math.min(1, this.startRev + dtReal * 2.5) : Math.max(0, this.startRev - dtReal * 3);
+    if (this.phase === 'countdown' || this.awaitRelease) v.rpm = 0.22 + this.startRev * 0.7;
 
     // ---- AI
     const ctx = this._aiCtx || (this._aiCtx = { racers: this.racers, player: P });
@@ -1284,7 +1328,7 @@ export class Race {
     const st = this._audioState || (this._audioState = {});
     st.rpm = v.rpm;
     st.electric = !!this.player.def.electric;
-    st.throttle = this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25;
+    st.throttle = this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25 + 0.75 * this.startRev;
     st.speed = v.speed;
     st.topSpeed = v.topSpeed;
     st.boost = v.boostLevel;
@@ -1354,6 +1398,9 @@ export class Race {
     h.slipstream = v.slipstream;
     h.timeScale = this.timeScale;
     h.mode = this.cfg.mode;
+    // (on the start line: the hint, and the touch NITRO button reads REV)
+    h.launch = this.phase === 'countdown' || this.awaitRelease;
+    h.launchHeld = this.launchHeld;
   }
 
   /** Minimap data: track polyline + cars. */

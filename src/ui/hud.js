@@ -53,6 +53,7 @@ export class HUD {
         <div class="drift-tier"><span class="lbl">${t('hud.drift')}</span><span class="pts">0</span></div>
         <div class="popups"></div>
         <div class="center-msg"></div>
+        <div class="launch"></div>
         <div class="gauge">
           <div class="g-red"></div>
           <div class="g-track"></div>
@@ -94,6 +95,7 @@ export class HUD {
       driftPts: $(this.root, '.drift-tier .pts'),
       popups: $(this.root, '.popups'),
       center: $(this.root, '.center-msg'),
+      launch: $(this.root, '.launch'),
       gauge: $(this.root, '.gauge'),
       num: $(this.root, '.g-center .num'),
       unit: $(this.root, '.g-center .unit'),
@@ -406,6 +408,9 @@ export class HUD {
       this._setNum('suf', $.suf, place, fmtSuf);
       this._setNum('of', $.of, h.total || 0, fmtOf);
     }
+    // how to launch, on the start line until the gas is held
+    $.launch.classList.toggle('on', !!h.launch && !h.launchHeld);
+    if (h.launch) this._set('launch', $.launch, this.app.input.revBy === 'nitro' ? t('start.holdNitro') : t('start.holdGas'));
     this._setNum('l', $.l, h.lap || 1, fmtLap);
     this._setNum('ls', $.ls, h.laps || 1, fmtLaps);
     this._set('time', $.time, formatTime(h.time || 0));

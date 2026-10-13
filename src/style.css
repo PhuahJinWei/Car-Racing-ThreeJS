@@ -3774,6 +3774,32 @@ kbd.k-pill {
   font-variant-numeric: tabular-nums;
 }
 
+/* how to launch, under the countdown on the start line */
+.launch {
+  position: absolute;
+  left: 50%;
+  top: calc(33% + clamp(5rem, 28vmin, 15rem) + 0.5rem);
+  transform: translateX(-50%);
+  display: none;
+  padding: 0.5rem 0.95rem;
+  border-radius: 6px;
+  background: rgba(8, 9, 12, 0.62);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: calc(0.22em * var(--track));
+  color: var(--ink-2);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.launch.on {
+  display: block;
+  animation: fadeIn 0.3s;
+}
+
 .countdown.go {
   color: var(--good);
   letter-spacing: calc(0.06em * var(--track));

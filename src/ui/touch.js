@@ -186,15 +186,28 @@ export class TouchControls {
     const n = this.nitroEl;
     n.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      n.setPointerCapture?.(e.pointerId);
       this.input.press('nitro');
+      this.input.setTouch({ nitro: true });
       n.classList.add('on');
       setTimeout(() => n.classList.remove('on'), 120);
     });
+    // (held, NITRO revs the engine on the start line)
+    const endNitro = () => this.input.setTouch({ nitro: false });
+    n.addEventListener('pointerup', endNitro);
+    n.addEventListener('pointercancel', endNitro);
+    n.addEventListener('lostpointercapture', endNitro);
     // Stop the page from scrolling / zooming while playing.
     this.root.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   }
 
   update(hud) {
+    // on the start line the button revs the engine
+    const rev = hud.launch && this.input.revBy === 'nitro';
+    if (rev !== this._lastRev) {
+      this._lastRev = rev;
+      $(this.nitroEl, '.lbl').textContent = rev ? t('touch.rev') : t('touch.nitro');
+    }
     const nitro = hud.nitro || 0;
     const c = Math.floor(nitro);
     if (c !== this._lastN) {
@@ -218,7 +231,7 @@ export class TouchControls {
   }
 
   reset() {
-    this.input.setTouch({ steer: 0, throttle: 0, brake: 0, drift: false });
+    this.input.setTouch({ steer: 0, throttle: 0, brake: 0, drift: false, nitro: false });
     this.driftPointers.clear();
     this.driftEl.classList.remove('on');
     this.stickPointer = null;
