@@ -226,9 +226,228 @@ export function panel(f, { view, outline, depth = 0, rings = 6, step = 0.03 }) {
   return out;
 }
 
+/** A closed outline [[a, b, sharp?], ...] densified (Catmull-Rom between its sharp points). */
+export function densifyLoop(outline, step) {
+  const n = outline.length;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const p1 = outline[i];
+    const p2 = outline[(i + 1) % n];
+    const p0 = p1[2] ? p1 : outline[(i - 1 + n) % n];
+    const p3 = p2[2] ? p2 : outline[(i + 2) % n];
+    const len = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    const steps = Math.max(1, Math.ceil(len / step));
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const c = (a0, a1, a2, a3) => 0.5 * (2 * a1 + (-a0 + a2) * t + (2 * a0 - 5 * a1 + 4 * a2 - a3) * t * t + (-a0 + 3 * a1 - 3 * a2 + a3) * t * t * t);
+      pts.push([c(p0[0], p1[0], p2[0], p3[0]), c(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  return pts;
+}
+
+/**
+ * A closed outline grown outward by `d` (negative: inward), densified at `step`. Corners come out
+ * slightly rounded, as a frame's do.
+ */
+export function offsetLoop(outline, d, step = 0.004) {
+  const pts = densifyLoop(outline, step);
+  const n = pts.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = pts[i];
+    const [bx, by] = pts[(i + 1) % n];
+    area += ax * by - bx * ay;
+  }
+  const s = area > 0 ? 1 : -1;
+  return pts.map((p, i) => {
+    const [ax, ay] = pts[(i - 1 + n) % n];
+    const [bx, by] = pts[(i + 1) % n];
+    let tx = bx - ax;
+    let ty = by - ay;
+    const l = Math.hypot(tx, ty) || 1;
+    tx /= l;
+    ty /= l;
+    return [p[0] + ty * d * s, p[1] - tx * d * s];
+  });
+}
+
+/**
+ * Steady a path laid on the skin: where its rays graze a steep surface (a wraparound windshield's
+ * pillars), neighbouring points land at uneven heights and the strip comes out ragged. Points that
+ * jump far from their neighbours are pulled back between them, the path is relaxed, and every point
+ * is put back onto the surface with its normal there. (In place.)
+ */
+function steady(f, base, nor, ok, closed) {
+  const n = ok.length;
+  if (n < 3) return;
+  const at = (i) => (closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i)));
+  const P = Float64Array.from(base);
+  const tmp = new Float64Array(P.length);
+  // typical spacing, to spot points that jumped
+  let total = 0;
+  for (let i = 1; i < n; i++) total += Math.hypot(P[i * 3] - P[i * 3 - 3], P[i * 3 + 1] - P[i * 3 - 2], P[i * 3 + 2] - P[i * 3 - 1]);
+  const typical = total / (n - 1);
+  for (let it = 0; it < 4; it++) {
+    for (let i = 0; i < n; i++) {
+      const fixedEnd = !closed && (i === 0 || i === n - 1);
+      const a = at(i - 1);
+      const b = at(i + 1);
+      for (let c = 0; c < 3; c++) {
+        const mid = (P[a * 3 + c] + P[b * 3 + c]) / 2;
+        tmp[i * 3 + c] = fixedEnd || !ok[i] ? P[i * 3 + c] : P[i * 3 + c] + (mid - P[i * 3 + c]) * 0.5;
+      }
+      // (a point far off the line between its neighbours goes all the way back to it)
+      if (!fixedEnd && ok[i]) {
+        const off = Math.hypot(P[i * 3] - (P[a * 3] + P[b * 3]) / 2, P[i * 3 + 1] - (P[a * 3 + 1] + P[b * 3 + 1]) / 2, P[i * 3 + 2] - (P[a * 3 + 2] + P[b * 3 + 2]) / 2);
+        if (off > typical * 1.5) for (let c = 0; c < 3; c++) tmp[i * 3 + c] = (P[a * 3 + c] + P[b * 3 + c]) / 2;
+      }
+    }
+    P.set(tmp);
+  }
+  const g = [0, 0, 0];
+  for (let i = 0; i < n; i++) {
+    if (!ok[i]) continue;
+    let x = P[i * 3];
+    let y = P[i * 3 + 1];
+    let z = P[i * 3 + 2];
+    for (let k = 0; k < 4; k++) {
+      const d = f(x, y, z);
+      normalAt(f, x, y, z, g);
+      x -= g[0] * d;
+      y -= g[1] * d;
+      z -= g[2] * d;
+    }
+    normalAt(f, x, y, z, g);
+    base[i * 3] = x;
+    base[i * 3 + 1] = y;
+    base[i * 3 + 2] = z;
+    nor[i * 3] = g[0];
+    nor[i * 3 + 1] = g[1];
+    nor[i * 3 + 2] = g[2];
+  }
+}
+
+/**
+ * Thin out a dense 2D path: keep a point once the path has turned `turn` radians, or run `run`
+ * metres, since the last one kept (straight runs need few points, bends keep theirs).
+ */
+function sparse(pts, closed, turn, run) {
+  const n = pts.length;
+  if (n < 4) return pts;
+  const dir = (a, b) => Math.atan2(b[1] - a[1], b[0] - a[0]);
+  const keep = [pts[0]];
+  let last = 0;
+  let heading = dir(pts[0], pts[1]);
+  let len = 0;
+  for (let i = 1; i < n - 1; i++) {
+    len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    let d = dir(pts[i], pts[i + 1]) - heading;
+    d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+    if (d > turn || len > run) {
+      keep.push(pts[i]);
+      last = i;
+      heading = dir(pts[i], pts[i + 1]);
+      len = 0;
+    }
+  }
+  void last;
+  if (!closed) keep.push(pts[n - 1]);
+  return keep;
+}
+
+/**
+ * A rounded strip standing on the skin along a 2D path drawn in a view: chrome trims, window
+ * frames, drip rails. Real geometry, so it stays smooth and crisp at any size (painted onto the
+ * voxel mesh, a centimetre-wide trim came out crumpled). Its cross-section is a half-ellipse
+ * `width` across and `height` tall, sunk `sink` into the skin so no gap shows. An open path tapers
+ * to nothing at its ends; `closed` joins it into a loop.
+ */
+export function bead(f, { view, path, closed = false, width, height, sink = 0.0008, step = 0.004, sides = 6, sharp = false, turn = 0.06, run = 0.08 }) {
+  const pts = sparse(closed ? densifyLoop(path, step) : resample(path, step, sharp), closed, turn, run);
+  const n = pts.length;
+  const base = [];
+  const nor = [];
+  const ok = [];
+  for (const [a, b] of pts) {
+    const before = base.length;
+    const good = project(f, view, a, b, 0, base, nor);
+    if (!good) {
+      base.length = before;
+      base.push(0, 0, 0);
+      nor.push(0, 1, 0);
+    }
+    ok.push(good);
+  }
+  steady(f, base, nor, ok, closed);
+  // distance along the path (for the tapered ends)
+  const along = [0];
+  for (let i = 1; i < n; i++) along.push(along[i - 1] + Math.hypot(base[i * 3] - base[i * 3 - 3], base[i * 3 + 1] - base[i * 3 - 2], base[i * 3 + 2] - base[i * 3 - 1]));
+  const total = along[n - 1];
+  const taper = width * 1.5;
+  const pos = [];
+  const vn = [];
+  const ring = sides + 1;
+  for (let i = 0; i < n; i++) {
+    const p = i * 3;
+    const prev = closed ? (i - 1 + n) % n : Math.max(0, i - 1);
+    const next = closed ? (i + 1) % n : Math.min(n - 1, i + 1);
+    const nx = nor[p];
+    const ny = nor[p + 1];
+    const nz = nor[p + 2];
+    let tx = base[next * 3] - base[prev * 3];
+    let ty = base[next * 3 + 1] - base[prev * 3 + 1];
+    let tz = base[next * 3 + 2] - base[prev * 3 + 2];
+    const tn = tx * nx + ty * ny + tz * nz;
+    tx -= nx * tn;
+    ty -= ny * tn;
+    tz -= nz * tn;
+    let tl = Math.hypot(tx, ty, tz) || 1;
+    tx /= tl;
+    ty /= tl;
+    tz /= tl;
+    // across the strip: B = N x T
+    const bx = ny * tz - nz * ty;
+    const by = nz * tx - nx * tz;
+    const bz = nx * ty - ny * tx;
+    const k = closed ? 1 : Math.min(1, Math.sqrt(Math.min(along[i], total - along[i]) / taper));
+    const hw = (width / 2) * k;
+    const hh = height * k;
+    for (let j = 0; j <= sides; j++) {
+      const th = (Math.PI * j) / sides;
+      const c = Math.cos(th);
+      const s = Math.sin(th);
+      pos.push(base[p] + bx * c * hw + nx * (s * hh - sink), base[p + 1] + by * c * hw + ny * (s * hh - sink), base[p + 2] + bz * c * hw + nz * (s * hh - sink));
+      // the half-ellipse's normal: (cos/a, sin/b) scaled
+      let ex = bx * c * height + nx * s * (width / 2);
+      let ey = by * c * height + ny * s * (width / 2);
+      let ez = bz * c * height + nz * s * (width / 2);
+      const el = Math.hypot(ex, ey, ez) || 1;
+      vn.push(ex / el, ey / el, ez / el);
+    }
+  }
+  const idx = [];
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const i2 = (i + 1) % n;
+    if (!ok[i] || !ok[i2]) continue;
+    for (let j = 0; j < sides; j++) {
+      const a = i * ring + j;
+      const b = i * ring + j + 1;
+      const c = i2 * ring + j;
+      const d = i2 * ring + j + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  const out = { positions: new Float32Array(pos), normals: new Float32Array(vn), indices: new Uint32Array(idx) };
+  orient(out.positions, out.normals, out.indices);
+  return out;
+}
+
 export function buildDecal(f, spec) {
   if (spec.kind === 'ribbon') return ribbon(f, spec);
   if (spec.kind === 'disc') return disc(f, spec);
   if (spec.kind === 'panel') return panel(f, spec);
+  if (spec.kind === 'bead') return bead(f, spec);
   throw new Error(`unknown decal kind ${spec.kind}`);
 }

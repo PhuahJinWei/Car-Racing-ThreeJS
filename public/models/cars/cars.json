@@ -4,33 +4,33 @@
       "id": "volt",
       "file": "volt.glb",
       "factory": true,
-      "v": "a2f6264385",
+      "v": "663401c518",
       "gz": true,
       "light": {
         "file": "volt.m.glb",
-        "v": "53fae2f237"
+        "v": "6abce9cfd6"
       }
     },
     {
       "id": "razor",
       "file": "razor.glb",
       "factory": true,
-      "v": "ceb913f523",
+      "v": "8e96895039",
       "gz": true,
       "light": {
         "file": "razor.m.glb",
-        "v": "a2f460125c"
+        "v": "3c6bdf69aa"
       }
     },
     {
       "id": "specter",
       "file": "specter.glb",
       "factory": true,
-      "v": "45c558374b",
+      "v": "8e97a728a7",
       "gz": true,
       "light": {
         "file": "specter.m.glb",
-        "v": "f06e1941d7"
+        "v": "0f8a2fcb11"
       }
     },
     {
@@ -38,10 +38,10 @@
       "file": "touge.glb",
       "gz": true,
       "factory": true,
-      "v": "b100d4abe8",
+      "v": "d0772edc04",
       "light": {
         "file": "touge.m.glb",
-        "v": "659cfac1b3"
+        "v": "f3f3bd8fba"
       }
     },
     {
@@ -49,10 +49,10 @@
       "file": "marshal.glb",
       "gz": true,
       "factory": true,
-      "v": "400a7f2176",
+      "v": "4fcbbbfbb7",
       "light": {
         "file": "marshal.m.glb",
-        "v": "39f725199c"
+        "v": "e074d17070"
       }
     },
     {
@@ -60,10 +60,10 @@
       "file": "brawler.glb",
       "gz": true,
       "factory": true,
-      "v": "013fe8c2dd",
+      "v": "4d2332d572",
       "light": {
         "file": "brawler.m.glb",
-        "v": "5cfdd1ea25"
+        "v": "6422d284b6"
       }
     },
     {
@@ -71,10 +71,10 @@
       "file": "ronin.glb",
       "gz": true,
       "factory": true,
-      "v": "64662d6ab9",
+      "v": "e31f586da1",
       "light": {
         "file": "ronin.m.glb",
-        "v": "974cb82aa9"
+        "v": "cdcc8f9302"
       }
     },
     {
@@ -82,10 +82,10 @@
       "file": "sidewinder.glb",
       "gz": true,
       "factory": true,
-      "v": "47be4f7151",
+      "v": "ce0203bcd8",
       "light": {
         "file": "sidewinder.m.glb",
-        "v": "7f9198d89f"
+        "v": "eb50bd3a51"
       }
     },
     {
@@ -93,10 +93,10 @@
       "file": "vesper.glb",
       "gz": true,
       "factory": true,
-      "v": "cf6c4e9053",
+      "v": "d4901d4d80",
       "light": {
         "file": "vesper.m.glb",
-        "v": "26b25a16ca"
+        "v": "a0bfeb7e8f"
       }
     },
     {
@@ -104,10 +104,10 @@
       "file": "juggernaut.glb",
       "gz": true,
       "factory": true,
-      "v": "b803c248fe",
+      "v": "36feaa572c",
       "light": {
         "file": "juggernaut.m.glb",
-        "v": "479dd49961"
+        "v": "742a70ed15"
       }
     },
     {
@@ -115,10 +115,10 @@
       "file": "mochi.glb",
       "gz": true,
       "factory": true,
-      "v": "9af98ffb01",
+      "v": "59034231d5",
       "light": {
         "file": "mochi.m.glb",
-        "v": "6b6aec55bd"
+        "v": "73b47e6088"
       }
     },
     {
@@ -126,10 +126,10 @@
       "file": "jukebox.glb",
       "gz": true,
       "factory": true,
-      "v": "af1a19e510",
+      "v": "35edfa5354",
       "light": {
         "file": "jukebox.m.glb",
-        "v": "b424d781a0"
+        "v": "dfd3096133"
       }
     },
     {
@@ -137,10 +137,10 @@
       "file": "cabbie.glb",
       "gz": true,
       "factory": true,
-      "v": "9f65098d3d",
+      "v": "cde37bd78b",
       "light": {
         "file": "cabbie.m.glb",
-        "v": "c903a106fd"
+        "v": "ca7c3c2032"
       }
     },
     {
@@ -148,10 +148,10 @@
       "file": "kaido.glb",
       "gz": true,
       "factory": true,
-      "v": "62abfac8b5",
+      "v": "936acf095d",
       "light": {
         "file": "kaido.m.glb",
-        "v": "4200a37ac5"
+        "v": "7faf5d9937"
       }
     },
     {
@@ -159,10 +159,10 @@
       "file": "sleeper.glb",
       "gz": true,
       "factory": true,
-      "v": "5d9135e587",
+      "v": "12e5ac9f40",
       "light": {
         "file": "sleeper.m.glb",
-        "v": "f24aefd623"
+        "v": "6269ff684a"
       }
     },
     {
@@ -170,10 +170,10 @@
       "file": "deuce.glb",
       "gz": true,
       "factory": true,
-      "v": "8c5db74160",
+      "v": "d8d77527af",
       "light": {
         "file": "deuce.m.glb",
-        "v": "ade74c5c2e"
+        "v": "64904050ff"
       }
     },
     {
@@ -181,10 +181,10 @@
       "file": "surge.glb",
       "gz": true,
       "factory": true,
-      "v": "f28f2a8d8a",
+      "v": "4835102794",
       "light": {
         "file": "surge.m.glb",
-        "v": "e22323d899"
+        "v": "690dac61fc"
       }
     },
     {
@@ -192,10 +192,10 @@
       "file": "vice.glb",
       "gz": true,
       "factory": true,
-      "v": "9de9e9b722",
+      "v": "5fa0670556",
       "light": {
         "file": "vice.m.glb",
-        "v": "bb767814f4"
+        "v": "146e308ed3"
       }
     },
     {
@@ -203,10 +203,10 @@
       "file": "enduro.glb",
       "gz": true,
       "factory": true,
-      "v": "7086aa1ac7",
+      "v": "ddb77303bb",
       "light": {
         "file": "enduro.m.glb",
-        "v": "efaa126124"
+        "v": "c76733baef"
       }
     },
     {
@@ -214,10 +214,10 @@
       "file": "apogee.glb",
       "gz": true,
       "factory": true,
-      "v": "15e335c60e",
+      "v": "edc311efc2",
       "light": {
         "file": "apogee.m.glb",
-        "v": "0a9d0e643a"
+        "v": "dfa45bb8df"
       }
     }
   ]

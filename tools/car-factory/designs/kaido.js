@@ -8,7 +8,7 @@
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
-import { VIEW } from '../decals.js';
+import { VIEW, offsetLoop } from '../decals.js';
 
 export function buildKaido() {
   const WH = {
@@ -119,16 +119,14 @@ export function buildKaido() {
   const doorWin = new Profile2D(DOOR_WIN, small);
   const quarterWin = new Profile2D(QUARTER_WIN, small);
   const windshield = new Profile2D(WINDSHIELD, small);
-  const rearGlass = new Profile2D(
-    mirrorU([
-      [0, -0.66],
-      [0.56, -0.68],
-      [0.6, -0.95],
-      [0.54, -1.26],
-      [0, -1.3],
-    ]),
-    small,
-  );
+  const REAR_GLASS = mirrorU([
+    [0, -0.66],
+    [0.56, -0.68],
+    [0.6, -0.95],
+    [0.54, -1.26],
+    [0, -1.3],
+  ]);
+  const rearGlass = new Profile2D(REAR_GLASS, small);
   // the surf line (side view, z y): a crease from the front fender, dipping along the door and
   // kicking up over the rear wheel to the tail
   const SURF = [
@@ -277,8 +275,7 @@ export function buildKaido() {
         acc.add(sdRoundBox(x, y - 0.6, z + 1.1, 0.6, 0.24, 0.06, 0.05), MAT.interior, 0.03);
       }
     }
-    // window openings through the cabin walls in chrome frames (glass panes sit in them); the rear
-    // glass is a shallow recess
+    // window openings through the cabin walls (glass panes sit in them, chrome frames round them)
     if (y > 0.78 && z < 1.0 && z > -1.42) {
       const onCab = dCab - dBody + 0.004; // negative where the glasshouse is the outer surface
       const top = cP - cS + 0.01; // negative on the top of the glasshouse
@@ -288,7 +285,7 @@ export function buildKaido() {
       reg = Math.max(windshield.sample(ax, z), top, onCab);
       acc.cut(pocket(reg, sh, 0.045, po), po.wall ? MAT.chrome : MAT.trim, 0.003);
       reg = Math.max(rearGlass.sample(ax, z), top);
-      acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
+      acc.cut(pocket(reg, sh, 0.045, po), po.wall ? MAT.chrome : MAT.trim, 0.003);
     }
     // wipers, a hub at each pivot (after the glass, whose cut would take them away)
     if (z > 0.85 && z < 0.97 && y > 0.79 && y < 0.86 && ax < 0.6) {
@@ -353,12 +350,6 @@ export function buildKaido() {
     // ---------------------------------------------------------------- material zones
     if (acc.m === MAT.paint) {
       if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
-      else if (y > 0.84 && z < 0.96 && z > -1.4 && ax > 0.4) {
-        // chrome drip rails along the roof's edges over the side glass, and chrome frames round it
-        const side = cS - cP + 0.01 < 0;
-        const frame = Math.min(doorWin.sample(z, y), quarterWin.sample(z, y));
-        if ((z < 0.4 && z > -0.66 && cS > -0.03 && cP > -0.03) || (side && frame > 0 && frame < 0.012)) acc.m = MAT.chrome;
-      }
     }
     out.m = acc.m;
     return acc.d;
@@ -370,6 +361,27 @@ export function buildKaido() {
     for (const outline of [DOOR_WIN, QUARTER_WIN]) decals.push({ kind: 'panel', mat: MAT.window, view, outline, depth: 0.006 });
   }
   decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: WINDSHIELD, depth: 0.006, rings: 8 });
+  decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: REAR_GLASS, depth: 0.006, rings: 6 });
+  // chrome frames round the side glass and chrome drip rails along the roof's edges: real strips
+  // laid on the skin (painted onto it, they came out ragged)
+  for (const view of [VIEW.left, VIEW.right]) {
+    for (const outline of [DOOR_WIN, QUARTER_WIN]) decals.push({ kind: 'bead', mat: MAT.chrome, view, path: offsetLoop(outline, 0.008), closed: true, width: 0.012, height: 0.0035 });
+    decals.push({
+      kind: 'bead',
+      mat: MAT.chrome,
+      view,
+      path: [
+        [0.38, 1.205],
+        [0.25, 1.222],
+        [0.05, 1.23],
+        [-0.45, 1.23],
+        [-0.55, 1.226],
+        [-0.65, 1.2],
+      ],
+      width: 0.009,
+      height: 0.004,
+    });
+  }
   const ring = (cx, cy, r) => Array.from({ length: 33 }, (_, i) => [cx + Math.cos((i / 32) * Math.PI * 2) * r, cy + Math.sin((i / 32) * Math.PI * 2) * r]);
   for (const sx of [1, -1]) {
     // (the lens stands a centimetre in front of the dark housing: at the housing's own depth, the

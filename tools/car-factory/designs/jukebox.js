@@ -8,7 +8,7 @@
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCapsule, sdEllipsoid } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
-import { VIEW } from '../decals.js';
+import { VIEW, offsetLoop } from '../decals.js';
 
 export function buildJukebox() {
   const WH = {
@@ -134,16 +134,14 @@ export function buildJukebox() {
   const doorWin = new Profile2D(DOOR_WIN, small);
   const quarterWin = new Profile2D(QUARTER_WIN, small);
   const windshield = new Profile2D(WINDSHIELD, small);
-  const rearGlass = new Profile2D(
-    mirrorU([
-      [0, -0.78],
-      [0.64, -0.8],
-      [0.7, -1.05],
-      [0.62, -1.36],
-      [0, -1.4],
-    ]),
-    small,
-  );
+  const REAR_GLASS = mirrorU([
+    [0, -0.78],
+    [0.64, -0.8],
+    [0.7, -1.05],
+    [0.62, -1.36],
+    [0, -1.4],
+  ]);
+  const rearGlass = new Profile2D(REAR_GLASS, small);
   // intersection of two roughly orthogonal fields with the true distance outside the edge, so the
   // baked AO doesn't see phantom occlusion around the part
   const edge = (a, b) => (a > 0 && b > 0 ? Math.hypot(a, b) : Math.max(a, b));
@@ -248,8 +246,7 @@ export function buildJukebox() {
         acc.add(sdRoundBox(x, y - 0.66, z + 1.03, 0.8, 0.26, 0.07, 0.05), MAT.interior, 0.03);
       }
     }
-    // window openings through the cabin walls in chrome frames (glass panes sit in them); the big
-    // rear window is a shallow recess
+    // window openings through the cabin walls (glass panes sit in them, chrome frames round them)
     if (y > 0.86 && z < 1.1 && z > -1.52) {
       const onCab = dCab - dBody + 0.004; // negative where the glasshouse is the outer surface
       const top = cP - cS + 0.01; // negative on the top of the glasshouse
@@ -259,7 +256,7 @@ export function buildJukebox() {
       reg = Math.max(windshield.sample(ax, z), top, onCab);
       acc.cut(pocket(reg, sh, 0.045, po), po.wall ? MAT.chrome : MAT.trim, 0.003);
       reg = Math.max(rearGlass.sample(ax, z), top);
-      acc.cut(pocket(reg, sh, 0.008, po), MAT.glass, 0.003);
+      acc.cut(pocket(reg, sh, 0.045, po), po.wall ? MAT.chrome : MAT.trim, 0.003);
     }
     // the wide chrome grille: a mesh behind round chrome bars, between the headlamps
     if (z > 2.5 && y > 0.4 && y < 0.7 && ax < 0.64) {
@@ -324,14 +321,6 @@ export function buildJukebox() {
       if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
       // a chrome edge along the top and trailing edge of each fin
       else if (ax > 0.82 && y > 0.92 && z < -1.7 && z > -2.75 && finSide.sample(z, y) > -0.016) acc.m = MAT.chrome;
-      // chrome frames round the glass: side windows, windshield (up the pillars and across the top:
-      // along the cowl the frame's border with the hood cost the far model 1.5k triangles) and rear
-      // window
-      else if (y > 0.86 && z < 0.99 && z > -1.52) {
-        const side = cS - cP + 0.01 < 0;
-        const ring = (d) => d > 0 && d < 0.015;
-        if (side ? ring(Math.min(doorWin.sample(z, y), quarterWin.sample(z, y))) : ring(windshield.sample(ax, z)) || ring(rearGlass.sample(ax, z))) acc.m = MAT.chrome;
-      }
     }
     out.m = acc.m;
     return acc.d;
@@ -359,6 +348,12 @@ export function buildJukebox() {
     for (const outline of [DOOR_WIN, QUARTER_WIN]) decals.push({ kind: 'panel', mat: MAT.window, view, outline, depth: 0.006 });
   }
   decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: WINDSHIELD, depth: 0.006, rings: 8 });
+  decals.push({ kind: 'panel', mat: MAT.window, view: VIEW.top, outline: REAR_GLASS, depth: 0.006, rings: 6 });
+  // chunky chrome frames round all the glass: real strips laid on the skin (painted onto it, they
+  // came out ragged)
+  const frame = (view, outline) => ({ kind: 'bead', mat: MAT.chrome, view, path: offsetLoop(outline, 0.01), closed: true, width: 0.016, height: 0.005 });
+  for (const view of [VIEW.left, VIEW.right]) for (const outline of [DOOR_WIN, QUARTER_WIN]) decals.push(frame(view, outline));
+  decals.push(frame(VIEW.top, WINDSHIELD), frame(VIEW.top, REAR_GLASS));
   for (const sx of [1, -1]) {
     for (const xc of [0.66, 0.84]) decals.push({ kind: 'disc', mat: MAT.lens, view: VIEW.front, center: [xc * sx, 0.615], radius: 0.045, depth: 0.028, segments: 24 });
   }

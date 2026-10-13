@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { polygonize, buildParts, smoothSeams, remapMaterials } from './mesher.js';
+import { polygonize, buildParts, cutMaterialBorders, remapMaterials } from './mesher.js';
 import { writeGLB } from './glb.js';
 import { MAT, MAT_NAMES, MAT_PBR } from './parts.js';
 import { buildDecal } from './decals.js';
@@ -39,10 +39,14 @@ const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, tou
 // triangle targets: full detail (player car, garage), a light version for distant opponents, and
 // a mid version that stands in for full detail on phones (medium / low quality). The mid version
 // ships in its own file (<id>.m.glb, with the far version), so phones download less.
+// (normalWeight: how much keeping the shading true counts against keeping the shape. High, the
+// triangles go to curves and fillets and flat panels make do with few - low, long slivers across a
+// curved shoulder shaded it in streaks. It also stops simplification sooner, so the phone and far
+// versions, which have to stay light, keep it lower)
 const LODS = [
-  { name: 'lod0', tris: 90000, error: 0.002, normalWeight: 0.15 },
+  { name: 'lod0', tris: 90000, error: 0.002, normalWeight: 0.6 },
   { name: 'lod1', tris: 16000, error: 0.008, normalWeight: 0.04 },
-  { name: 'lodm', tris: 42000, error: 0.003, normalWeight: 0.1 },
+  { name: 'lodm', tris: 42000, error: 0.003, normalWeight: 0.25 },
 ];
 
 // how much each part's shading detail matters (hidden wheel wells and pocket walls matter least)
@@ -54,6 +58,8 @@ const STAGES = [
   { mats: new Set([MAT.interior]), mul: 2 },
 ];
 // far away only the painted silhouette matters: every detail part gets coarsened first
+// the skin: these take their normals from the un-cut shell (see prepare in mesher.js)
+const SHELL_MATS = new Set([MAT.paint, MAT.plastic]);
 const FAR_STAGES = [{ mats: new Set([MAT.trim, MAT.grille, MAT.exhaust, MAT.carbon, MAT.chrome, MAT.head, MAT.tail, MAT.reverse, MAT.indicator, MAT.plastic]), mul: 3 }];
 
 const args = process.argv.slice(2);
@@ -90,7 +96,7 @@ function merge(list) {
 // far deeper (across a cut's opening the field still reports the skin it was cut from). The white
 // plate came out a third as bright as the bumper around it and read as a black plate. Its face
 // gets the AO an open flat panel bakes to instead.
-const PLATE_AO = 0.57;
+const PLATE_AO = 0.6;
 
 /** aoFloor for buildParts: lifts the paint inside the plate outline on the tail (null: no plate). */
 function plateAOFloor(design) {
@@ -146,23 +152,25 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
   console.log(`${id}: profiles ready in ${secs(t0)}`);
 
   const t1 = performance.now();
-  const mesh = polygonize(design.sdf, design.bounds, h);
+  // dual contouring: vertices sit on creases and corners rather than shaving them off
+  const mesh = polygonize(design.sdf, design.bounds, h, { dc: true });
   const st = mesh.stats;
-  console.log(`  surface nets @${h * 1000}mm: ${st.vertices} verts, ${st.triangles} tris, ${(st.evals / 1e6).toFixed(1)}M evals, ${secs(t1)}`);
+  console.log(`  dual contouring @${h * 1000}mm: ${st.vertices} verts, ${st.triangles} tris, ${(st.evals / 1e6).toFixed(1)}M evals, ${secs(t1)}`);
+  // material borders cut exactly where the material changes (not along whole voxel triangles)
+  const t3 = performance.now();
+  const cut = cutMaterialBorders(design.sdf, mesh);
+  console.log(`  cut ${cut} triangles along material borders ${secs(t3)}`);
   // a design's farMat(x, y, z, material) merges small details into what surrounds them in the far
   // model, which gets its own copy of the mesh (every material border keeps its full-resolution edge
   // through simplification: the VICE's louvres alone cost 11k triangles)
   const farMesh = design.farMat ? remapMaterials(mesh, design.farMat) : mesh;
-  const t3 = performance.now();
-  const seamVerts = smoothSeams(design.sdf, mesh);
-  if (farMesh !== mesh) smoothSeams(design.sdf, farMesh);
-  console.log(`  smoothed ${seamVerts} material-border vertices ${secs(t3)}`);
 
   // decal geometry per LOD (glass panes get much coarser far away)
   const decalsFor = (far) => {
     const out = new Map();
     for (const spec of design.decals || []) {
-      const s = far && spec.kind === 'panel' ? { ...spec, step: 0.09, rings: 2 } : spec;
+      // (far away: coarser glass, and trims with a three-sided section)
+      const s = far && spec.kind === 'panel' ? { ...spec, step: 0.09, rings: 2 } : far && spec.kind === 'bead' ? { ...spec, turn: 0.25, run: 0.3, sides: 3 } : spec;
       const m = buildDecal(design.shell, s);
       if (!m || !m.indices.length) {
         if (!far) console.warn(`  ! ${MAT_NAMES[spec.mat]} decal missed the surface`);
@@ -179,7 +187,7 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
   for (const lod of LODS) {
     const t2 = performance.now();
     const far = lod.name === 'lod1';
-    const parts = await buildParts(design.sdf, far ? farMesh : mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, aoFloor, stages: (far ? FAR_STAGES : STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
+    const parts = await buildParts(design.sdf, far ? farMesh : mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, aoFloor, shell: design.shell, shellMats: SHELL_MATS, creaseCos: far ? -2 : undefined, stages: (far ? FAR_STAGES : STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
     // the far LOD keeps opaque glass, so the cockpit behind it can go
     if (far) delete parts[MAT.interior];
     const list = Object.entries(parts).map(([m, p]) => ({ mat: +m, ...p }));

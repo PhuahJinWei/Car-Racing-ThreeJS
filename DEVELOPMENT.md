@@ -70,7 +70,7 @@ tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, 
 The twenty cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
 
 ```bash
-npm run build:cars                              # all cars, final quality (~1.5 min each)
+npm run build:cars                              # all cars, final quality (2-8 min each, about 80 min in all)
 node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview (~10 s)
 ```
 
@@ -79,16 +79,21 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - These are combined into a signed distance field.
   - Details are cut in (window openings, headlight pockets, intakes, wheel arches, vents) or added on (splitters, diffuser fins, wings, mirrors, a furnished cockpit).
 - **Build steps:**
-  - Meshing: sparse surface nets, with the borders between materials straightened.
-  - Simplification: meshoptimizer, guided by the surface normals.
+  - Meshing: sparse dual contouring on a 5 mm grid, so vertices sit on creases and corners instead of shaving them off.
+  - Material borders: every border is cut exactly where the material changes (found by bisection, well under a millimetre), so glass edges, trims and lamp outlines come out as clean lines rather than voxel staircases.
+  - Simplification: meshoptimizer, guided by the surface normals. The normals weigh heavily, so the triangles go to curves and fillets while flat panels make do with few (with less weight, long slivers across a curved shoulder shaded it in streaks).
     - Hidden parts such as wheel wells and the underbody get coarser first.
-    - Three levels of detail: about 97k (full), 49k (light, for phones) and 16k (far) triangles.
+    - Three levels of detail: about 97k (full), 50k (light, for phones) and 11k (far) triangles. The far version has no crease splits: every seam holds the simplifier back.
     - Every border between materials keeps its full-resolution edge, so a slatted grille or a row of louvres can cost the far version thousands of triangles. A design can merge such details into their surroundings for the far version only (`farMat`, as on the VICE's tail).
-  - Baking: normals and ambient occlusion from the field. The bake reads shallow recesses as deeper than they are, so a licence plate's recess gets the occlusion of a flat panel (`PLATE_AO` in `build.mjs`; other places can use the `aoFloor` hook of `buildParts`).
-- **Separate geometry:** thin details are generated on their own (LED strips, projector lenses and glass panes), laid onto the skin by ray marching.
+  - Normals: from the field, split where faces meet at a real crease. Paint and plastic take theirs from the un-cut `shell`, so gaps and trims cut into the skin don't dent the reflections around them. A light smoothing pass removes the distance grids' millimetre ripple.
+  - Ambient occlusion: from the field, then smoothed. An open surface bakes to 0.6, which the game's materials are tuned for; only real crevices and overhangs go darker. (An older bake judged tilted rays wrongly, so every flat panel read as part-shadowed by an amount that swung with the slightest change in its angle, and turned invisible ripples into blotches.) A licence plate's recess gets the occlusion of a flat panel (`PLATE_AO` in `build.mjs`; other places can use the `aoFloor` hook of `buildParts`).
+- **Separate geometry:** thin details are generated on their own and laid onto the skin by ray marching from a 2D drawing in one of the views (`decals` in a design):
+  - `panel`: glass panes filling an outline.
+  - `ribbon` and `disc`: LED strips and lamp lenses.
+  - `bead`: a rounded strip standing on the skin along a path, for chrome window frames, drip rails and trims (`offsetLoop` grows a window outline into a frame's path). Painted onto the mesh as a material band, a centimetre-wide trim came out crumpled; as its own geometry it stays smooth and crisp. Its path is steadied where the view's rays graze a steep surface, such as a wraparound windshield's pillars. The KAIDO and the JUKEBOX use them for every window frame.
 - **Output:** each build writes two models, each with a gzipped twin that the game prefers, and updates `cars.json` with cache-busting hashes:
-  - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
-  - `<id>.m.glb`: the light and far versions (about 0.76 MB gzipped), used on medium and low quality, so phones download and draw less.
+  - `<id>.glb`: the full and far versions (about 1.4 MB gzipped), used on high quality.
+  - `<id>.m.glb`: the light and far versions (about 0.9 MB gzipped), used on medium and low quality, so phones download and draw less.
 - **In game:**
   - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once. A design can ask for whitewall tyres by setting `whitewall` (the white band's width, in metres) in its wheel layout, as the JUKEBOX and the DEUCE do.
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
