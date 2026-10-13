@@ -342,20 +342,22 @@ export const TRACKS = [
       ['S', 520], // 21 underpass
       ['R', 90, 50], // 22 last corner
     ],
-    // a hill, kept to about 9 m: city buildings stand at road level, so a taller hill would leave
-    // their backs floating above the ground as it falls away
+    // a town on a 60 m hill: flat along the main straight, a gentle rise past turn 1, the climb up
+    // to the crest (15% at its steepest, a San Francisco street), down through the esses (11%), a
+    // switchback hairpin up the hill's flank and down through the underpass. Each keyframe is a
+    // level spot (a smoothstep between them), so a long climb has as few as it can
     elevation: [
       [0.0, 0],
-      [0.16, 1],
-      [0.33, 2],
-      [0.43, 8],
-      [0.48, 9],
-      [0.56, 4],
-      [0.62, 1],
-      [0.75, 3],
-      [0.85, -1],
-      [0.93, -1],
+      [0.12, 0],
+      [0.36, 16],
+      [0.475, 62],
+      [0.59, 30],
+      [0.7, 12],
+      [0.77, 20],
+      [0.97, 0],
     ],
+    // the ground is one hill under the roads, and the town on it steps down the slope
+    hill: true,
     sections: [
       { type: 'city', from: 0, to: 0.999 },
       { type: 'tunnel', from: [21, 0.25], to: [21, 0.8] },
@@ -366,8 +368,9 @@ export const TRACKS = [
       { at: [6, 0.1], offset: -2.5 },
       { at: [21, 0.1], offset: 0 },
     ],
-    // on the crest, so the car flies off the top of the hill
-    ramps: [{ at: [8, 0.45], length: 24, height: 2.4, width: 10, offset: 0 }],
+    // on the crest, so the car flies off the top of the hill (1.3-1.4 s and 80-95 m in the air,
+    // landing softly on the way down, either way round)
+    ramps: [{ at: [8, 0.45], length: 24, height: 2.8, width: 10, offset: 0 }],
     palette: {
       lamp: '#ffb35c',
       lamp2: '#e4ecff',

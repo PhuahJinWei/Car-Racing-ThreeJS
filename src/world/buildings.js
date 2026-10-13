@@ -169,8 +169,10 @@ export function createBuildingMaterial(opts = {}) {
         else wallCol = mix(vec3(0.1, 0.12, 0.15), vec3(0.16, 0.16, 0.18), bhash);
         if (kind > 0.5) wallCol = vec3(0.4, 0.4, 0.42) * (0.7 + 0.4 * bhash);
 
-        // light falling on the walls: night sky, warm street lights below, lit crowns above
-        float streetWash = exp(-max(yAbs, 0.0) / 5.0) * 0.32 + exp(-max(yAbs, 0.0) / 18.0) * 0.03;
+        // light falling on the walls: night sky, warm street lights below, lit crowns above. A
+        // building on a hill reaches down past its street, where the street lights don't reach
+        float below = max(-1.2 - yAbs, 0.0);
+        float streetWash = (exp(-max(yAbs, 0.0) / 5.0) * 0.32 + exp(-max(yAbs, 0.0) / 18.0) * 0.03) * exp(-below / 4.0);
         vec3 crownCol = mix(mix(vec3(1.0, 0.95, 0.85), vec3(0.45, 0.75, 1.0), step(0.4, crownHue)), vec3(0.85, 0.5, 1.0), step(0.75, crownHue));
         float crown = (totalH > 55.0 && kind < 0.5) ? smoothstep(totalH - 14.0, totalH - 1.0, yAbs) * step(0.35, h11(seed * 5.3)) : 0.0;
         vec3 wallLight = uAmbient * 0.1 + vec3(0.006, 0.007, 0.011) + uStreet * streetWash + crownCol * crown * 0.7;
@@ -229,11 +231,12 @@ export function createBuildingMaterial(opts = {}) {
           float fyAbs = (yAbs - podH) / floorH;
           float fi = floor(fyAbs);
           float ff = fract(fyAbs);
-          bool inGrid = bx >= 0.0 && bx < nb && yAbs > podH + 0.3 && yAbs < totalH - 1.2;
+          // (floors below the street too, where the ground falls away down a hill)
+          bool inGrid = bx >= 0.0 && bx < nb && ((yAbs > podH + 0.3 && yAbs < totalH - 1.2) || yAbs < -2.0);
 
           vec3 facade = wallCol * (0.85 + 0.25 * vnoise(vec2(uu, yAbs) * 0.35));
           // floor slab lines and a parapet cap
-          facade *= 1.0 - 0.18 * band(ff, 0.0, 0.06, 0.01) * step(podH, yAbs);
+          facade *= 1.0 - 0.18 * band(ff, 0.0, 0.06, 0.01) * max(step(podH, yAbs), step(yAbs, -2.0));
           facade = mix(facade, wallCol * 1.25, band(yAbs, totalH - 1.2, totalH + 1.0, 0.03));
           col = facade * wallLight;
 
@@ -308,7 +311,7 @@ export function createBuildingMaterial(opts = {}) {
           }
 
           // ---------------------------------------------------------------- storefronts
-          if (podH > 0.0 && yAbs < podH) {
+          if (podH > 0.0 && yAbs < podH && yAbs > -1.2) {
             float sw = 6.0 + 2.5 * h11(seed * 4.1);
             float sx = (uu + 0.5) / sw;
             float si = floor(sx);

@@ -145,6 +145,12 @@ export function createSignMaterial() {
  * opts.groundY: build up from a fixed ground far below (elevated expressway) instead of road level;
  * heights are then measured from the road (rows' hMin/hMax may be negative = roofs below the road).
  * opts.rows: custom row layout; opts.signs / opts.shops: street-level dressing on or off.
+ * opts.width: [min, max] frontage of a building (narrow plots for an old town).
+ * opts.foundation: a height every building reaches down to, so on a hill the ground can fall away
+ * from the street without leaving a building floating: its lower floors show below street level.
+ * opts.groundAt(x, z): the ground's height on a hill; the rows behind the street front then stand
+ * on their own ground, so the town steps up and down the slope. opts.filter(i, side, row) can
+ * leave out the buildings at a sample, on one side, in one row; opts.bridgeAt(i) the overpasses.
  */
 export function buildCity(track, baker, palette, rand, opts = {}) {
   const W = track.halfWidth;
@@ -189,11 +195,11 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
     for (const row of rows) {
       let s = rand() * 15;
       while (s < track.length) {
-        const width = 12 + rand() * 20;
+        const width = opts.width ? opts.width[0] + rand() * (opts.width[1] - opts.width[0]) : 12 + rand() * 20;
         const depth = row.dMin + rand() * (row.dMax - row.dMin);
         const i = Math.floor((s + width / 2) / track.ds) % track.n;
         s += width + row.gap[0] + rand() * (row.gap[1] - row.gap[0]);
-        if (!filter(i)) continue;
+        if (!filter(i, side, rows.indexOf(row))) continue;
         const rx = track.rx[i];
         const rz = track.rz[i];
         const rl = Math.hypot(rx, rz) || 1;
@@ -207,7 +213,14 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
         // with a fixed ground far below, heights are relative to the road: stand up from the ground
         if (fixedGround !== null) h = Math.max(12, track.py[i] - fixedGround + h);
         placed.push({ x: cx, z: cz, r: Math.hypot(width, depth) / 2 });
-        buildings.push({ x: cx, z: cz, y: groundOf(i), w: width, d: depth, h, yaw, side, i, row: rows.indexOf(row) });
+        const ri = rows.indexOf(row);
+        // street level: the road's, or on a hill for the rows behind the front, its own ground's
+        // (which lies 0.9 below the street it would have)
+        const street = opts.groundAt && ri > 0 ? opts.groundAt(cx, cz) + 0.9 : null;
+        // down a slope well below the road, the roof stays below the road too: the view from the
+        // road goes out over the rooftops
+        if (street !== null && track.py[i] - street > 6) h = Math.max(6, Math.min(h, track.py[i] - street - 0.8));
+        buildings.push({ x: cx, z: cz, y: street === null ? groundOf(i) : street - 1.2, street, w: width, d: depth, h, yaw, side, i, row: ri });
       }
     }
   }
@@ -217,13 +230,15 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
   const blocks = [];
   for (const b of buildings) {
     // reference for "street level" (shop fronts, the warm wash of street lights on the walls)
-    const road = fixedGround === null ? track.py[b.i] : fixedGround + 1.2;
+    const road = b.street ?? (fixedGround === null ? track.py[b.i] : fixedGround + 1.2);
     const seed = rand() * 100;
     const style = b.h > 70 && rand() < 0.6 ? 1 : rand() < 0.5 ? 0.5 : 0;
     const litFrac = style === 0 ? 0.15 + rand() * 0.25 : style === 0.5 ? 0.18 + rand() * 0.35 : 0.1 + rand() * 0.25;
     const crownHue = rand();
     const shops = opts.shops !== false && b.row === 0 && rand() < 0.8 ? 1 : 0;
     const top = b.y + b.h;
+    // the lowest block stands on the foundation when there is one deeper than the street
+    const foot = opts.foundation != null ? Math.min(b.y, opts.foundation) : b.y;
     // local frame: x = depth (away from the road), z = width (along the road)
     const cs = Math.cos(b.yaw);
     const sn = Math.sin(b.yaw);
@@ -236,7 +251,7 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
     b.signMax = b.h;
     if (b.h > 40 && rand() < 0.65) {
       const podTop = b.y + 1.2 + 6 + rand() * 10;
-      add(0, 0, b.d, b.w, b.y, podTop, 0);
+      add(0, 0, b.d, b.w, foot, podTop, 0);
       b.signMax = podTop - b.y;
       const inX = 1.5 + rand() * 3;
       const inZ = 1.5 + rand() * 3;
@@ -255,7 +270,7 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
         roof = { lx: back, lz: 0, sx: tsx, sz: tsz, y: top };
       }
     } else {
-      add(0, 0, b.d, b.w, b.y, top, 0);
+      add(0, 0, b.d, b.w, foot, top, 0);
     }
     // rooftop service boxes (lift rooms, plant) on most roofs
     const nBox = rand() < 0.75 ? 1 + Math.floor(rand() * 2.5) : 0;
@@ -361,9 +376,9 @@ export function buildCity(track, baker, palette, rand, opts = {}) {
     const span = W * 2 + 34;
     let count = 0;
     for (let i = 40; i < track.n && count < opts.overpasses; i += Math.floor(track.n / (opts.overpasses + 1))) {
-      // find a straight-ish spot
+      // find a straight-ish spot (and one opts.bridgeAt allows)
       let j = i;
-      while (j < track.n - 1 && (Math.abs(track.kappa[j]) > 0.004 || track.tunnelFlags[j])) j++;
+      while (j < track.n - 1 && (Math.abs(track.kappa[j]) > 0.004 || track.tunnelFlags[j] || (opts.bridgeAt && !opts.bridgeAt(j)))) j++;
       if (j >= track.n - 1) break;
       count++;
       const f = { x: track.px[j], y: track.py[j], z: track.pz[j] };

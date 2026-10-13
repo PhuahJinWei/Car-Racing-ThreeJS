@@ -589,11 +589,67 @@ export function buildGantries(track, baker, palette, opts = {}) {
 // ---------------------------------------------------------------------------------------
 // Ground: terrain that follows the track nearby and flattens out, with a theme shader.
 // ---------------------------------------------------------------------------------------
+
+/**
+ * The hill under a road that climbs well above its lowest point: the road's heights spread
+ * outward (a gaussian of `sigma` metres) and fade to `base` far from the road, so the ground
+ * between roads at different heights is one smooth slope. Returns (x, z) => height.
+ */
+export function hillField(track, opts = {}) {
+  const sigma = opts.sigma ?? 140;
+  const falloff = opts.falloff ?? 4; // weight of the base: higher, the hill ends sooner
+  const base = opts.base ?? track.bounds.minY - 1.2;
+  const step = Math.max(1, Math.round(10 / track.ds));
+  const sx = [];
+  const sz = [];
+  const sy = [];
+  for (let i = 0; i < track.n; i += step) {
+    sx.push(track.px[i]);
+    sz.push(track.pz[i]);
+    sy.push(track.py[i]);
+  }
+  const inv = 1 / (2 * sigma * sigma);
+  const cut2 = (3.2 * sigma) ** 2;
+  return (x, z) => {
+    let sw = falloff;
+    let sh = falloff * base;
+    for (let k = 0; k < sx.length; k++) {
+      const dx = sx[k] - x;
+      const dz = sz[k] - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > cut2) continue;
+      const w = Math.exp(-d2 * inv);
+      sw += w;
+      sh += w * sy[k];
+    }
+    return sh / sw;
+  };
+}
+
+/**
+ * The ground's surface over a hillField: at the road's own height beside it (a little below the
+ * road, as everywhere), blending into the hill over `blend` metres from a few metres out (so the
+ * terrain mesh, coarser than the road, can't cut a corner up through the road's edge on a steep
+ * slope). Returns (x, z) => height.
+ */
+export function hillGround(track, field, blend = 40) {
+  const W = track.halfWidth;
+  return (x, z) => {
+    const hill = field(x, z) - 0.9;
+    const r = track.nearestDistance(x, z, W + blend + 16);
+    if (r.index < 0) return hill;
+    const t = smoothstep(W + 6, W + 6 + blend, r.dist);
+    return (track.py[r.index] - 0.9) * (1 - t) + hill * t;
+  };
+}
+
+/** opts.ground: the surface's height at (x, z) (a hillGround) instead of falling to baseY. */
 export function buildTerrain(track, palette, opts = {}) {
   const b = track.bounds;
   const margin = opts.margin ?? 600;
   const cell = opts.cell ?? 22;
   const baseY = opts.baseY ?? b.minY - 0.8;
+  const ground = opts.ground ?? null;
   const minX = b.minX - margin;
   const maxX = b.maxX + margin;
   const minZ = b.minZ - margin;
@@ -609,11 +665,13 @@ export function buildTerrain(track, palette, opts = {}) {
   for (let v = 0; v < pos.count; v++) {
     const x = pos.getX(v);
     const z = pos.getZ(v);
-    const r = track.nearestDistance(x, z, 160);
-    let y = baseY;
+    const r = track.nearestDistance(x, z, ground ? W + 52 : 160);
+    let y = ground ? ground(x, z) : baseY;
     if (r.index >= 0) {
-      const t = smoothstep(W + 3, W + (opts.blend ?? 110), r.dist);
-      y = (track.py[r.index] - 0.9) * (1 - t) + baseY * t;
+      if (!ground) {
+        const t = smoothstep(W + 3, W + (opts.blend ?? 110), r.dist);
+        y = (track.py[r.index] - 0.9) * (1 - t) + baseY * t;
+      }
       near[v] = 1 - smoothstep(W + 2, W + 40, r.dist);
     }
     pos.setY(v, y);
@@ -639,7 +697,7 @@ export function createGroundMaterial(palette, style) {
       uBase: { value: new THREE.Color(palette.ground ?? '#06060a') },
       uLineA: { value: new THREE.Color(palette.primary) },
       uLineB: { value: new THREE.Color(palette.secondary) },
-      uStyle: { value: style === 'grass' ? 1 : style === 'carpet' ? 2 : 0 },
+      uStyle: { value: { grass: 1, carpet: 2, town: 3 }[style] ?? 0 },
     },
     vertexShader: /* glsl */ `
       attribute float aNear;
@@ -669,23 +727,37 @@ export function createGroundMaterial(palette, style) {
       float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       float vnoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash12(i), hash12(i + vec2(1,0)), u.x), mix(hash12(i + vec2(0,1)), hash12(i + vec2(1,1)), u.x), u.y); }
+      // city light carpet: sodium street grid, a few white main roads, scattered lit windows
+      vec3 carpet(vec2 p) {
+        vec2 g = p / 34.0;
+        vec2 cell = floor(g);
+        vec2 f = fract(g);
+        float street = 1.0 - smoothstep(0.0, 0.05, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)));
+        float dots = step(0.5, fract((p.x + p.y) * 0.2)) * street;
+        float block = hash12(cell);
+        vec3 col = uBase + uAmbient * 0.04;
+        vec3 sodium = vec3(1.0, 0.62, 0.28);
+        col += mix(sodium, vec3(0.9, 0.95, 1.0), step(0.85, block)) * dots * 0.9;
+        col += vec3(1.0, 0.82, 0.6) * step(0.988, hash12(floor(p / 5.0))) * (1.0 - street) * 1.1;
+        col += vec3(0.85, 0.9, 1.0) * step(0.995, hash12(floor(p / 4.0) + 7.0)) * (1.0 - street) * 1.0;
+        return col;
+      }
+      // dark urban ground with faint grid
+      vec3 urban(vec2 p) {
+        vec2 g = abs(fract(p / 40.0) - 0.5);
+        float line = 1.0 - smoothstep(0.0, 0.02, min(g.x, g.y));
+        float n = vnoise(p * 0.5);
+        return uBase * (0.8 + 0.4 * n) + uAmbient * 0.05 + uLineA * line * 0.06;
+      }
       void main() {
         vec2 p = vWorld.xz;
         vec3 col;
-        if (uStyle > 1.5) {
+        if (uStyle > 2.5) {
+          // a town on a hill: paved beside the road, the lit streets of the town further out
+          col = mix(carpet(p), urban(p), smoothstep(0.0, 0.4, vNear));
+        } else if (uStyle > 1.5) {
           // city light carpet far below
-          vec2 g = p / 34.0;
-          vec2 cell = floor(g);
-          vec2 f = fract(g);
-          float street = 1.0 - smoothstep(0.0, 0.05, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)));
-          float dots = step(0.5, fract((p.x + p.y) * 0.2)) * street;
-          float block = hash12(cell);
-          col = uBase + uAmbient * 0.04;
-          // sodium street grid, a few white main roads, scattered lit windows in the blocks
-          vec3 sodium = vec3(1.0, 0.62, 0.28);
-          col += mix(sodium, vec3(0.9, 0.95, 1.0), step(0.85, block)) * dots * 0.9;
-          col += vec3(1.0, 0.82, 0.6) * step(0.988, hash12(floor(p / 5.0))) * (1.0 - street) * 1.1;
-          col += vec3(0.85, 0.9, 1.0) * step(0.995, hash12(floor(p / 4.0) + 7.0)) * (1.0 - street) * 1.0;
+          col = carpet(p);
         } else if (uStyle > 0.5) {
           // night grass with mowing stripes
           float stripe = step(0.5, fract((p.x * 0.7 + p.y * 0.7) / 18.0));
@@ -693,11 +765,7 @@ export function createGroundMaterial(palette, style) {
           col = vec3(0.014, 0.03, 0.016) * (0.7 + 0.6 * n) * (0.85 + 0.25 * stripe);
           col += uAmbient * 0.04;
         } else {
-          // dark urban ground with faint grid
-          vec2 g = abs(fract(p / 40.0) - 0.5);
-          float line = 1.0 - smoothstep(0.0, 0.02, min(g.x, g.y));
-          float n = vnoise(p * 0.5);
-          col = uBase * (0.8 + 0.4 * n) + uAmbient * 0.05 + uLineA * line * 0.06;
+          col = urban(p);
         }
         col *= 1.0 + vNear * 0.6;
         float d = uFogDensity * vFogDepth;

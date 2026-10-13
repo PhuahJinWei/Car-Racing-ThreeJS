@@ -3,7 +3,7 @@ import { Track } from './track.js';
 import { getTrackDef } from './tracks.js';
 import { LightBaker } from './lighting.js';
 import { buildTrackSurfaces, buildPillars, buildBoostPads, buildRamps, buildStartGantry, barrierFaceOffset } from './track-mesh.js';
-import { buildLamps, buildChevrons, buildGantries, buildSignGantries, buildTerrain, createGroundMaterial } from './decor-common.js';
+import { buildLamps, buildChevrons, buildGantries, buildSignGantries, buildTerrain, createGroundMaterial, hillField, hillGround } from './decor-common.js';
 import { buildCity } from './decor-city.js';
 import { buildStadium } from './decor-stadium.js';
 import { createEnvironment, createEnvMap } from './environment.js';
@@ -123,11 +123,36 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     ground.position.set((track.bounds.minX + track.bounds.maxX) / 2, groundY, (track.bounds.minZ + track.bounds.maxZ) / 2);
     decor.add(ground);
   } else if (def.theme === 'city') {
-    const city = buildCity(track, baker, palette, rand, { density, overpasses: 4, filter: notTunnel, cover });
+    // a town on a hill: the ground is one hill under the roads, and the blocks are an old town's,
+    // narrow and mid-rise. The rows behind the street front stand on their own ground, so the town
+    // climbs above the road and drops below it, and every block reaches down the slope below its
+    // street. Where the hill falls away beside the road (the crest), the street front on that side
+    // stays open, for the view down over the rooftops and the lit streets below
+    const ground = def.hill ? hillGround(track, hillField(track)) : null;
+    const fallsAway = (i, side) => {
+      const rl = Math.hypot(track.rx[i], track.rz[i]) || 1;
+      const k = (side * 40) / rl;
+      return track.py[i] - ground(track.px[i] + track.rx[i] * k, track.pz[i] + track.rz[i] * k) > 6;
+    };
+    const town = ground && {
+      rows: [
+        { setback: 6, dMin: 10, dMax: 18, hMin: 9, hMax: 30, gap: [0.5, 3] },
+        { setback: 28, dMin: 12, dMax: 22, hMin: 12, hMax: 42, gap: [2, 7] },
+        { setback: 56, dMin: 14, dMax: 28, hMin: 14, hMax: 60, gap: [4, 14] },
+      ],
+      width: [8, 20],
+      foundation: track.bounds.minY - 3,
+      groundAt: ground,
+      filter: (i, side, row) => notTunnel(i) && !(row === 0 && fallsAway(i, side)),
+      // no bridge over the open crest: there'd be nothing for it to join
+      bridgeAt: (i) => !fallsAway(i, -1) && !fallsAway(i, 1),
+    };
+    const city = buildCity(track, baker, palette, rand, { density, overpasses: 4, filter: notTunnel, cover, ...town });
     decor.add(city);
     const lamps = buildLamps(track, baker, { spacing: 30, filter: notTunnel, paired: true, color: palette.lamp, intensity: 0.8, radius: 20, offset: 2.4, height: 8.5, arm: 2.4 });
     if (lamps) decor.add(lamps);
-    const terrain = buildTerrain(track, palette, { style: 'asphalt', baseY: track.bounds.minY - 1.2 });
+    // (the plane out to the horizon sits below the hill's lowest ground)
+    const terrain = buildTerrain(track, palette, ground ? { style: 'town', ground, cell: 14, margin: 450, baseY: track.bounds.minY - 2.6 } : { style: 'asphalt', baseY: track.bounds.minY - 1.2 });
     decor.add(terrain);
   } else {
     const stadium = buildStadium(track, baker, palette, rand, { density, cones: quality.cones !== false, coneIntensity: rain ? 0.12 : 0.09 });
