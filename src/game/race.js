@@ -349,6 +349,8 @@ export class Race {
     }
     this.emit('countdown', { value: 'GO' });
     this.app.audio?.play('go');
+    // a low shot off the front corner as the lights go out, whipping round to the chase camera
+    this.rig.carShot([2.1, 0.42, 4.4], [0, 0.5, 0.4], 48, 0.4, 0.55);
     // let go just before GO: perfect; well before: a late start; still holding: wait for the release
     if (!this.launchHeld) {
       this._launchTip();
@@ -485,6 +487,11 @@ export class Race {
       } else this._stuck = 0;
     } else if (this.phase === 'finish' || this.phase === 'results') {
       this.time += dt;
+      // once the car is past the finish-line camera, the orbit
+      if (this._finishShot != null && (this.rig.cine?.type !== 'spot' || this.track.deltaS(v.s, this._finishShot) > 6)) {
+        this._finishShot = null;
+        this.rig.startOrbit();
+      }
       if (this.phase === 'finish' && this.phaseTime > 3.2) {
         this.phase = 'results';
         this.phaseTime = 0;
@@ -926,9 +933,10 @@ export class Race {
             this.app.audio?.play('land', { strength: e.strength });
             this.app.input.vibrate(40);
           }
-          if (this.timeScaleTarget < 1 && this._airSlowmo) {
+          if (this._airSlowmo) {
             this._airSlowmo = false;
-            this.timeScaleTarget = 1;
+            if (this.timeScaleTarget < 1) this.timeScaleTarget = 1;
+            if (this.rig.cine?.type === 'spot') this.rig.endCinematic(0.25);
           }
           break;
         }
@@ -949,6 +957,10 @@ export class Race {
       this._airSlowmo = true;
       this.timeScaleTarget = 0.55;
       this.slowmo = 0.7;
+      // a low trackside shot of the car flying past (on the far side of the road from it), back to
+      // the chase camera on landing
+      const side = v.d >= 0 ? -1 : 1;
+      this.rig.spotShot(this.track.pointAt(v.s + Math.max(v.vf, 10) * 0.9, side * (this.track.halfWidth - 0.5), _v, 1.3), 6, 1.8);
     }
     for (const r of this.ais) r.ai.events.length = 0;
   }
@@ -986,9 +998,21 @@ export class Race {
     if (r.isPlayer) {
       this.phase = 'finish';
       this.phaseTime = 0;
-      this.timeScaleTarget = 0.28;
-      this.slowmo = 1.4;
-      this.rig.startOrbit();
+      // a close finish (a rival within 0.6 s, either side of the line) gets deeper, longer slow motion
+      const v = r.vehicle;
+      let gap = Infinity;
+      for (const o of this.racers) {
+        if (o === r) continue;
+        if (o.finished) gap = Math.min(gap, this.time - o.finishTime);
+        else gap = Math.min(gap, (r.progress - o.progress) / Math.max(v.speed, 1));
+      }
+      const close = gap < 0.6;
+      this.timeScaleTarget = close ? 0.2 : 0.28;
+      this.slowmo = close ? 2 : 1.4;
+      // the car crossing the line, from low at the roadside just past it; then the orbit (see update)
+      this._finishShot = v.s + Math.max(v.speed, 12) * 0.8;
+      const side = v.d >= 0 ? -1 : 1;
+      this.rig.spotShot(this.track.pointAt(this._finishShot, side * (this.track.halfWidth - 0.4), _v, 0.7), 5.5, 3);
       this.flash = 0.12;
       this.flashColor = [1, 0.9, 0.75];
       this.app.audio?.play('finish', { place: r.place });
@@ -1310,11 +1334,12 @@ export class Race {
     globalUniforms.uAmbient.value.copy(this.baseAmbient).add(_c.setRGB(0.62, 0.66, 0.85).multiplyScalar(skyLight * 0.5));
     this.world.env.moon.intensity = this.world.env.moonIntensity + skyLight * 2.5;
     this.world.env.hemi.intensity = this.baseHemi + skyLight;
-    const blurMul = st.motionBlur ?? 1;
+    // (the speed blur and lines belong to the chase view, not to a shot from the roadside)
+    const blurMul = (st.motionBlur ?? 1) * (this.rig.cine ? 0.2 : 1);
     const inTunnel = v.frame.tunnel;
     fx.blur = ((0.003 + 0.027 * sp * sp) * (inTunnel ? 1.15 : 1) + boost * 0.035) * blurMul * (1 - this.rig.hideCar * 0.3);
     fx.ca = (0.0012 + boost * 0.0075 + this.impact * 0.012 + (this.timeScale < 0.8 ? 0.004 : 0)) * (st.chromatic ?? 1);
-    fx.speedLines = Math.max(0, boost - 0.3) * 0.35 * (st.speedLines ?? 1);
+    fx.speedLines = Math.max(0, boost - 0.3) * 0.35 * (st.speedLines ?? 1) * (this.rig.cine ? 0 : 1);
     fx.vignette = 0.38 + boost * 0.22 + (1 - this.timeScale) * 0.25;
     fx.flash = this.flash;
     fx.flashColor = this.flashColor;

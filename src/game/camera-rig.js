@@ -3,7 +3,7 @@ import { clamp, damp, lerp, noise1, smoothstep, easeInOutCubic } from '../core/m
 import { makeFrame } from '../world/track.js';
 
 const MODES = {
-  chase: { dist: 5.7, height: 1.8, look: 0.95, ahead: 5, fov: 62, fovSpeed: 20 },
+  chase: { dist: 5.4, height: 1.55, look: 0.85, ahead: 5, fov: 62, fovSpeed: 19 },
   near: { dist: 4.3, height: 1.38, look: 0.8, ahead: 6, fov: 66, fovSpeed: 22 },
   bumper: { dist: -1.9, height: 0.82, look: 0.7, ahead: 30, fov: 74, fovSpeed: 24 },
 };
@@ -13,6 +13,9 @@ export const CAMERA_MODES = Object.keys(MODES);
 const REF_HEIGHT = 1.16;
 const REF_HALF_LENGTH = 2.28;
 const MAX_RAISE = 0.75;
+// the widest the chase view gets: held at speed / on nitro, and briefly with a kick (degrees)
+const FOV_MAX = 84;
+const FOV_KICK_MAX = 92;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -20,6 +23,8 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _left = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _look = new THREE.Vector3();
+const _road = new THREE.Vector3();
+const _side = new THREE.Vector3();
 
 /**
  * Dynamic chase camera: lag in turns, surge on acceleration, FOV punch at speed and on boost,
@@ -38,6 +43,8 @@ export class CameraRig {
     this.trauma = 0;
     this.roll = 0;
     this.surge = 0;
+    this.side = 0; // sideways lag in turns (m)
+    this.lookBias = 0; // how far the view leans towards the road ahead (0..1)
     this.time = 0;
     this.shakeScale = 1;
     this.cine = null;
@@ -96,6 +103,19 @@ export class CameraRig {
 
   startTV() {
     this.cine = { type: 'tv', t: 0, spot: null };
+  }
+
+  /**
+   * A shot from beside the car - p and l (where it looks) in car space [left, up, fwd] - held for
+   * `duration`, then blended back to the chase camera over `blendOut`.
+   */
+  carShot(p, l, fov, duration, blendOut = 0.5) {
+    this.cine = { type: 'car', t: 0, p, l, fov, duration, blendOut };
+  }
+
+  /** A shot from a fixed point (world) that follows the car, framing about `frame` m around it. */
+  spotShot(p, frame = 6, duration = 3) {
+    this.cine = { type: 'spot', t: 0, p: p.clone(), frame, duration };
   }
 
   endCinematic(blendTime = 0.7) {
@@ -157,24 +177,39 @@ export class CameraRig {
     this.dir.y = 0;
     this.dir.normalize();
 
-    // ---- surge (camera falls behind when accelerating hard)
-    const surgeT = clamp((t.longAcc || 0) * 0.045, -0.7, 1.2) + boost * 0.9;
+    // ---- surge (camera falls behind when accelerating hard - on nitro too, for a moment, then it
+    // tucks in low behind the car)
+    const surgeT = clamp((t.longAcc || 0) * 0.045, -0.7, 0.8);
     this.surge = damp(this.surge, surgeT, 3.5, dt);
 
     // ---- base chase placement
     const P = t.position;
-    let dist = cfg.dist + fit.d + (this.mode === 'bumper' ? 0 : this.surge - sp * 0.35);
-    let height = cfg.height + fit.h - (this.mode === 'bumper' ? 0 : sp * 0.18);
+    let dist = cfg.dist + fit.d + (this.mode === 'bumper' ? 0 : this.surge - sp * 0.35 - boost * 0.35);
+    let height = cfg.height + fit.h - (this.mode === 'bumper' ? 0 : sp * 0.18 + boost * 0.18);
     if (!t.grounded && t.airTime > 0.25 && this.mode !== 'bumper') {
       dist += Math.min(2.5, t.airTime * 2.5);
       height += Math.min(1.2, t.airTime);
     }
     const camUp = _v2.copy(_up).lerp(t.up, 0.45).normalize();
     const pos = _v.copy(P).addScaledVector(this.dir, -dist).addScaledVector(camUp, height);
+    // ---- in a turn the camera swings wide (to the outside), so the car slides across the frame
+    const sideT = this.mode === 'bumper' ? 0 : clamp((t.yawRate || 0) * hs * 0.0075, -0.85, 0.85);
+    this.side = damp(this.side, sideT, 2.6, dt);
+    pos.addScaledVector(_side.crossVectors(_up, this.dir).normalize(), -this.side);
     if (this.mode === 'bumper') {
       pos.copy(P).addScaledVector(t.fwd, 1.9).addScaledVector(t.up, cfg.height);
     }
     const look = _look.copy(P).addScaledVector(this.mode === 'bumper' ? t.fwd : this.dir, cfg.ahead + sp * 6).addScaledVector(camUp, cfg.look);
+    // ---- lean the view towards where the road goes, so a corner shows up early (only while
+    // driving along the track, on the ground)
+    if (this.mode !== 'bumper' && t.s !== undefined && t.grounded !== false) {
+      const rp = this.track.pointAt(t.s + 14 + sp * 14, (t.d || 0) * 0.6, _road, cfg.look + 0.3);
+      const rx = rp.x - P.x;
+      const rz = rp.z - P.z;
+      const along = (rx * this.dir.x + rz * this.dir.z) / (Math.hypot(rx, rz) || 1);
+      this.lookBias = damp(this.lookBias, along > 0.55 ? 0.3 : 0, 3, dt);
+      look.lerp(rp, this.lookBias);
+    }
 
     // ---- keep the camera inside walls / under tunnel roofs
     if (this.mode !== 'bumper') {
@@ -195,21 +230,24 @@ export class CameraRig {
     // ---- roll + fov
     const rollT = this.mode === 'bumper' ? clamp(-t.yawRate * hs * 0.002, -0.1, 0.1) : clamp(-t.yawRate * hs * 0.0032, -0.15, 0.15) + (drifting ? t.drift.dir * 0.05 : 0);
     this.roll = damp(this.roll, rollT, 4, dt);
-    const fovT = cfg.fov + cfg.fovSpeed * Math.pow(Math.min(sp, 1.2), 1.4) + 13 * boost;
+    // (wide at speed and on nitro, but held below FOV_MAX so the car stays big in the frame; the
+    // nitro's punch is a brief kick past it)
+    const fovT = Math.min(FOV_MAX, cfg.fov + cfg.fovSpeed * Math.pow(Math.min(sp, 1.2), 1.4) + 6 * boost);
     this.fov = damp(this.fov, fovT, 2.6, dt);
     this.fovKick = damp(this.fovKick, 0, 3.2, dt);
 
     // ---- shake
     this.trauma = Math.max(0, this.trauma - dt * 1.3);
-    const shake = (this.trauma * this.trauma + Math.pow(Math.min(sp, 1.3), 2.2) * 0.06 + boost * 0.12) * this.shakeScale;
+    const shake = (this.trauma * this.trauma + Math.pow(Math.min(sp, 1.3), 2.2) * 0.06 + boost * 0.18) * this.shakeScale;
     const ts = this.time * 23;
     const sx = noise1(ts) * shake * 0.22;
-    const sy = noise1(ts + 31.7) * shake * 0.16;
+    // (plus a fine road buzz that builds with speed)
+    const sy = noise1(ts + 31.7) * shake * 0.16 + noise1(ts * 2.7 + 13.1) * Math.pow(Math.min(sp, 1.3), 2) * 0.014 * this.shakeScale;
     const sr = noise1(ts + 77.1) * shake * 0.025;
 
     let finalPos = pos;
     let finalLook = look;
-    let finalFov = this.fov + this.fovKick;
+    let finalFov = Math.min(FOV_KICK_MAX, this.fov + this.fovKick);
     let finalRoll = this.roll + sr;
 
     // ---- cinematics
@@ -250,6 +288,18 @@ export class CameraRig {
         finalLook = new THREE.Vector3().copy(P).addScaledVector(_up, 0.6);
         finalFov = 48;
         finalRoll = 0;
+      } else if (c.type === 'car') {
+        finalPos = new THREE.Vector3().copy(P).addScaledVector(left, c.p[0]).addScaledVector(t.up, c.p[1]).addScaledVector(t.fwd, c.p[2]);
+        finalLook = new THREE.Vector3().copy(P).addScaledVector(left, c.l[0]).addScaledVector(t.up, c.l[1]).addScaledVector(t.fwd, c.l[2]);
+        finalFov = c.fov;
+        finalRoll = 0;
+        if (c.t >= c.duration) this.endCinematic(c.blendOut);
+      } else if (c.type === 'spot') {
+        finalPos = c.p.clone();
+        finalLook = new THREE.Vector3().copy(P).addScaledVector(_up, 0.55);
+        finalFov = clamp((2 * Math.atan(c.frame / finalPos.distanceTo(finalLook)) * 180) / Math.PI, 14, 62);
+        finalRoll = 0;
+        if (c.t >= c.duration) this.endCinematic(0.35);
       } else if (c.type === 'tv') {
         if (!c.spot || this.track.deltaS(t.s, c.spot.s) > 28) {
           const ahead = 70 + Math.random() * 60;
