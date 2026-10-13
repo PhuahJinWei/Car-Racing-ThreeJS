@@ -328,20 +328,45 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
     letter('POLICE', tz, ty, 0.15, paint, '800');
   }
 
-  // number roundel on the doors
+  // number roundel on the doors (a design can make it smaller: `roundel`, its radius)
   if (id === 'lv_race' || custom.number?.value != null) {
+    const rr = meta.roundel ?? 0.2;
     all((kind) => {
       if (kind !== 'side') return;
       ctx.beginPath();
-      ctx.ellipse(door[0], door[1], 0.2, 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(door[0], door[1], rr, rr, 0, 0, Math.PI * 2);
       ctx.fillStyle = '#f2f4f8';
       ctx.fill();
-      ctx.lineWidth = 0.018;
+      ctx.lineWidth = 0.09 * rr;
       ctx.strokeStyle = accent;
       ctx.stroke();
     });
     const digits = String(number);
-    letter(digits, door[0], door[1], digits.length > 1 ? 0.2 : 0.26, '#0b0b10', '900');
+    letter(digits, door[0], door[1], (digits.length > 1 ? 1 : 1.3) * rr, '#0b0b10', '900');
+    // ...and on top of the nose, in the accent colour, read from in front (a grand prix car's
+    // `nose`: { z, size } in metres): the digits' tops point back along the top view. A patch of
+    // the body colour behind them keeps a stripe from swallowing them.
+    if (meta.nose) {
+      const { z: nz, size: ns } = meta.nose;
+      const hw = (digits.length * 0.62 * ns) / 2 + 0.015;
+      inView('T', () => {
+        topPoly([[-hw, nz - ns * 0.62], [hw, nz - ns * 0.62], [hw, nz + ns * 0.62], [-hw, nz + ns * 0.62]]);
+        ctx.fillStyle = paint;
+        ctx.fill();
+      });
+      const t = tileRect('T', W, H);
+      const [x0] = layout.min;
+      const pz = t.w / len;
+      const px = t.h / (layout.max[0] - x0);
+      ctx.save();
+      ctx.setTransform(0, px / pz, -1, 0, t.x + (z1 - meta.nose.z) * pz, t.y - x0 * px);
+      ctx.fillStyle = accent;
+      ctx.font = `900 ${Math.round(meta.nose.size * pz)}px Orbitron, Arial Black, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(digits, 0, 0);
+      ctx.restore();
+    }
   }
 
   // licence plate (designs that have a plate recess say where): white, a dark border and lettering

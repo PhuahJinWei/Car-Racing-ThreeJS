@@ -98,8 +98,9 @@ function spokeShape(theta, half, rIn, rOut, n) {
 }
 
 // ---------------------------------------------------------------------------------------- tyre
-export function tyreGeometry(r, w, hq, rim = rimRadius(r)) {
-  return cached(`tyre|${r}|${w}|${hq}|${rim}`, () => {
+/** slick: no tread grooves (a racing tyre; `slick` in a design's wheel layout). */
+export function tyreGeometry(r, w, hq, rim = rimRadius(r), slick = false) {
+  return cached(`tyre|${r}|${w}|${hq}|${rim}|${slick}`, () => {
     const hw = w / 2;
     const sh = 0.028;
     const prof = [
@@ -112,7 +113,7 @@ export function tyreGeometry(r, w, hq, rim = rimRadius(r)) {
       [r - 0.005, -hw + sh * 0.8],
       [r, -hw + sh * 1.15],
     ];
-    if (hq) {
+    if (hq && !slick) {
       for (const gq of [-0.3, -0.1, 0.1, 0.3]) {
         const c = gq * w;
         prof.push([r, c - 0.008], [r - 0.007, c - 0.005], [r - 0.007, c + 0.005], [r, c + 0.008]);
@@ -201,6 +202,9 @@ const RIM_STYLES = {
       add(() => a, (t) => 0.0125 + 0.008 * t, hub * 0.85, lip, 6);
     }
   },
+  // no spokes: a flat aero cover over the whole face on a centre-lock nut (see rimGeometry), as
+  // on a grand prix car
+  cover: () => {},
 };
 
 export function rimGeometry(style, r, w, hq, rim = rimRadius(r)) {
@@ -249,23 +253,34 @@ export function rimGeometry(style, r, w, hq, rim = rimRadius(r)) {
       hub,
       lip,
     );
-    // hub, lug nuts, centre cap
-    const hubFace = face(hub) + 0.002;
-    const hubDisc = new THREE.CylinderGeometry(hub + 0.006, hub + 0.012, 0.03, hq ? 36 : 16);
-    hubDisc.rotateZ(-Math.PI / 2);
-    hubDisc.translate(hubFace - 0.015, 0, 0);
-    parts.push(hubDisc);
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + Math.PI / 5;
-      const nut = new THREE.CylinderGeometry(0.0095, 0.0105, 0.02, 6);
+    if (st === 'cover') {
+      // the cover, flush with the lip and dipping round the hub (outside in, so it faces out)
+      const back = lipFace - 0.03;
+      parts.push(lathe([[lip + 0.004, lipFace - 0.01], [lip - 0.008, lipFace - 0.005], [hub + 0.014, lipFace - 0.008], [hub * 0.78, back], [0.004, back]], hq ? 72 : 28));
+      // the centre-lock nut
+      const nut = new THREE.CylinderGeometry(0.034, 0.038, 0.03, 6);
       nut.rotateZ(-Math.PI / 2);
-      nut.translate(hubFace + 0.006, Math.cos(a) * 0.05, Math.sin(a) * 0.05);
+      nut.translate(back + 0.015, 0, 0);
       parts.push(nut);
+    } else {
+      // hub, lug nuts, centre cap
+      const hubFace = face(hub) + 0.002;
+      const hubDisc = new THREE.CylinderGeometry(hub + 0.006, hub + 0.012, 0.03, hq ? 36 : 16);
+      hubDisc.rotateZ(-Math.PI / 2);
+      hubDisc.translate(hubFace - 0.015, 0, 0);
+      parts.push(hubDisc);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + Math.PI / 5;
+        const nut = new THREE.CylinderGeometry(0.0095, 0.0105, 0.02, 6);
+        nut.rotateZ(-Math.PI / 2);
+        nut.translate(hubFace + 0.006, Math.cos(a) * 0.05, Math.sin(a) * 0.05);
+        parts.push(nut);
+      }
+      const cap = new THREE.CylinderGeometry(0.027, 0.031, 0.012, hq ? 28 : 12);
+      cap.rotateZ(-Math.PI / 2);
+      cap.translate(hubFace + 0.005, 0, 0);
+      parts.push(cap);
     }
-    const cap = new THREE.CylinderGeometry(0.027, 0.031, 0.012, hq ? 28 : 12);
-    cap.rotateZ(-Math.PI / 2);
-    cap.translate(hubFace + 0.005, 0, 0);
-    parts.push(cap);
     const merged = mergeGeometries(
       parts.map((g) => {
         g.deleteAttribute('uv');
@@ -443,12 +458,12 @@ function bakeWheels(wheels, partOf, boneOf) {
  * steer.
  */
 export function wheelSet(wheels, style, hq) {
-  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w},${w.rim},${w.whitewall}`).join('|')}|${style}|${hq}`;
+  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w},${w.rim},${w.whitewall},${!!w.slick}`).join('|')}|${style}|${hq}`;
   const spin = (k) => 2 * k + 1;
   const pivot = (k) => 2 * k;
   const rimOf = (w) => w.rim ?? rimRadius(w.r);
   const set = {
-    tyre: cached(`${key}|tyre`, () => bakeWheels(wheels, (w) => tyreGeometry(w.r, w.w, hq, rimOf(w)), spin)),
+    tyre: cached(`${key}|tyre`, () => bakeWheels(wheels, (w) => tyreGeometry(w.r, w.w, hq, rimOf(w), !!w.slick), spin)),
     rim: cached(`${key}|rim`, () => bakeWheels(wheels, (w) => rimGeometry(style, w.r, w.w, hq, rimOf(w)), spin)),
     blur: cached(`${key}|blur`, () => bakeWheels(wheels, (w) => blurGeometry(w.r, w.w, rimOf(w)), pivot)),
   };

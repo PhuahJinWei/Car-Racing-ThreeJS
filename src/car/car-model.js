@@ -823,7 +823,7 @@ export class CarModel {
 
     // --- exhausts + flames
     const exN = def.exhaust;
-    const exX = exN === 4 ? [-0.42, -0.28, 0.28, 0.42] : [-0.36, 0.36];
+    const exX = exN === 4 ? [-0.42, -0.28, 0.28, 0.42] : exN === 1 ? [0] : [-0.36, 0.36];
     const exGeo = [];
     const exY = rb[2] + 0.13;
     for (const x of exX) {
@@ -1222,7 +1222,7 @@ export class CarModel {
         pivot.add(spin);
         this.group.add(pivot);
         bones.push(pivot, spin);
-        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, rim: w.rim, whitewall: w.whitewall, side });
+        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, rim: w.rim, whitewall: w.whitewall, slick: w.slick, side });
         this.wheels.push({ pivot, spin, r: w.r, w: w.w, front, side });
       }
     }
@@ -1240,9 +1240,11 @@ export class CarModel {
       return m;
     };
     this.tyreMesh = skinned(set.tyre, this.tireMat);
-    // whitewall tyres, on the cars whose wheel layout asks for them
+    // whitewall tyres, on the cars whose wheel layout asks for them (`wallColor` tints the band: a
+    // racing tyre's compound ring)
     if (set.whitewall) {
-      this.whitewallMat = withAO(new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.75, metalness: 0, envMapIntensity: 0.5, vertexColors: true, envMap: env }));
+      const wall = meta.wheels.rear.wallColor ?? 0xe6e3da;
+      this.whitewallMat = withAO(new THREE.MeshStandardMaterial({ color: wall, roughness: 0.75, metalness: 0, envMapIntensity: 0.5, vertexColors: true, envMap: env }));
       skinned(set.whitewall, this.whitewallMat);
     }
     this.rimMesh = skinned(set.rim, this.rimMat);

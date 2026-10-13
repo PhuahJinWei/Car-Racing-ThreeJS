@@ -45,6 +45,7 @@ export const RIMS = [
   { id: 'r_mesh', name: 'Mesh', style: 'mesh', price: 900 },
   { id: 'r_blade', name: 'Blade', style: 'blade', price: 1200 },
   { id: 'r_classic', name: 'Classic Eight', style: 'classic', price: 900 },
+  { id: 'r_cover', name: 'Aero Cover', style: 'cover', price: 1100 },
 ];
 
 export const RIM_COLORS = [
@@ -172,9 +173,6 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   kaido: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_black', rims: 'r_classic', rimColor: 'rc_gold' },
   // family-car silver, as unassuming as it gets
   sleeper: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_black' },
-  // violet with orange flames, on classic eight-spoke wheels (black vanished at night from the
-  // chase camera)
-  deuce: { ...DEFAULT_CUSTOM, paint: 'p_violet', accent: 'p_orange', livery: 'lv_flames', rims: 'r_classic' },
   // pearl white under its dark glass roof, on graphite aero wheels
   surge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', rims: 'r_turbine', rimColor: 'rc_graphite' },
   // white, on silver five-spoke wheels
@@ -183,6 +181,8 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   enduro: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_crimson', livery: 'lv_stripes', number: 'n_33', rims: 'r_mesh' },
   // a hypercar's acid green with black accents, on graphite blade wheels
   apogee: { ...DEFAULT_CUSTOM, paint: 'p_lime', accent: 'p_black', rims: 'r_blade', rimColor: 'rc_graphite' },
+  // racing red with a white stripe and the champion's number, on black covered wheels
+  monoposto: { ...DEFAULT_CUSTOM, paint: 'p_crimson', accent: 'p_white', livery: 'lv_race', number: 'n_1', rims: 'r_cover', rimColor: 'rc_black' },
 };
 
 /** Whether an item is on offer for a car (some are made for one car). */

@@ -49,7 +49,7 @@ You can make each track feel new by driving it **backwards**, **mirrored**, or i
 
 ## Your garage
 
-Every race earns you credits. Spend them in the garage on twenty different cars, from a tiny city car, a taxi and a 30s hot rod to an 80s drift hatchback, a lifted pickup, an electric saloon, an 80s wedge supercar, a 60s Le Mans racer and a long-tailed speed-record megacar, and on ways to make them your own: paint colours, finishes, liveries (stripes, a two-tone "panda", hot-rod flames and more), door numbers, window tint, wheels, glowing underlights, and the light trail your car leaves behind at speed.
+The garage holds twenty different cars, from a tiny city car, a taxi and a 50s land yacht to an 80s drift hatchback, a lifted pickup, an electric saloon, an 80s wedge supercar, a 60s Le Mans racer, a long-tailed speed-record megacar and a modern grand prix single-seater. Four are yours from the start: the Volt GT grand tourer, the MARSHAL pursuit sedan, the VICE supercar and the JUGGERNAUT pickup. Every race earns you credits to spend on the other sixteen, and on ways to make them your own: paint colours, finishes, liveries (stripes, a two-tone "panda", hot-rod flames and more), door numbers, window tint, wheels, glowing underlights, and the light trail your car leaves behind at speed.
 
 ![The garage, showing the red Volt GT on a turntable with the paint colour options below](docs/screenshots/garage.jpg)
 

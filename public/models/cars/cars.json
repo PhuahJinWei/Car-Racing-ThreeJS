@@ -4,11 +4,11 @@
       "id": "volt",
       "file": "volt.glb",
       "factory": true,
-      "v": "663401c518",
+      "v": "cba8fd0b8a",
       "gz": true,
       "light": {
         "file": "volt.m.glb",
-        "v": "6abce9cfd6"
+        "v": "32334d3b47"
       }
     },
     {
@@ -38,10 +38,10 @@
       "file": "touge.glb",
       "gz": true,
       "factory": true,
-      "v": "d0772edc04",
+      "v": "cc705a7bc2",
       "light": {
         "file": "touge.m.glb",
-        "v": "f3f3bd8fba"
+        "v": "afe909680a"
       }
     },
     {
@@ -49,10 +49,10 @@
       "file": "marshal.glb",
       "gz": true,
       "factory": true,
-      "v": "4fcbbbfbb7",
+      "v": "ac04a18536",
       "light": {
         "file": "marshal.m.glb",
-        "v": "e074d17070"
+        "v": "008c1cc4f4"
       }
     },
     {
@@ -104,10 +104,10 @@
       "file": "juggernaut.glb",
       "gz": true,
       "factory": true,
-      "v": "36feaa572c",
+      "v": "ae3a0e97fe",
       "light": {
         "file": "juggernaut.m.glb",
-        "v": "742a70ed15"
+        "v": "69ec632996"
       }
     },
     {
@@ -115,10 +115,10 @@
       "file": "mochi.glb",
       "gz": true,
       "factory": true,
-      "v": "59034231d5",
+      "v": "57f0bff63b",
       "light": {
         "file": "mochi.m.glb",
-        "v": "73b47e6088"
+        "v": "1b56c4596e"
       }
     },
     {
@@ -126,10 +126,10 @@
       "file": "jukebox.glb",
       "gz": true,
       "factory": true,
-      "v": "35edfa5354",
+      "v": "b0e298a48b",
       "light": {
         "file": "jukebox.m.glb",
-        "v": "dfd3096133"
+        "v": "f6107450ca"
       }
     },
     {
@@ -137,10 +137,10 @@
       "file": "cabbie.glb",
       "gz": true,
       "factory": true,
-      "v": "cde37bd78b",
+      "v": "3a7a12c473",
       "light": {
         "file": "cabbie.m.glb",
-        "v": "ca7c3c2032"
+        "v": "9325d10e3f"
       }
     },
     {
@@ -166,17 +166,6 @@
       }
     },
     {
-      "id": "deuce",
-      "file": "deuce.glb",
-      "gz": true,
-      "factory": true,
-      "v": "d8d77527af",
-      "light": {
-        "file": "deuce.m.glb",
-        "v": "64904050ff"
-      }
-    },
-    {
       "id": "surge",
       "file": "surge.glb",
       "gz": true,
@@ -192,10 +181,10 @@
       "file": "vice.glb",
       "gz": true,
       "factory": true,
-      "v": "5fa0670556",
+      "v": "910e500a7e",
       "light": {
         "file": "vice.m.glb",
-        "v": "146e308ed3"
+        "v": "8f0d172d36"
       }
     },
     {
@@ -218,6 +207,17 @@
       "light": {
         "file": "apogee.m.glb",
         "v": "dfa45bb8df"
+      }
+    },
+    {
+      "id": "monoposto",
+      "file": "monoposto.glb",
+      "gz": true,
+      "factory": true,
+      "v": "be2ccfb18e",
+      "light": {
+        "file": "monoposto.m.glb",
+        "v": "cda42d8b1d"
       }
     }
   ]

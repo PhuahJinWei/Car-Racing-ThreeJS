@@ -1,7 +1,10 @@
 import { DEFAULT_CUSTOM_BY_CAR, OWNERSHIP_KEY } from '../car/customization.js';
+import { CARS } from '../car/car-defs.js';
 
 const KEY = 'neonoverdrive.save.v1';
 const GHOST_PREFIX = 'neonoverdrive.ghost.';
+// cars taken out of the game, with what they cost: owners get it back (see _retireCars)
+const RETIRED_CARS = { deuce: 10000 };
 
 export const DEFAULT_SETTINGS = {
   quality: 'auto',
@@ -121,6 +124,36 @@ export class Storage {
         /* corrupted save -> defaults */
       }
     }
+    this._retireCars();
+    this._grantFreeCars();
+  }
+
+  /** Cars no longer in the game: refund what they cost, and drive the Volt if one was selected. */
+  _retireCars() {
+    const known = new Set(CARS.map((c) => c.id));
+    const gone = this.data.ownedCars.filter((id) => !known.has(id));
+    if (!gone.length && known.has(this.data.car)) return;
+    for (const id of gone) this.data.credits += RETIRED_CARS[id] ?? 0;
+    this.data.ownedCars = this.data.ownedCars.filter((id) => known.has(id));
+    for (const id of Object.keys(this.data.custom)) if (!known.has(id)) delete this.data.custom[id];
+    if (!known.has(this.data.car)) this.data.car = 'volt';
+    this.save();
+  }
+
+  /** Every free car (price 0) is yours from the start, in its stock look - old saves included. */
+  _grantFreeCars() {
+    let added = false;
+    for (const car of CARS) {
+      if (car.price !== 0 || this.ownsCar(car.id)) continue;
+      this.data.ownedCars.push(car.id);
+      const def = DEFAULT_CUSTOM_BY_CAR[car.id];
+      if (def) {
+        this.data.custom[car.id] = { ...def };
+        for (const [cat, id] of Object.entries(def)) this.grant(cat, id);
+      }
+      added = true;
+    }
+    if (added) this.save();
   }
 
   _merge(base, saved) {
