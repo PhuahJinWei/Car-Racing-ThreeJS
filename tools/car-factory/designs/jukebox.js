@@ -1,7 +1,10 @@
 // JUKEBOX - a late-50s American land yacht. A long, wide, low two-door hardtop: quad headlamps under
-// hooded fender tips, a wide chrome grille, a massive chrome bumper with two bullets on it, a hood
-// ornament, a wide windshield and a pillarless glasshouse, a chrome spear down each side, skirts
-// over the rear wheels, and huge tail fins carrying twin bullet tail lamps. Left-hand drive.
+// chrome visors on the fender tips, a wide chrome grille, massive chrome bumpers (two bullets and
+// amber parking lamps on the front one, the exhaust ports in the ends of the rear one), a hood
+// ornament, a wide windshield and a pillarless glasshouse in chrome frames, a chrome spear down each
+// side over chrome sills and arch trims, skirts over the rear wheels, huge chrome-edged tail fins
+// carrying twin bullet tail lamps in chrome rings, a chrome grille across the tail echoing the front
+// one, and whitewall tyres. Left-hand drive.
 // Axes: +X = car's left, +Y = up, +Z = forward. Metres.
 import { Profile2D, mirrorU, smax, smin, smoothstep, sdRoundBox, sdCylZ, sdCapsule, sdEllipsoid } from '../sdf.js';
 import { MAT, Acc, pocket, addCockpit } from '../parts.js';
@@ -9,8 +12,9 @@ import { VIEW } from '../decals.js';
 
 export function buildJukebox() {
   const WH = {
-    front: { z: 1.55, y: 0.36, x: 0.8, r: 0.36, w: 0.21, rim: 0.2 },
-    rear: { z: -1.6, y: 0.36, x: 0.8, r: 0.36, w: 0.21, rim: 0.2 },
+    // (small rims on tall sidewalls, wide whitewalls on them)
+    front: { z: 1.55, y: 0.36, x: 0.8, r: 0.36, w: 0.21, rim: 0.2, whitewall: 0.075 },
+    rear: { z: -1.6, y: 0.36, x: 0.8, r: 0.36, w: 0.21, rim: 0.2, whitewall: 0.075 },
   };
   const GAP = 0.04; // tyre to arch clearance
 
@@ -180,7 +184,7 @@ export function buildJukebox() {
   function sdf(x, y, z, out) {
     const ax = Math.abs(x);
     const sh = shell(x, y, z);
-    const { dBody, dCab, cS, cP } = S;
+    const { dBody, dCab, cS, cP, bP } = S;
     acc.set(sh, MAT.paint);
 
     // ---------------------------------------------------------------- add-ons
@@ -194,8 +198,10 @@ export function buildJukebox() {
       acc.add(Math.max(roundEdge(bodyPlan.sample(ax, z) - 0.06, Math.abs(y - 0.33) - 0.075, 0.03), 2.4 - z), MAT.chrome, 0.015);
       acc.add(sdEllipsoid(ax - 0.42, y - 0.45, z - 2.76, 0.065, 0.065, 0.13), MAT.chrome, 0.015);
     }
+    // (the rear one was once bounded the wrong way round, z < -2.4 written as -2.4 - z < 0, and only
+    // a sliver behind each rear wheel was ever built)
     if (z < -2.35 && y > 0.22 && y < 0.5) {
-      acc.add(Math.max(roundEdge(bodyPlan.sample(ax, z) - 0.06, Math.abs(y - 0.35) - 0.07, 0.03), -2.4 - z), MAT.chrome, 0.015);
+      acc.add(Math.max(roundEdge(bodyPlan.sample(ax, z) - 0.06, Math.abs(y - 0.35) - 0.07, 0.03), z + 2.4), MAT.chrome, 0.015);
     }
     // a chrome jet on the nose of the hood
     if (z > 2.35 && z < 2.75 && y > 0.74 && y < 0.88 && ax < 0.06) {
@@ -210,10 +216,23 @@ export function buildJukebox() {
       acc.add(sdRoundBox(ax - 0.93, y - 0.95, z - 0.85, 0.045, 0.032, 0.05, 0.03), MAT.chrome, 0.006);
       acc.add(sdCapsule(ax, y, z, 0.86, 0.86, 0.86, 0.92, 0.935, 0.855, 0.012), MAT.chrome, 0.008);
     }
-    // twin exhausts under the rear bumper ends
-    if (z < -2.4 && y < 0.3 && ax > 0.48 && ax < 0.72) {
-      acc.add(sdCylZ(ax - 0.6, y - 0.22, z + 2.66, 0.038, 0.08), MAT.chrome, 0.004);
-      acc.cut(sdCylZ(ax - 0.6, y - 0.22, z + 2.66, 0.029, 0.2), MAT.exhaust);
+    // chrome visors over the headlamps, along the top of the fender tips
+    if (z > 2.55 && y > 0.68 && y < 0.74 && ax > 0.55 && ax < 0.96) {
+      acc.add(roundEdge(Math.max(sh - 0.02, -(sh + 0.01)), sdRoundBox(ax - 0.75, y - 0.71, 0, 0.18, 0.011, 1, 0.008), 0.005), MAT.chrome, 0.004);
+    }
+    // chrome sills between the wheels, chrome trims round the front wheel arches and along the
+    // foot of the rear skirts (the arch cuts come later and leave them be)
+    if (ax > 0.85 && y > 0.24 && y < 0.34 && z > -1.25 && z < 1.17) {
+      acc.add(roundEdge(Math.max(bP - 0.005, -(bP + 0.015)), sdRoundBox(z + 0.04, y - 0.29, 0, 1.14, 0.02, 1, 0.01), 0.004), MAT.chrome, 0.003);
+    }
+    if (ax > 0.85 && y > 0.28 && y < 0.82) {
+      const band = Math.max(bP - 0.006, -(bP + 0.015));
+      if (Math.abs(z - WH.front.z) < 0.48) {
+        acc.add(roundEdge(band, Math.abs(Math.hypot(y - WH.front.y, z - WH.front.z) - (WH.front.r + GAP + 0.02)) - 0.011, 0.004), MAT.chrome, 0.003);
+      }
+      if (Math.abs(z - WH.rear.z) < 0.42 && y < 0.4) {
+        acc.add(roundEdge(band, Math.max(Math.abs(y - 0.375) - 0.011, Math.abs(z - WH.rear.z) - 0.39), 0.004), MAT.chrome, 0.003);
+      }
     }
 
     // ---------------------------------------------------------------- cuts
@@ -257,16 +276,38 @@ export function buildJukebox() {
         acc.add(Math.hypot(r - 0.068, S.bP + 0.004) - 0.01, MAT.chrome, 0.003);
       }
     }
-    // twin bullet tail lamps in each fin's trailing edge
+    // twin bullet tail lamps in each fin's trailing edge, a chrome ring where each leaves the fin
     if (ax > 0.82 && y > 0.86 && y < 1.1 && z < -2.55) {
-      for (const yc of [0.935, 1.025]) acc.add(sdEllipsoid(ax - 0.93, y - yc, z + 2.68, 0.032, 0.032, 0.06), MAT.tail, 0.006);
+      for (const yc of [0.935, 1.025]) {
+        acc.add(sdEllipsoid(ax - 0.93, y - yc, z + 2.68, 0.032, 0.032, 0.06), MAT.tail, 0.006);
+        acc.add(Math.hypot(Math.hypot(ax - 0.93, y - yc) - 0.036, z + 2.69) - 0.008, MAT.chrome, 0.004);
+      }
     }
-    // the tail: a chrome strip across the deck lid, reversing lamps and the plate recess between the
-    // bumper and the lid
-    if (z < -2.55 && y > 0.42 && y < 0.86 && ax < 0.9) {
+    // the tail: a chrome strip across the deck lid; under it a chrome grille right across the tail,
+    // echoing the front one, with the plate standing in its middle and a reversing lamp either side
+    if (z < -2.55 && y > 0.42 && y < 0.86 && ax < 0.92) {
       acc.add(Math.max(Math.hypot(y - 0.8, sh + 0.004) - 0.011, ax - 0.86), MAT.chrome, 0.003);
-      acc.cut(pocket(sdRoundBox(x, y - 0.555, 0, 0.16, 0.078, 1, 0.02), sh, 0.012, po), po.wall ? MAT.trim : MAT.paint, 0.003);
-      acc.cut(pocket(sdRoundBox(ax - 0.5, y - 0.555, 0, 0.08, 0.035, 1, 0.015), sh, 0.012, po), po.wall ? MAT.chrome : MAT.reverse, 0.003);
+      const grille = sdRoundBox(x, y - 0.56, 0, 0.84, 0.09, 1, 0.025);
+      const plate = sdRoundBox(x, y - 0.555, 0, 0.165, 0.08, 1, 0.012);
+      const lamp = sdRoundBox(ax - 0.52, y - 0.56, 0, 0.09, 0.035, 1, 0.012);
+      acc.cut(pocket(grille, sh, 0.04, po), po.wall ? MAT.chrome : MAT.grille, 0.006);
+      acc.add(edge(Math.abs(grille + 0.005) - 0.006, Math.max(sh - 0.005, -(sh + 0.015))), MAT.chrome, 0.002);
+      // (the bars stand on the grille's floor and stop short of the plate and the lamps)
+      for (const yb of [0.515, 0.56, 0.605]) {
+        acc.add(edge(Math.max(grille, Math.abs(y - yb) - 0.007, -plate - 0.012, -lamp - 0.012), Math.max(sh + 0.006, -(sh + 0.045))), MAT.chrome, 0.002);
+      }
+      acc.add(edge(plate, Math.max(sh + 0.012, -(sh + 0.045))), MAT.paint, 0.002);
+      acc.add(edge(lamp, Math.max(sh + 0.01, -(sh + 0.045))), MAT.reverse, 0.002);
+    }
+    // the exhausts end in ports in the rear bumper's ends; amber parking lamps in the front bumper
+    // under the headlamps
+    if (z < -2.6 && y > 0.26 && y < 0.42 && ax > 0.45 && ax < 0.8) {
+      const bumper = roundEdge(bodyPlan.sample(ax, z) - 0.06, Math.abs(y - 0.35) - 0.07, 0.03);
+      acc.cut(pocket(sdRoundBox(ax - 0.62, y - 0.345, 0, 0.075, 0.032, 1, 0.03), bumper, 0.05, po), po.wall ? MAT.chrome : MAT.exhaust, 0.004);
+    }
+    if (z > 2.6 && y > 0.29 && y < 0.37 && ax > 0.6 && ax < 0.92) {
+      const bumper = roundEdge(bodyPlan.sample(ax, z) - 0.06, Math.abs(y - 0.33) - 0.075, 0.03);
+      acc.cut(pocket(sdRoundBox(ax - 0.76, y - 0.33, 0, 0.075, 0.018, 1, 0.016), bumper, 0.012, po), po.wall ? MAT.chrome : MAT.amber, 0.003);
     }
     // wheel arches (open to the side, black liners inside); a skirt hides the top of each rear wheel
     if (ax > 0.5 && y < 0.9) {
@@ -279,9 +320,35 @@ export function buildJukebox() {
     }
 
     // ---------------------------------------------------------------- material zones
-    if (acc.m === MAT.paint && y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+    if (acc.m === MAT.paint) {
+      if (y < 0.235) acc.m = MAT.trim; // underbody (the floor sits at 0.22)
+      // a chrome edge along the top and trailing edge of each fin
+      else if (ax > 0.82 && y > 0.92 && z < -1.7 && z > -2.75 && finSide.sample(z, y) > -0.016) acc.m = MAT.chrome;
+      // chrome frames round the glass: side windows, windshield and rear window
+      else if (y > 0.86 && z < 1.12 && z > -1.52) {
+        const side = cS - cP + 0.01 < 0;
+        const ring = (d) => d > 0 && d < 0.015;
+        if (side ? ring(Math.min(doorWin.sample(z, y), quarterWin.sample(z, y))) : ring(windshield.sample(ax, z)) || ring(rearGlass.sample(ax, z))) acc.m = MAT.chrome;
+      }
+    }
     out.m = acc.m;
     return acc.d;
+  }
+
+  // the far model (distant rivals): the thin chrome trims merge into what they're laid on (every
+  // material border keeps its full-resolution edge through simplification), the tail grille reads
+  // as one chrome panel
+  function farMat(x, y, z, m) {
+    const ax = Math.abs(x);
+    if (m === MAT.chrome) {
+      if (ax > 0.85 && y < 0.33 && Math.abs(z + 0.04) < 1.2) return MAT.paint; // sills
+      if (ax > 0.85 && y < 0.82 && Math.abs(Math.hypot(y - WH.front.y, z - WH.front.z) - 0.42) < 0.03) return MAT.paint; // front arch trims
+      if (ax > 0.85 && y > 0.35 && y < 0.4 && Math.abs(z - WH.rear.z) < 0.42) return MAT.paint; // skirt strips
+      if (ax > 0.82 && y > 0.9 && z < -1.7 && z > -2.66) return MAT.paint; // fin edges
+      if (y > 0.88 && y < 1.4 && z > -1.55 && z < 1.12) return MAT.trim; // window frames
+    }
+    if (z < -2.55 && y > 0.45 && y < 0.68 && ax < 0.88 && (m === MAT.grille || m === MAT.reverse)) return MAT.chrome;
+    return m;
   }
 
   // ------------------------------------------------------------------ glass, lamps
@@ -298,8 +365,9 @@ export function buildJukebox() {
     id: 'jukebox',
     sdf,
     shell,
+    farMat,
     decals,
-    // the grille mesh sits in a pocket: full AO turns it into a black void
+    // the grille meshes sit in pockets: full AO turns them into black voids
     aoStrength: { [MAT.grille]: 0.45, [MAT.chrome]: 0.7 },
     bounds: { min: [-1.25, 0.0, -3.0], max: [1.25, 1.5, 3.05] },
     meta: {
@@ -328,8 +396,8 @@ export function buildJukebox() {
         [-0.75, 0.615, 2.72],
       ],
       exhausts: [
-        [0.6, 0.22, -2.75],
-        [-0.6, 0.22, -2.75],
+        [0.62, 0.345, -2.8],
+        [-0.62, 0.345, -2.8],
       ],
     },
   };

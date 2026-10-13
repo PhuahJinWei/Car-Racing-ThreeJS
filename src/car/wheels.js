@@ -132,6 +132,37 @@ export function tyreGeometry(r, w, hq, rim = rimRadius(r)) {
   });
 }
 
+/** A white band round the outer sidewall, `band` wide from just outside the rim: a design sets
+ * `whitewall` (its width) in its wheel layout, wide whitewalls on a 50s car. It follows the
+ * sidewall's bulge as tyreGeometry draws it, a hair proud of it, with the same segments. */
+export function whitewallGeometry(r, w, hq, rim = rimRadius(r), band = 0.06) {
+  return cached(`whitewall|${r}|${w}|${hq}|${rim}|${band}`, () => {
+    const hw = w / 2;
+    const wall = [
+      [rim + 0.012, hw - 0.006],
+      [rim + 0.03, hw - 0.001],
+      [(rim + r) / 2, hw + 0.005],
+      [r - 0.028 * 1.1, hw + 0.002],
+    ];
+    const at = (rho) => {
+      let i = 1;
+      while (i < wall.length - 1 && rho > wall[i][0]) i++;
+      const [r0, a0] = wall[i - 1];
+      const [r1, a1] = wall[i];
+      return a0 + ((a1 - a0) * (rho - r0)) / (r1 - r0);
+    };
+    const inner = rim + 0.022;
+    const outer = Math.min(inner + band, r - 0.045);
+    // (outside in, as the tyre's outer wall runs, so it faces the same way)
+    const prof = [];
+    for (let i = 0; i <= 6; i++) {
+      const rho = outer + ((inner - outer) * i) / 6;
+      prof.push([rho, at(rho) + 0.0015]);
+    }
+    return finish(lathe(prof, hq ? 72 : 28), () => 0.95);
+  });
+}
+
 // ---------------------------------------------------------------------------------------- rims
 const RIM_STYLES = {
   // five split spokes (V pairs)
@@ -407,11 +438,12 @@ function bakeWheels(wheels, partOf, boneOf) {
 
 /**
  * Geometry for all four wheels of a car (see bakeWheels), shared between every car with the same
- * wheels: { tyre, rim, blur } plus { disc, caliper } in high quality. Tyres, rims and discs roll
- * with the spin bones; calipers and the blur disc only steer.
+ * wheels: { tyre, rim, blur } plus { disc, caliper } in high quality, and { whitewall } when every
+ * wheel has one. Tyres, rims and discs roll with the spin bones; calipers and the blur disc only
+ * steer.
  */
 export function wheelSet(wheels, style, hq) {
-  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w},${w.rim}`).join('|')}|${style}|${hq}`;
+  const key = `set|${wheels.map((w) => `${w.x},${w.y},${w.z},${w.r},${w.w},${w.rim},${w.whitewall}`).join('|')}|${style}|${hq}`;
   const spin = (k) => 2 * k + 1;
   const pivot = (k) => 2 * k;
   const rimOf = (w) => w.rim ?? rimRadius(w.r);
@@ -423,6 +455,9 @@ export function wheelSet(wheels, style, hq) {
   if (hq) {
     set.disc = cached(`${key}|disc`, () => bakeWheels(wheels, (w) => discGeometry(w.r, w.w, rimOf(w)), spin));
     set.caliper = cached(`${key}|caliper`, () => bakeWheels(wheels, (w) => caliperGeometry(w.r, w.w, rimOf(w)), pivot));
+  }
+  if (wheels.every((w) => w.whitewall > 0)) {
+    set.whitewall = cached(`${key}|whitewall`, () => bakeWheels(wheels, (w) => whitewallGeometry(w.r, w.w, hq, rimOf(w), w.whitewall), spin));
   }
   return set;
 }

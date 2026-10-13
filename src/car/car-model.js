@@ -1222,7 +1222,7 @@ export class CarModel {
         pivot.add(spin);
         this.group.add(pivot);
         bones.push(pivot, spin);
-        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, rim: w.rim, side });
+        this.wheelLayout.push({ x: side * w.x, y: w.y, z: w.z, r: w.r, w: w.w, rim: w.rim, whitewall: w.whitewall, side });
         this.wheels.push({ pivot, spin, r: w.r, w: w.w, front, side });
       }
     }
@@ -1240,6 +1240,11 @@ export class CarModel {
       return m;
     };
     this.tyreMesh = skinned(set.tyre, this.tireMat);
+    // whitewall tyres, on the cars whose wheel layout asks for them
+    if (set.whitewall) {
+      this.whitewallMat = withAO(new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.75, metalness: 0, envMapIntensity: 0.5, vertexColors: true, envMap: env }));
+      skinned(set.whitewall, this.whitewallMat);
+    }
     this.rimMesh = skinned(set.rim, this.rimMat);
     if (this.wheelHQ) {
       skinned(set.disc, this.brakeMat);
@@ -1525,7 +1530,7 @@ export class CarModel {
   }
 
   setEnvRotation(euler) {
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.indicatorMat, this.plasticMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) {
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.indicatorMat, this.plasticMat, this.tireMat, this.whitewallMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) {
       if (m && m.envMapRotation) m.envMapRotation.copy(euler);
     }
   }
@@ -1539,7 +1544,7 @@ export class CarModel {
       if (isSharedWheelGeometry(o.geometry)) return;
       o.geometry.dispose();
     });
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, this.amberMat, this.indicatorMat, this.plasticMat, ...(this.beaconMats || [])]) m?.dispose();
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, this.amberMat, this.indicatorMat, this.plasticMat, this.whitewallMat, ...(this.beaconMats || [])]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();
