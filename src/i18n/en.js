@@ -12,6 +12,7 @@ export default {
   'theme.tunnel': 'EXPRESSWAY',
   'theme.city': 'STREET',
   'theme.stadium': 'CIRCUIT',
+  'theme.park': 'PARK',
   'level.1': 'BEGINNER',
   'level.2': 'INTERMEDIATE',
   'level.3': 'EXPERT',

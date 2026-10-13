@@ -9,6 +9,7 @@ import { Garage } from './scenes/garage.js';
 import { MenuStreet } from './scenes/street.js';
 import { Race, pickRivals } from './game/race.js';
 import { getTrackDef } from './world/tracks.js';
+import { ensureScenery } from './world/scenery.js';
 import { evaluateDaily, dailyProgress, todayKey } from './game/daily.js';
 import { clamp } from './core/math.js';
 import { setLanguage, t } from './core/i18n.js';
@@ -197,7 +198,11 @@ export class App {
     // that's here
     const ids = [...new Set([carId, ...(full.rivals || [])])];
     let fetched = 0;
+    // and a track modelled in Blender brings its set (the park round Floodlight Park): without it
+    // the track gets its plain dressing
+    const scenery = ensureScenery(getTrackDef(cfg.trackId).scenery, (this.renderer.preset?.decorDensity ?? 1) < 0.8);
     await Promise.all(ids.map((id) => ensureCarAssets([id], this.renderer.renderer).then(() => progress(0.05 + (0.4 * ++fetched) / ids.length))));
+    await scenery;
     if (full.rivals) {
       const here = [carId, ...full.rivals].filter((id) => getCarAsset(id));
       if (here.length) full.rivals = full.rivals.map((id, k) => (getCarAsset(id) || !getCarDef(id).model ? id : here[k % here.length]));

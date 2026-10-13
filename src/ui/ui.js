@@ -39,7 +39,7 @@ const TRACK_SHOTS = {
   circuit: { src: circuitShot, focus: '70% 55%' },
   ring: { src: ringShot, focus: '50% 55%' },
   heights: { src: heightsShot, focus: '50% 55%' },
-  park: { src: parkShot, focus: '48% 55%' },
+  park: { src: parkShot, focus: '46% 55%' },
 };
 // Event setup order (TRACKS keeps its own order: the daily challenge picks from it by index)
 const SETUP_ORDER = ['district', 'lumen', 'circuit', 'ring', 'heights', 'park'];

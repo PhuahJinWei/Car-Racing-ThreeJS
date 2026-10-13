@@ -7,6 +7,7 @@ import { buildLamps, buildChevrons, buildGantries, buildSignGantries, buildTerra
 import { buildCity } from './decor-city.js';
 import { buildStadium } from './decor-stadium.js';
 import { planHarbour, buildHarbour } from './decor-harbour.js';
+import { getScenery, buildScenery } from './scenery.js';
 import { createEnvironment, createEnvMap } from './environment.js';
 import { globalUniforms, setCover } from './materials.js';
 import { CoverMap } from './cover-map.js';
@@ -21,6 +22,9 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
   const track = new Track(def, variant);
   const palette = { ...def.palette };
   const rain = variant.weather === 'rain';
+  // a set modelled in Blender round the track (loaded before the race is built), if it has one
+  const set = def.scenery ? getScenery(def.scenery, (quality.decorDensity ?? 1) < 0.8) : null;
+  const stadium = def.theme === 'stadium' || (def.theme === 'park' && !set);
   const scene = new THREE.Scene();
   const root = new THREE.Group();
   scene.add(root);
@@ -35,8 +39,8 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     clouds: rain ? 1.6 : 1,
     overcast: rain ? 1 : 0,
     skyline: true,
-    skylineHeight: def.theme === 'stadium' ? 0.25 : 0.55,
-    skylineDensity: def.theme === 'stadium' ? 0.5 : 1,
+    skylineHeight: stadium ? 0.25 : def.theme === 'park' ? 0.42 : 0.55,
+    skylineDensity: stadium ? 0.5 : 1,
     hemi: 1.0,
   });
   globalUniforms.uWet.value = rain ? 1 : 0;
@@ -177,10 +181,17 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
     // (the plane out to the horizon sits below the hill's lowest ground)
     const terrain = buildTerrain(track, palette, ground ? { style: 'town', ground, cell: 14, margin: 450, baseY: track.bounds.minY - 2.6 } : { style: 'asphalt', baseY: track.bounds.minY - 1.2 });
     decor.add(terrain);
+  } else if (set) {
+    // a park (or another set) modelled in Blender round the track, its lamps lighting the road;
+    // the city's lit streets beyond its edge
+    decor.add(buildScenery(set, track, baker, palette, variant));
+    const city = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000).rotateX(-Math.PI / 2), createGroundMaterial(palette, 'carpet'));
+    city.position.set((track.bounds.minX + track.bounds.maxX) / 2, track.bounds.minY - 2.5, (track.bounds.minZ + track.bounds.maxZ) / 2);
+    decor.add(city);
   } else {
-    const stadium = buildStadium(track, baker, palette, rand, { density, cones: quality.cones !== false, coneIntensity: rain ? 0.12 : 0.09 });
-    decor.add(stadium);
-    crowdMat = stadium.userData.crowdMat || null;
+    const stands = buildStadium(track, baker, palette, rand, { density, cones: quality.cones !== false, coneIntensity: rain ? 0.12 : 0.09 });
+    decor.add(stands);
+    crowdMat = stands.userData.crowdMat || null;
     const terrain = buildTerrain(track, palette, { style: 'grass', baseY: track.bounds.minY - 1.0 });
     decor.add(terrain);
     const gantries = buildGantries(track, baker, palette, { spacing: 260, color: '#f2f6ff', intensity: 0.9 });
@@ -227,7 +238,7 @@ export function buildWorld(renderer, trackId, variant, quality = {}) {
   cover.build();
   setCover(cover);
 
-  const envRT = createEnvMap(renderer, palette, { softbox: def.theme === 'stadium' ? 3.0 : 2.4 });
+  const envRT = createEnvMap(renderer, palette, { softbox: stadium ? 3.0 : 2.4 });
   scene.environment = envRT.texture;
 
   // Light probe for dynamic objects (cars): sample baked light at a world point.

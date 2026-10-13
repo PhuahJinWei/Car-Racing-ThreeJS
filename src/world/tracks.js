@@ -400,8 +400,11 @@ export const TRACKS = [
   {
     id: 'park',
     name: 'FLOODLIGHT PARK',
-    tagline: 'A tight club circuit under the floodlights. A chicane, a hairpin and no time to breathe.',
-    theme: 'stadium',
+    tagline: 'A club circuit through a city park at night: through the woods round the hairpin, over a stone bridge and along the lake.',
+    // a city park at night, modelled in Blender round the track (tools/blender/scenery/park.py);
+    // the stadium sections only dress it if that can't be loaded
+    theme: 'park',
+    scenery: 'park',
     difficulty: 3,
     width: 14,
     laps: 3,
