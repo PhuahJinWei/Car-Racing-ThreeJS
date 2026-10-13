@@ -1153,13 +1153,14 @@ export class UI {
       panel.innerHTML = `<h3 class="panel-title">${SECTIONS[tab].name}</h3>${SECTIONS[tab].html()}`;
       panel.scrollTop = 0;
     };
-    // developer mode: tap the Profile title seven times (a pause of over a second starts over)
+    // developer mode: tap Profile seven times - its title, or its tab once it's open (a pause of
+    // over 1.5 s starts over)
     let taps = 0;
     let lastTap = 0;
     const devTap = () => {
       if (devMode()) return;
       const now = performance.now();
-      taps = now - lastTap > 1200 ? 1 : taps + 1;
+      taps = now - lastTap > 1500 ? 1 : taps + 1;
       lastTap = now;
       const left = DEV_TAPS - taps;
       if (left <= 0) {
@@ -1196,7 +1197,7 @@ export class UI {
     view.addEventListener('click', (e) => {
       const d = e.target.closest('[data-dev]');
       if (d) return devAction(d.dataset.dev);
-      if (tab === 'profile' && e.target.closest('.panel-title')) return devTap();
+      if (tab === 'profile' && e.target.closest('.panel-title, [data-tab="profile"]')) return devTap();
       const b = e.target.closest('[data-tab]');
       if (!b) return;
       tab = b.dataset.tab;
