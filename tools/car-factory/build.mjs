@@ -46,7 +46,7 @@ const LODS = [
 ];
 
 // how much each part's shading detail matters (hidden wheel wells and pocket walls matter least)
-const IMPORTANCE = { paint: 1, glass: 1, chrome: 0.6, head: 0.5, tail: 0.5, reverse: 0.5, indicator: 0.5, carbon: 0.35, interior: 0.3, trim: 0.2, grille: 0.15, exhaust: 0.15 };
+const IMPORTANCE = { paint: 1, glass: 1, chrome: 0.6, head: 0.5, tail: 0.5, reverse: 0.5, indicator: 0.5, plastic: 0.5, carbon: 0.35, interior: 0.3, trim: 0.2, grille: 0.15, exhaust: 0.15 };
 const MAT_WEIGHTS = Object.fromEntries(Object.entries(IMPORTANCE).map(([k, v]) => [MAT[k], v]));
 // mostly hidden parts get looser geometric tolerances (multiples of the LOD's error)
 const STAGES = [
@@ -54,7 +54,7 @@ const STAGES = [
   { mats: new Set([MAT.interior]), mul: 2 },
 ];
 // far away only the painted silhouette matters: every detail part gets coarsened first
-const FAR_STAGES = [{ mats: new Set([MAT.trim, MAT.grille, MAT.exhaust, MAT.carbon, MAT.chrome, MAT.head, MAT.tail, MAT.reverse, MAT.indicator]), mul: 3 }];
+const FAR_STAGES = [{ mats: new Set([MAT.trim, MAT.grille, MAT.exhaust, MAT.carbon, MAT.chrome, MAT.head, MAT.tail, MAT.reverse, MAT.indicator, MAT.plastic]), mul: 3 }];
 
 const args = process.argv.slice(2);
 const quick = args.includes('--quick');

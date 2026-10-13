@@ -96,6 +96,7 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
   - A patrol car's light bar uses two extra materials (`beaconR`, `beaconB`) that the game flashes; with reduced flashes they glow in turn instead.
   - Amber lenses come in two kinds: `amber` glows all the time as a position lamp, while `indicator` is an unlit amber turn-signal lens (the VICE's rear lamps), which would otherwise look stuck on at night.
+  - `plastic` is unpainted dark grey plastic, for a cheap car's bumpers and mouldings (the MOCHI). Far away it shares the black trim's material.
   - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street.
 
 ## Adding real car models
