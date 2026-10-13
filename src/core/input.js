@@ -24,7 +24,8 @@ export class Input {
     this.edges = new Set();
     // rev: held to rev the engine on the start line - the gas, or NITRO where the gas is automatic
     // (revBy says which)
-    this.state = { steer: 0, throttle: 0, brake: 0, drift: false, nitroHeld: false, rev: false };
+    // autoGas: the throttle is the automatic one (touch), which a drift lifts (see Vehicle)
+    this.state = { steer: 0, throttle: 0, brake: 0, drift: false, nitroHeld: false, rev: false, autoGas: false };
     this.revBy = 'gas';
     this.kbSteer = 0;
     this.device = 'keyboard';
@@ -219,6 +220,7 @@ export class Input {
       s.brake = gp.brake;
       s.drift = gp.drift;
       s.rev = gp.throttle > 0.5;
+      s.autoGas = false;
       this.revBy = 'gas';
     } else if (dev === 'touch' || dev === 'tilt') {
       if (this.tilt.enabled && this.tilt.has) {
@@ -231,6 +233,7 @@ export class Input {
       s.drift = this.touch.drift;
       s.brake = this.touch.brake;
       s.throttle = this.autoAccel ? 1 : this.touch.throttle;
+      s.autoGas = this.autoAccel;
       s.rev = this.autoAccel ? this.touch.nitro : this.touch.throttle > 0.5;
       this.revBy = this.autoAccel ? 'nitro' : 'gas';
     } else {
@@ -239,6 +242,7 @@ export class Input {
       s.brake = this.has('down') ? 1 : 0;
       s.drift = this.has('drift');
       s.rev = s.throttle > 0;
+      s.autoGas = false;
       this.revBy = 'gas';
     }
     s.nitroHeld = this.has('nitro');

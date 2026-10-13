@@ -15,6 +15,9 @@ const STOPPED = 0.05;
 const GEAR_TOP = [0, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 2.0];
 const EV_GEAR_TOP = [0, 2.0];
 const DRIFT_MIN = 17; // a drift needs this much speed; slower, the drift button only brakes
+// with the gas automatic (touch), the gas a drift eases to while steering fully into it (0: off
+// the gas entirely, as a keyboard player lets go of it)
+const AUTO_LIFT = 0;
 // realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
 const SHIFT_CUT = 0.12; // torque gap of an upshift
@@ -210,6 +213,12 @@ export class Vehicle {
     } else {
       D.slip = slipRaw;
     }
+    // with the gas automatic (touch), a drift lifts off it the way a keyboard player lets go of the
+    // gas: steering hard into the drift eases it towards AUTO_LIFT, steering less or countersteering
+    // brings it back - the thumb that holds the drift also sets its speed
+    const liftT = inp.autoGas && D.active ? lerp(1, AUTO_LIFT, clamp(steer * D.dir, 0, 1)) : 1;
+    this.autoLift = damp(this.autoLift ?? 1, liftT, 14, dt);
+    if (inp.autoGas) throttle = Math.min(throttle, this.autoLift);
 
     if (!this.grounded) wTarget *= 0.35;
     const yawResp = D.active ? 6 : 9;
