@@ -255,6 +255,7 @@ export class AudioEngine {
         for (const o of [e.oscA, e.oscB, e.oscC, e.whine, e.lfo, e.spool, e.squeal, e.sqLfo, e.opp, e.opp2]) o.stop();
         for (const n of [e.wind, e.screech, e.screech2, e.scrape, e.roar, e.jet, e.rain]) n.src.stop();
         for (const s of [e.siren, e.rivalSiren]) if (s) for (const o of [s.a, s.b, s.wail, s.yelpLfo]) o.stop();
+        if (e.motor) for (const o of [e.motor.a, e.motor.b, e.motor.inv]) o.stop();
         e.bed.disconnect();
       } catch {
         /* already stopped */
@@ -281,8 +282,20 @@ export class AudioEngine {
     aim(e.lfo.frequency, f0 * 0.5, t, k);
     const thr = clamp(p.throttle, 0, 1);
     aim(e.filter.frequency, 220 + p.rpm * 1700 * (0.35 + 0.65 * thr) + p.boost * 1600, t, 0.05);
-    aim(e.out.gain, (0.12 + thr * 0.13 + p.boost * 0.08) * (p.airborne ? 0.85 : 1), t, 0.06);
+    // (an electric car has no combustion to hear: its motor is a voice of its own, below)
+    aim(e.out.gain, p.electric ? 0 : (0.12 + thr * 0.13 + p.boost * 0.08) * (p.airborne ? 0.85 : 1), t, 0.06);
     aim(e.gW.gain, sp * 0.025 + p.boost * 0.05, t, 0.1);
+    if (p.electric) {
+      // the motor whines up with road speed (one speed, no gear changes), and under load at low
+      // speed the inverter sings thinly over it
+      const m = e.motor || (e.motor = this._motorVoice(e.bed));
+      const fm = (150 + sp * 1700 + p.boost * 240) * pitchMul;
+      aim(m.a.frequency, fm, t, k);
+      aim(m.b.frequency, fm * 1.5, t, k);
+      aim(m.g.gain, (0.015 + thr * 0.045 + p.boost * 0.02) * (p.airborne ? 0.85 : 1), t, 0.06);
+      aim(m.inv.frequency, (2900 + sp * 1200) * pitchMul, t, 0.1);
+      aim(m.gInv.gain, thr * 0.008 * clamp(1 - sp * 2, 0, 1), t, 0.08);
+    }
     aim(e.wind.g.gain, sp * sp * 0.2 + p.boost * 0.06, t, 0.1);
     aim(e.wind.f.frequency, 300 + sp * 1500, t, 0.1);
     const scr = clamp(p.drift, 0, 1);
@@ -298,9 +311,9 @@ export class AudioEngine {
     aim(e.jet.f.frequency, 700 + p.boost * 800 + sp * 700, t, 0.1);
     aim(e.gSpool.gain, p.boost * 0.012, t, 0.15);
     aim(e.spool.frequency, (2000 + p.rpm * 1500 + p.boost * 700) * pitchMul, t, 0.12);
-    if (p.boost > 0.3 && Math.random() < dt * 8 * p.boost) this._pop(0.3 * p.boost);
+    if (!p.electric && p.boost > 0.3 && Math.random() < dt * 8 * p.boost) this._pop(0.3 * p.boost);
     // lift off at high revs: the dump valve sighs and the exhaust crackles for a moment
-    if (e.prevThr > 0.7 && thr < 0.2 && p.rpm > 0.55 && sp > 0.3 && !p.airborne && ts > 0.9 && t - e.lastLift > 1.2) {
+    if (!p.electric && e.prevThr > 0.7 && thr < 0.2 && p.rpm > 0.55 && sp > 0.3 && !p.airborne && ts > 0.9 && t - e.lastLift > 1.2) {
       e.lastLift = t;
       this.play('blowoff');
       e.crackleUntil = t + rand(0.35, 0.8);
@@ -351,6 +364,25 @@ export class AudioEngine {
         aim(r.b.detune, cents, t, 0.1);
       }
     }
+  }
+
+  /**
+   * An electric motor: two clean tones a fifth apart that the race pitches with road speed, and the
+   * faint high whistle of its inverter. Silent until its levels are raised.
+   */
+  _motorVoice(dest) {
+    const v = {};
+    v.a = this._osc('sine', 150);
+    v.b = this._osc('sine', 225);
+    v.inv = this._osc('sine', 2900);
+    v.g = this._gain(0);
+    v.a.connect(v.g);
+    v.b.connect(this._gain(0.4)).connect(v.g);
+    v.g.connect(dest);
+    v.gInv = this._gain(0);
+    v.inv.connect(v.gInv).connect(dest);
+    for (const o of [v.a, v.b, v.inv]) o.start();
+    return v;
   }
 
   /**

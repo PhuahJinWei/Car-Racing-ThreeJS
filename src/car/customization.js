@@ -33,8 +33,10 @@ export const LIVERIES = [
   { id: 'lv_split', name: 'Two-Tone', price: 1000 },
   { id: 'lv_circuit', name: 'Circuitry', price: 1800 },
   { id: 'lv_panda', name: 'Panda', price: 1200 },
+  { id: 'lv_flames', name: 'Flames', price: 1500 },
   // only for the car named in `only`
   { id: 'lv_police', name: 'Patrol', price: 0, only: 'marshal' },
+  { id: 'lv_taxi', name: 'Taxi', price: 0, only: 'cabbie' },
 ];
 
 export const RIMS = [
@@ -156,6 +158,31 @@ export const DEFAULT_CUSTOM_BY_CAR = {
   ronin: { ...DEFAULT_CUSTOM, paint: 'p_violet', accent: 'p_black', rims: 'r_mesh' },
   // rally white with red stripes and a door number, on gold wheels
   sidewinder: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_crimson', livery: 'lv_race', rims: 'r_turbine', rimColor: 'rc_gold' },
+  // a deep green-blue with chrome, on silver mesh wheels that pass for wire wheels
+  vesper: { ...DEFAULT_CUSTOM, paint: 'p_teal', accent: 'p_silver', rims: 'r_mesh' },
+  // desert gold with black flares and bumpers, on silver wheels (dark ones vanish in the flares)
+  juggernaut: { ...DEFAULT_CUSTOM, paint: 'p_gold', accent: 'p_black' },
+  // two-tone: cyan with a white roof
+  mochi: { ...DEFAULT_CUSTOM, paint: 'p_cyan', accent: 'p_white', livery: 'lv_split' },
+  // two-tone: cherry red with a white top, on classic eight-spoke wheels
+  jukebox: { ...DEFAULT_CUSTOM, paint: 'p_crimson', accent: 'p_white', livery: 'lv_split', rims: 'r_classic' },
+  // taxi yellow with a black checker band
+  cabbie: { ...DEFAULT_CUSTOM, paint: 'p_yellow', accent: 'p_black', livery: 'lv_taxi' },
+  // silver with black over-fenders, on gold eight-spoke wheels
+  kaido: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_black', rims: 'r_classic', rimColor: 'rc_gold' },
+  // family-car silver, as unassuming as it gets
+  sleeper: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_black' },
+  // violet with orange flames, on classic eight-spoke wheels (black vanished at night from the
+  // chase camera)
+  deuce: { ...DEFAULT_CUSTOM, paint: 'p_violet', accent: 'p_orange', livery: 'lv_flames', rims: 'r_classic' },
+  // pearl white under its dark glass roof, on graphite aero wheels
+  surge: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', rims: 'r_turbine', rimColor: 'rc_graphite' },
+  // white, on silver five-spoke wheels
+  vice: { ...DEFAULT_CUSTOM, paint: 'p_white', accent: 'p_black', rims: 'r_split' },
+  // racing silver with red stripes and a door number, on silver mesh wheels
+  enduro: { ...DEFAULT_CUSTOM, paint: 'p_silver', accent: 'p_crimson', livery: 'lv_stripes', number: 'n_33', rims: 'r_mesh' },
+  // a hypercar's acid green with black accents, on graphite blade wheels
+  apogee: { ...DEFAULT_CUSTOM, paint: 'p_lime', accent: 'p_black', rims: 'r_blade', rimColor: 'rc_graphite' },
 };
 
 /** Whether an item is on offer for a car (some are made for one car). */
@@ -183,7 +210,7 @@ export function resolveCustom(custom) {
   };
 }
 
-/** Random cosmetic setup for AI opponents (deterministic per seed); patrol cars keep their colours. */
+/** Random cosmetic setup for AI opponents (deterministic per seed); patrol cars and taxis keep their colours. */
 export function randomCustom(r, def) {
   const pick = (arr) => arr[Math.floor(r() * arr.length)];
   const c = {
@@ -197,5 +224,5 @@ export function randomCustom(r, def) {
     underglow: r() < 0.85 ? 'ug_none' : pick(UNDERGLOWS.slice(1, 7)).id,
     trail: 'tr_red',
   };
-  return def?.patrol ? { ...c, ...DEFAULT_CUSTOM_BY_CAR[def.id] } : c;
+  return def?.patrol || def?.stock ? { ...c, ...DEFAULT_CUSTOM_BY_CAR[def.id] } : c;
 }

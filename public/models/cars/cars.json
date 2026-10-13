@@ -49,10 +49,10 @@
       "file": "marshal.glb",
       "gz": true,
       "factory": true,
-      "v": "664410598f",
+      "v": "400a7f2176",
       "light": {
         "file": "marshal.m.glb",
-        "v": "7cc85c6467"
+        "v": "39f725199c"
       }
     },
     {
@@ -60,10 +60,10 @@
       "file": "brawler.glb",
       "gz": true,
       "factory": true,
-      "v": "aae231afd4",
+      "v": "013fe8c2dd",
       "light": {
         "file": "brawler.m.glb",
-        "v": "3f354fc9c4"
+        "v": "5cfdd1ea25"
       }
     },
     {
@@ -71,10 +71,10 @@
       "file": "ronin.glb",
       "gz": true,
       "factory": true,
-      "v": "7ea1853755",
+      "v": "64662d6ab9",
       "light": {
         "file": "ronin.m.glb",
-        "v": "8b395ea7d8"
+        "v": "974cb82aa9"
       }
     },
     {
@@ -82,10 +82,142 @@
       "file": "sidewinder.glb",
       "gz": true,
       "factory": true,
-      "v": "d4c34a66f1",
+      "v": "47be4f7151",
       "light": {
         "file": "sidewinder.m.glb",
-        "v": "70c5f1b419"
+        "v": "7f9198d89f"
+      }
+    },
+    {
+      "id": "vesper",
+      "file": "vesper.glb",
+      "gz": true,
+      "factory": true,
+      "v": "cf6c4e9053",
+      "light": {
+        "file": "vesper.m.glb",
+        "v": "26b25a16ca"
+      }
+    },
+    {
+      "id": "juggernaut",
+      "file": "juggernaut.glb",
+      "gz": true,
+      "factory": true,
+      "v": "b803c248fe",
+      "light": {
+        "file": "juggernaut.m.glb",
+        "v": "479dd49961"
+      }
+    },
+    {
+      "id": "mochi",
+      "file": "mochi.glb",
+      "gz": true,
+      "factory": true,
+      "v": "b4baa2ac06",
+      "light": {
+        "file": "mochi.m.glb",
+        "v": "a61057cbf6"
+      }
+    },
+    {
+      "id": "jukebox",
+      "file": "jukebox.glb",
+      "gz": true,
+      "factory": true,
+      "v": "a651ee88d5",
+      "light": {
+        "file": "jukebox.m.glb",
+        "v": "eeaf43d6f7"
+      }
+    },
+    {
+      "id": "cabbie",
+      "file": "cabbie.glb",
+      "gz": true,
+      "factory": true,
+      "v": "ed4a159b37",
+      "light": {
+        "file": "cabbie.m.glb",
+        "v": "0cb59af066"
+      }
+    },
+    {
+      "id": "kaido",
+      "file": "kaido.glb",
+      "gz": true,
+      "factory": true,
+      "v": "62abfac8b5",
+      "light": {
+        "file": "kaido.m.glb",
+        "v": "4200a37ac5"
+      }
+    },
+    {
+      "id": "sleeper",
+      "file": "sleeper.glb",
+      "gz": true,
+      "factory": true,
+      "v": "5d9135e587",
+      "light": {
+        "file": "sleeper.m.glb",
+        "v": "f24aefd623"
+      }
+    },
+    {
+      "id": "deuce",
+      "file": "deuce.glb",
+      "gz": true,
+      "factory": true,
+      "v": "578fe905ae",
+      "light": {
+        "file": "deuce.m.glb",
+        "v": "81a3250195"
+      }
+    },
+    {
+      "id": "surge",
+      "file": "surge.glb",
+      "gz": true,
+      "factory": true,
+      "v": "f28f2a8d8a",
+      "light": {
+        "file": "surge.m.glb",
+        "v": "e22323d899"
+      }
+    },
+    {
+      "id": "vice",
+      "file": "vice.glb",
+      "gz": true,
+      "factory": true,
+      "v": "9de9e9b722",
+      "light": {
+        "file": "vice.m.glb",
+        "v": "bb767814f4"
+      }
+    },
+    {
+      "id": "enduro",
+      "file": "enduro.glb",
+      "gz": true,
+      "factory": true,
+      "v": "7086aa1ac7",
+      "light": {
+        "file": "enduro.m.glb",
+        "v": "efaa126124"
+      }
+    },
+    {
+      "id": "apogee",
+      "file": "apogee.glb",
+      "gz": true,
+      "factory": true,
+      "v": "15e335c60e",
+      "light": {
+        "file": "apogee.m.glb",
+        "v": "0a9d0e643a"
       }
     }
   ]

@@ -48,6 +48,46 @@ function rng(seed) {
   };
 }
 
+/** '#rrggbb' colour a share t of the way from a to b, as a CSS colour. */
+function mixHex(a, b, t) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const ca = p(a);
+  const cb = p(b);
+  return `rgb(${ca.map((v, i) => Math.round(v + (cb[i] - v) * t)).join(', ')})`;
+}
+
+// hot-rod flame licks from the bottom up: [length (share of the whole), base centre, rise of the tip]
+const FLAME_LICKS = [
+  [0.5, 0.1, 0.12],
+  [0.84, 0.3, 0.16],
+  [1.0, 0.5, 0.16],
+  [0.7, 0.7, 0.14],
+  [0.4, 0.88, 0.08],
+];
+
+/**
+ * Add a flame job's outline to the current path. map(u, v) places it: u runs back from the base
+ * (0..1), v across it (0..1).
+ */
+function flamePath(ctx, map) {
+  const P = (u, v) => map(u, v);
+  // the solid base
+  ctx.moveTo(...P(-0.05, -0.02));
+  ctx.lineTo(...P(0.08, -0.02));
+  ctx.lineTo(...P(0.08, 1.02));
+  ctx.lineTo(...P(-0.05, 1.02));
+  ctx.closePath();
+  for (const [L, c, rise] of FLAME_LICKS) {
+    const w = 0.15;
+    const tv = c + rise;
+    // lower edge: full, bulging down before it sweeps up into the tip; upper edge: hollowed
+    ctx.moveTo(...P(0, c - w));
+    ctx.bezierCurveTo(...P(0.45 * L, c - w - 0.07), ...P(0.8 * L, tv - 0.12), ...P(L, tv));
+    ctx.bezierCurveTo(...P(0.72 * L, tv - 0.05), ...P(0.4 * L, c - 0.04), ...P(0, c + w));
+    ctx.closePath();
+  }
+}
+
 /**
  * layout: { min: [x,y,z], max: [x,y,z], panels?, livery?, wheels? } (car space, metres)
  * custom: resolved customization ({ paint, accent, livery, number }); number: the number to show
@@ -180,6 +220,57 @@ export function drawProjectedLivery(canvas, layout, custom, number = 7) {
         ctx.fill();
       } else if (kind === 'top') {
         topPoly([[-cabin.x, cabin.z0], [cabin.x, cabin.z0], [cabin.x, cabin.z1], [-cabin.x, cabin.z1]]);
+        ctx.fill();
+      }
+    });
+  } else if (id === 'lv_taxi') {
+    // a checkered band down each side, two rows of squares in the accent colour over the paint
+    const tx = meta.taxi || { z0: zr - 0.3, z1: zf + 0.3, y: shoulder - 0.15 };
+    const sq = 0.055;
+    all((kind) => {
+      if (kind !== 'side') return;
+      for (let row = 0; row < 2; row++) {
+        const ya = tx.y + row * sq;
+        for (let k = 0, z = tx.z0; z < tx.z1; k++, z += sq) {
+          if ((k + row) % 2) continue;
+          const zb = Math.min(z + sq, tx.z1);
+          poly([[z, ya], [zb, ya], [zb, ya + sq], [z, ya + sq]]);
+          ctx.fill();
+        }
+      }
+    });
+  } else if (id === 'lv_flames') {
+    // a flame job: a solid base round the nose, licks sweeping back along the sides (and over a
+    // long enough hood), pale at the base and deepening to the accent colour at the tips. A design
+    // can place it ({ z: base, len, y0, y1 }); by default it runs from the nose to mid-car.
+    const fl = meta.flames || {};
+    const zb = fl.z ?? z1;
+    const lenS = fl.len ?? Math.max(1.4, len * 0.5);
+    const lo = fl.y0 ?? Math.max(y0 + 0.2, shoulder - 0.42);
+    const hi = fl.y1 ?? shoulder + 0.05;
+    const hood = zb - cabin.z1 - 0.05;
+    const hw = cabin.x + 0.12;
+    const grad = (ax, ay, bx, by) => {
+      const g = ctx.createLinearGradient(ax, ay, bx, by);
+      g.addColorStop(0, mixHex(accent, '#ffffff', 0.6));
+      g.addColorStop(0.4, mixHex(accent, '#ffffff', 0.25));
+      g.addColorStop(0.85, accent);
+      return g;
+    };
+    all((kind) => {
+      if (kind === 'side') {
+        ctx.beginPath();
+        flamePath(ctx, (u, v) => [zb - u * lenS, lo + v * (hi - lo)]);
+        ctx.fillStyle = grad(zb, 0, zb - lenS, 0);
+        ctx.fill();
+      } else if (kind === 'top' && hood > 0.4) {
+        ctx.beginPath();
+        for (const s of [-1, 1]) flamePath(ctx, (u, v) => [s * (0.04 + v * (hw - 0.04)), zb - u * hood]);
+        ctx.fillStyle = grad(0, zb, 0, zb - hood);
+        ctx.fill();
+      } else if (kind === 'front') {
+        poly([[-3, y0 - 1], [3, y0 - 1], [3, hi], [-3, hi]]);
+        ctx.fillStyle = mixHex(accent, '#ffffff', 0.6);
         ctx.fill();
       }
     });

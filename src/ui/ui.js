@@ -148,6 +148,8 @@ const LIVERY_ART = {
   lv_circuit: (a) => `<path d="M3 8h6l3 3h4l2-2h3M3 15h4l2 2h5l3-3h4M12 11v6" stroke="${a}" stroke-width="1.3" fill="none"/><circle cx="18" cy="9" r="1.1" fill="${a}"/><circle cx="9" cy="17" r="1.1" fill="${a}"/>`,
   lv_panda: (a) => `<rect x="0" y="13.5" width="24" height="10.5" fill="${a}"/>`,
   lv_police: (a) => `<rect x="0" y="10" width="24" height="8" fill="${a}"/><rect x="6.5" y="5" width="5.5" height="2.6" rx="1" fill="#ff2a3a"/><rect x="12" y="5" width="5.5" height="2.6" rx="1" fill="#2a6bff"/>`,
+  lv_flames: (a) => `<path d="M0.4 18.7L3.2 18.7L3.2 6.3L0.4 6.3zM1.5 19.1C6.2 19.9 9.9 17.3 12 15.9C9.1 16.5 5.7 17.8 1.5 15.5zM1.5 16.7C9.4 17.5 15.6 14.4 19.1 13C14.2 13.6 8.6 15.4 1.5 13.1zM1.5 14.3C11 15.1 18.3 12 22.5 10.6C16.6 11.2 9.9 13 1.5 10.7zM1.5 11.9C8.1 12.7 13.3 9.9 16.2 8.4C12.1 9 7.4 10.6 1.5 8.3zM1.5 9.7C5.3 10.6 8.2 8.4 9.9 7C7.5 7.6 4.9 8.4 1.5 6.1z" fill="${a}"/>`,
+  lv_taxi: (a) => Array.from({ length: 12 }, (_, i) => `<rect x="${i * 2}" y="${i % 2 ? 13 : 11}" width="2" height="2" fill="${a}"/>`).join(''),
 };
 
 function swatchFor(cat, item, custom) {

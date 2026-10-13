@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { polygonize, buildParts, smoothSeams } from './mesher.js';
+import { polygonize, buildParts, smoothSeams, remapMaterials } from './mesher.js';
 import { writeGLB } from './glb.js';
 import { MAT, MAT_NAMES, MAT_PBR } from './parts.js';
 import { buildDecal } from './decals.js';
@@ -19,10 +19,22 @@ import { buildMarshal } from './designs/marshal.js';
 import { buildBrawler } from './designs/brawler.js';
 import { buildRonin } from './designs/ronin.js';
 import { buildSidewinder } from './designs/sidewinder.js';
+import { buildVesper } from './designs/vesper.js';
+import { buildJuggernaut } from './designs/juggernaut.js';
+import { buildMochi } from './designs/mochi.js';
+import { buildJukebox } from './designs/jukebox.js';
+import { buildCabbie } from './designs/cabbie.js';
+import { buildKaido } from './designs/kaido.js';
+import { buildSleeper } from './designs/sleeper.js';
+import { buildDeuce } from './designs/deuce.js';
+import { buildSurge } from './designs/surge.js';
+import { buildVice } from './designs/vice.js';
+import { buildEnduro } from './designs/enduro.js';
+import { buildApogee } from './designs/apogee.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../../public/models/cars');
-const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, touge: buildTouge, marshal: buildMarshal, brawler: buildBrawler, ronin: buildRonin, sidewinder: buildSidewinder };
+const DESIGNS = { volt: buildVolt, razor: buildRazor, specter: buildSpecter, touge: buildTouge, marshal: buildMarshal, brawler: buildBrawler, ronin: buildRonin, sidewinder: buildSidewinder, vesper: buildVesper, juggernaut: buildJuggernaut, mochi: buildMochi, jukebox: buildJukebox, cabbie: buildCabbie, kaido: buildKaido, sleeper: buildSleeper, deuce: buildDeuce, surge: buildSurge, vice: buildVice, enduro: buildEnduro, apogee: buildApogee };
 
 // triangle targets: full detail (player car, garage), a light version for distant opponents, and
 // a mid version that stands in for full detail on phones (medium / low quality). The mid version
@@ -34,7 +46,7 @@ const LODS = [
 ];
 
 // how much each part's shading detail matters (hidden wheel wells and pocket walls matter least)
-const IMPORTANCE = { paint: 1, glass: 1, chrome: 0.6, head: 0.5, tail: 0.5, reverse: 0.5, carbon: 0.35, interior: 0.3, trim: 0.2, grille: 0.15, exhaust: 0.15 };
+const IMPORTANCE = { paint: 1, glass: 1, chrome: 0.6, head: 0.5, tail: 0.5, reverse: 0.5, indicator: 0.5, carbon: 0.35, interior: 0.3, trim: 0.2, grille: 0.15, exhaust: 0.15 };
 const MAT_WEIGHTS = Object.fromEntries(Object.entries(IMPORTANCE).map(([k, v]) => [MAT[k], v]));
 // mostly hidden parts get looser geometric tolerances (multiples of the LOD's error)
 const STAGES = [
@@ -42,7 +54,7 @@ const STAGES = [
   { mats: new Set([MAT.interior]), mul: 2 },
 ];
 // far away only the painted silhouette matters: every detail part gets coarsened first
-const FAR_STAGES = [{ mats: new Set([MAT.trim, MAT.grille, MAT.exhaust, MAT.carbon, MAT.chrome, MAT.head, MAT.tail, MAT.reverse]), mul: 3 }];
+const FAR_STAGES = [{ mats: new Set([MAT.trim, MAT.grille, MAT.exhaust, MAT.carbon, MAT.chrome, MAT.head, MAT.tail, MAT.reverse, MAT.indicator]), mul: 3 }];
 
 const args = process.argv.slice(2);
 const quick = args.includes('--quick');
@@ -72,6 +84,33 @@ function merge(list) {
     oi += m.indices.length;
   }
   return { positions, normals, indices };
+}
+
+// A licence plate sits in a recess about a centimetre deep, which the field-based AO bake reads as
+// far deeper (across a cut's opening the field still reports the skin it was cut from). The white
+// plate came out a third as bright as the bumper around it and read as a black plate. Its face
+// gets the AO an open flat panel bakes to instead.
+const PLATE_AO = 0.57;
+
+/** aoFloor for buildParts: lifts the paint inside the plate outline on the tail (null: no plate). */
+function plateAOFloor(design) {
+  const plate = design.meta?.livery?.plate;
+  if (!plate) return null;
+  // the skin at the plate, found by marching the un-cut shell forward from behind the car
+  let z = design.bounds.min[2];
+  for (let i = 0; i < 4000 && z < design.bounds.max[2]; i++) {
+    const d = design.shell(plate.x, plate.y, z);
+    if (d < 0.0005) break;
+    z += Math.max(d * 0.8, 0.0005);
+  }
+  if (z >= design.bounds.max[2]) {
+    console.warn('  ! no tail found behind the licence plate; its AO is left as baked');
+    return null;
+  }
+  const zMax = z + 0.05;
+  const hw = plate.w / 2 + 0.005;
+  const hh = plate.h / 2 + 0.005;
+  return (x, y, vz, nx, ny, nz, m) => (m === MAT.paint && nz < -0.5 && vz < zMax && Math.abs(x - plate.x) < hw && Math.abs(y - plate.y) < hh ? PLATE_AO : 0);
 }
 
 /** Add/refresh the model in cars.json; the content hash busts browser and service-worker caches. */
@@ -110,8 +149,13 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
   const mesh = polygonize(design.sdf, design.bounds, h);
   const st = mesh.stats;
   console.log(`  surface nets @${h * 1000}mm: ${st.vertices} verts, ${st.triangles} tris, ${(st.evals / 1e6).toFixed(1)}M evals, ${secs(t1)}`);
+  // a design's farMat(x, y, z, material) merges small details into what surrounds them in the far
+  // model, which gets its own copy of the mesh (every material border keeps its full-resolution edge
+  // through simplification: the VICE's louvres alone cost 11k triangles)
+  const farMesh = design.farMat ? remapMaterials(mesh, design.farMat) : mesh;
   const t3 = performance.now();
   const seamVerts = smoothSeams(design.sdf, mesh);
+  if (farMesh !== mesh) smoothSeams(design.sdf, farMesh);
   console.log(`  smoothed ${seamVerts} material-border vertices ${secs(t3)}`);
 
   // decal geometry per LOD (glass panes get much coarser far away)
@@ -130,11 +174,12 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
     return out;
   };
 
+  const aoFloor = plateAOFloor(design);
   const groups = [];
   for (const lod of LODS) {
     const t2 = performance.now();
     const far = lod.name === 'lod1';
-    const parts = await buildParts(design.sdf, mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, stages: (far ? FAR_STAGES : STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
+    const parts = await buildParts(design.sdf, far ? farMesh : mesh, lod.tris, { error: lod.error, normalWeight: lod.normalWeight, matWeights: MAT_WEIGHTS, aoStrength: design.aoStrength, aoFloor, stages: (far ? FAR_STAGES : STAGES).map((st) => ({ mats: st.mats, error: lod.error * st.mul })) });
     // the far LOD keeps opaque glass, so the cockpit behind it can go
     if (far) delete parts[MAT.interior];
     const list = Object.entries(parts).map(([m, p]) => ({ mat: +m, ...p }));
@@ -150,6 +195,12 @@ for (const id of ids.length ? ids : Object.keys(DESIGNS)) {
     const tris = list.map((p) => `${MAT_NAMES[p.mat]} ${p.indices.length / 3}`).join(', ');
     const total = list.reduce((s, p) => s + p.indices.length / 3, 0);
     console.log(`  ${lod.name}: ${total} tris (${tris}) ${secs(t2)}`);
+    // a NaN in a design's distance field (a 0/0, say) ends up in the vertices and breaks the
+    // game's bounds and camera fit
+    for (const p of list) {
+      const bad = p.positions.reduce((n, v) => n + (Number.isFinite(v) ? 0 : 1), 0);
+      if (bad) console.warn(`  ! ${lod.name} ${MAT_NAMES[p.mat]}: ${bad} non-finite vertex coordinates`);
+    }
   }
 
   // full file: lod0 + lod1; light file: the mid version as its near model (named lod0) + lod1

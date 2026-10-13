@@ -1098,6 +1098,11 @@ export class CarModel {
     this.lensMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.3, 2.6) });
     // amber lamp lenses (turn signals lit as position lamps), on the cars that have them
     if (asset.lods.lod0.some((p) => p.role === 'amber')) this.amberMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 0.72, 0.1) });
+    // unlit amber turn-signal lenses (rear indicators): a glossy amber lens, faintly aglow like the
+    // reverse lens so it still reads as amber at night beside the lit tail lamps
+    if (asset.lods.lod0.some((p) => p.role === 'indicator')) {
+      this.indicatorMat = withAO(new Phys({ color: 0xc8650c, metalness: 0.1, roughness: 0.12, emissive: new THREE.Color(0.16, 0.066, 0.006), vertexColors: true }));
+    }
     this.exhaustGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 0.1, 0.02) });
     this.tireMat = withAO(new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.85, metalness: 0, envMapIntensity: 0.5, vertexColors: true }));
     this.rimMat = withAO(
@@ -1116,6 +1121,7 @@ export class CarModel {
       this.beaconMats = [new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.01, 0.02) }), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.02, 0.06, 0.4) })];
     }
     for (const m of [this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) m.envMap = env;
+    if (this.indicatorMat) this.indicatorMat.envMap = env;
     // crash damage (race cars only): every body material bends with the dents, wheels don't
     if (this.opts.damage) {
       this.damage = new CarDamage(asset, { layout: this.liveryLayout, res: this.opts.damageRes ?? 256 });
@@ -1130,6 +1136,7 @@ export class CarModel {
       patchDamage(this.tailMat, u, 'tailBasic');
       patchDamage(this.tailLensMat, u, 'tailLens');
       patchDamage(this.reverseMat, u, 'tailLens');
+      if (this.indicatorMat) patchDamage(this.indicatorMat, u, 'tailLens');
       for (const m of this.beaconMats || []) patchDamage(m, u, 'plain');
     }
     const byRole = {
@@ -1145,6 +1152,7 @@ export class CarModel {
       amber: this.amberMat,
       tail: this.tailLensMat,
       reverse: this.reverseMat,
+      indicator: this.indicatorMat,
       tailglow: this.tailMat,
       exhaust: this.exhaustGlowMat,
       interior: this.interiorMat,
@@ -1439,11 +1447,11 @@ export class CarModel {
     // reverse lamps
     this.reverse += ((state.reverse ? 1 : 0) - this.reverse) * Math.min(1, dt * 14);
     if (this.reverseMat) this.reverseMat.emissiveIntensity = 0.1 + this.reverse * 3;
-    // boost flames
+    // boost flames (an electric car has no exhaust to shoot them from)
     this.boost += ((state.boost || 0) - this.boost) * Math.min(1, dt * 10);
     this.backfire = Math.max(0, this.backfire - dt * 6);
     const fp = Math.max(this.boost, this.backfire);
-    this.flames.visible = fp > 0.02;
+    this.flames.visible = fp > 0.02 && !this.def?.electric;
     this.flameMat.uniforms.uPower.value = fp;
     const flameLen = this.opts.hq ? 1 : 0.6;
     this.flames.scale.set(1, 1, (0.45 + fp * 0.6 + Math.random() * 0.15 * fp) * flameLen);
@@ -1506,7 +1514,7 @@ export class CarModel {
   }
 
   setEnvRotation(euler) {
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) {
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.indicatorMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.interiorMat, this.windowMat]) {
       if (m && m.envMapRotation) m.envMapRotation.copy(euler);
     }
   }
@@ -1520,7 +1528,7 @@ export class CarModel {
       if (isSharedWheelGeometry(o.geometry)) return;
       o.geometry.dispose();
     });
-    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, this.amberMat, ...(this.beaconMats || [])]) m?.dispose();
+    for (const m of [this.bodyMat, this.glassMat, this.trimMat, this.tailMat, this.headMat, this.tireMat, this.rimMat, this.brakeMat, this.caliperMat, this.flameMat, this.underglowMat, this.exhaustGlowMat, this.beamMat, this.carbonMat, this.chromeMat, this.grilleMat, this.headHousingMat, this.tailLensMat, this.reverseMat, this.lensMat, this.shadowMat, this.blurMat, this.interiorMat, this.windowMat, this.amberMat, this.indicatorMat, ...(this.beaconMats || [])]) m?.dispose();
     if (this.liveryTex) this.liveryTex.dispose();
     if (this.damage) this.damage.dispose();
     this.wheelSkeleton?.dispose();

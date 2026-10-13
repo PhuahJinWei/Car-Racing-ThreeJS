@@ -209,8 +209,8 @@ export class MenuStreet {
     this._updateHeadlights();
     if (this.car) {
       this.car.update(dt, { speed: 0, steer: 0, brake: false, boost: 0 });
-      // cold-night exhaust vapour
-      if (Math.random() < dt * 3) {
+      // cold-night exhaust vapour (not from an electric car)
+      if (!this.car.def?.electric && Math.random() < dt * 3) {
         const e = this.car.exhaustPos[Math.floor(Math.random() * this.car.exhaustPos.length)];
         _v.copy(e).applyMatrix4(this.car.body.matrixWorld);
         this.effects.puff(_v.x, _v.y, _v.z, (Math.random() - 0.5) * 0.3, 0.25, (Math.random() - 0.5) * 0.3, [0.55, 0.56, 0.6], 0.05, 0.12, 0.9, 1.8);

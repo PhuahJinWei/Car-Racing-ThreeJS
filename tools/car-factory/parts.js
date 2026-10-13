@@ -24,6 +24,8 @@ export const MAT = {
   reverse: 16,
   // amber lamp lens (turn signals), lit by the game as a position lamp
   amber: 17,
+  // amber turn-signal lens left unlit (rear indicators: lit all the time, they'd look stuck on)
+  indicator: 18,
 };
 export const MAT_NAMES = Object.fromEntries(Object.entries(MAT).map(([k, v]) => [v, k]));
 
@@ -47,6 +49,7 @@ export const MAT_PBR = {
   beaconB: { color: [0.02, 0.08, 0.5], metallic: 0, roughness: 0.2, emissive: [0.05, 0.25, 1] },
   reverse: { color: [0.7, 0.72, 0.75], metallic: 0.6, roughness: 0.12, emissive: [0.15, 0.15, 0.16] },
   amber: { color: [1, 0.45, 0.06], metallic: 0, roughness: 0.2, emissive: [1, 0.42, 0.05] },
+  indicator: { color: [0.6, 0.24, 0.02], metallic: 0.1, roughness: 0.15 },
 };
 
 /** Material-tracking distance accumulator. */

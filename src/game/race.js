@@ -525,8 +525,9 @@ export class Race {
     const tr = this.track;
     const P = this.player;
     const v = P.vehicle;
-    const LEN = 4.45;
     const WID = 1.95;
+    const lenP = P.def.dims?.length ?? 4.6;
+    const massP = P.def.stats.mass ?? 1;
     const f = v.frame;
     const hl = Math.hypot(f.rx, f.rz) || 1;
     const rhx = f.rx / hl;
@@ -534,6 +535,13 @@ export class Race {
     this._hitCooldown = Math.max(0, (this._hitCooldown || 0) - dt);
     for (const r of this.ais) {
       const a = r.ai;
+      // a long pickup touches sooner, a little city car later (two typical 4.6 m cars: 4.45 m)
+      const LEN = 0.968 * (lenP + (r.def.dims?.length ?? 4.6)) * 0.5;
+      // heavier cars shove lighter ones aside: each car's share of the push, and of the speed
+      // traded, goes by the other car's mass (both shares are 1 when the masses match)
+      const massA = r.def.stats.mass ?? 1;
+      const kP = (2 * massA) / (massP + massA);
+      const kA = (2 * massP) / (massP + massA);
       const ds = tr.deltaS(a.s, v.s);
       const dd = a.d - v.d;
       if (Math.abs(ds) >= LEN || Math.abs(dd) >= WID) continue;
@@ -547,17 +555,17 @@ export class Race {
         // side swipe
         const sgn = Math.sign(dd) || 1;
         const push = penD * 0.5;
-        a.d += sgn * push;
-        v.x -= rhx * sgn * push;
-        v.z -= rhz * sgn * push;
+        a.d += sgn * push * kA;
+        v.x -= rhx * sgn * push * kP;
+        v.z -= rhz * sgn * push * kP;
         const pvl = v.vx * rhx + v.vz * rhz;
         const rel = pvl - a.vd;
         if (rel * sgn > 0) {
-          v.vx -= rhx * rel * 0.85;
-          v.vz -= rhz * rel * 0.85;
-          a.vd += rel * 0.6;
+          v.vx -= rhx * rel * Math.min(1, 0.85 * kP);
+          v.vz -= rhz * rel * Math.min(1, 0.85 * kP);
+          a.vd += rel * 0.6 * kA;
         }
-        a.vd += sgn * 1.5;
+        a.vd += sgn * 1.5 * kA;
         strength = Math.abs(rel) + 1.5;
       } else {
         const rel = v.vf - a.v;
@@ -566,10 +574,10 @@ export class Race {
           v.x -= f.tx * penS * 0.6;
           v.z -= f.tz * penS * 0.6;
           if (rel > 0) {
-            const keep = (a.v + rel * 0.25) / Math.max(v.vf, 1);
+            const keep = (a.v + rel * Math.max(0, 1 - 0.75 * kP)) / Math.max(v.vf, 1);
             v.vx *= keep;
             v.vz *= keep;
-            a.v += rel * 0.55;
+            a.v += rel * 0.55 * kA;
             a.bump = 0.6;
           }
           strength = Math.max(0, rel);
@@ -578,9 +586,9 @@ export class Race {
           a.progress -= penS * 0.6;
           a.s = wrap(a.s - penS * 0.6, tr.length);
           if (rel < 0) {
-            v.vx += f.tx * -rel * 0.45;
-            v.vz += f.tz * -rel * 0.45;
-            a.v += rel * 0.6;
+            v.vx += f.tx * -rel * 0.45 * kP;
+            v.vz += f.tz * -rel * 0.45 * kP;
+            a.v += rel * Math.min(1, 0.6 * kA);
           }
           strength = Math.max(0, -rel);
         }
@@ -619,13 +627,17 @@ export class Race {
         const b = rb.ai;
         const ds = tr.deltaS(b.s, a.s);
         const dd = b.d - a.d;
+        const LEN = 0.968 * ((ra.def.dims?.length ?? 4.6) + (rb.def.dims?.length ?? 4.6)) * 0.5;
         if (Math.abs(ds) < LEN && Math.abs(dd) < WID) {
           // closing speed, nose to tail or side by side, for the crash damage
           const hit = Math.abs(ds) > Math.abs(dd) * 1.6 ? Math.abs(a.v - b.v) : Math.abs(a.vd - b.vd) + 1;
           const pen = WID - Math.abs(dd);
           const sgn = Math.sign(dd) || 1;
-          a.d -= sgn * pen * 0.5;
-          b.d += sgn * pen * 0.5;
+          // (the lighter car gives way more)
+          const ma = ra.def.stats.mass ?? 1;
+          const mb = rb.def.stats.mass ?? 1;
+          a.d -= sgn * pen * (mb / (ma + mb));
+          b.d += sgn * pen * (ma / (ma + mb));
           if (ds > 0 && a.v > b.v) a.v = lerp(a.v, b.v, 0.5);
           else if (ds < 0 && b.v > a.v) b.v = lerp(b.v, a.v, 0.5);
           if (hit > 4 && this.clock - (ra.hitT ?? -9) > 0.4 && this.clock - (rb.hitT ?? -9) > 0.4) {
@@ -1271,6 +1283,7 @@ export class Race {
     // one state object, refilled every frame
     const st = this._audioState || (this._audioState = {});
     st.rpm = v.rpm;
+    st.electric = !!this.player.def.electric;
     st.throttle = this.phase === 'racing' || this.player.finished ? this.app.input.state.throttle : 0.25;
     st.speed = v.speed;
     st.topSpeed = v.topSpeed;
@@ -1327,7 +1340,7 @@ export class Race {
     h.lapTime = this.phase === 'racing' ? this.time - P.lapStart : 0;
     h.bestLap = P.bestLap;
     h.speed = v.speed;
-    h.gear = v.reversing ? 'R' : v.gear;
+    h.gear = v.reversing ? 'R' : P.def.electric ? 'D' : v.gear;
     h.rpm = v.rpm;
     h.nitro = v.nitro;
     h.nitroMax = v.nitroMax;

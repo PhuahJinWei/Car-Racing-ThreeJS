@@ -220,6 +220,24 @@ export function polygonize(sdf, bounds, h, opts = {}) {
 }
 
 /**
+ * A copy of a mesh with each triangle's material remapped by fn(x, y, z, material) at its centre (a
+ * design's far model merges small details into what surrounds them). It has its own positions, so
+ * smoothSeams straightens only the borders it keeps: a merged border left straightened is a
+ * wavering crease the simplifier keeps thousands of triangles for.
+ */
+export function remapMaterials(mesh, fn) {
+  const { positions: P, indices: I, triMats } = mesh;
+  const tm = new Uint8Array(triMats.length);
+  for (let t = 0; t < tm.length; t++) {
+    const a = I[t * 3] * 3;
+    const b = I[t * 3 + 1] * 3;
+    const c = I[t * 3 + 2] * 3;
+    tm[t] = fn((P[a] + P[b] + P[c]) / 3, (P[a + 1] + P[b + 1] + P[c + 1]) / 3, (P[a + 2] + P[b + 2] + P[c + 2]) / 3, triMats[t]);
+  }
+  return { ...mesh, positions: P.slice(), triMats: tm };
+}
+
+/**
  * Straighten material borders: voxel meshing leaves them as staircases of triangle edges. Each
  * border vertex is relaxed toward the midpoint of its two border neighbours and pulled back onto
  * the surface. Smooth borders look cleaner and simplify into far fewer triangles.
@@ -371,6 +389,14 @@ function prepare(sdf, mesh, opts) {
     for (let v = 0; v < n; v++) {
       const s = opts.aoStrength[vm[v]];
       if (s !== undefined) AO[v] = 1 - (1 - AO[v]) * s;
+    }
+  }
+  // ...and set a floor under it in chosen places: aoFloor(x, y, z, nx, ny, nz, material) returns
+  // the least AO a vertex may have (0: leave it)
+  if (opts.aoFloor) {
+    for (let v = 0; v < n; v++) {
+      const f = opts.aoFloor(P[v * 3], P[v * 3 + 1], P[v * 3 + 2], N[v * 3], N[v * 3 + 1], N[v * 3 + 2], vm[v]);
+      if (f > AO[v]) AO[v] = f;
     }
   }
   prep ={ split, P, N, AO, vm: Uint8Array.from(vm) };

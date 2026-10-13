@@ -11,8 +11,9 @@ const REVERSE_ACC = 6;
 const REVERSE_MAX = 9; // ~32 km/h
 const REVERSE_DELAY = 0.45; // brake held at a standstill this long engages reverse
 const STOPPED = 0.05;
-// top of each gear's speed band, as a share of top speed
+// top of each gear's speed band, as a share of top speed (an electric car has a single speed)
 const GEAR_TOP = [0, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 2.0];
+const EV_GEAR_TOP = [0, 2.0];
 const DRIFT_MIN = 17; // a drift needs this much speed; slower, the drift button only brakes
 // realism touches that cost no time: drive lost to wheelspin or an upshift is paid back after
 const SPIN_SPEED = 13; // full throttle below this spins the driven tyres
@@ -232,9 +233,10 @@ export class Vehicle {
     if (!pedalBrake || Math.abs(vf) > STOPPED) this.stopHold = 0;
     if (throttle > 0.1 && !pedalBrake) this.reversing = false;
     // flooring it from low speed spins the driven tyres for a moment (more so in the wet; hardly at
-    // all when all four wheels are driven)
-    const launching = this.grounded && throttle > 0.5 && !pedalBrake && vf > -1 && vf < SPIN_SPEED;
-    const spinT = launching ? Math.pow(1 - Math.max(vf, 0) / SPIN_SPEED, 1.5) * (this.wet ? 1 : 0.75) * (this.def.awd ? 0.25 : 1) : 0;
+    // all when all four wheels are driven; harder and for longer on a car with a spin factor)
+    const spin = this.def.spin ?? 1;
+    const launching = this.grounded && throttle > 0.5 && !pedalBrake && vf > -1 && vf < SPIN_SPEED * spin;
+    const spinT = launching ? Math.pow(1 - Math.max(vf, 0) / (SPIN_SPEED * spin), 1.5) * Math.min(1, (this.wet ? 1 : 0.75) * spin) * (this.def.awd ? 0.25 : 1) : 0;
     this.wheelspin = damp(this.wheelspin, spinT, spinT > this.wheelspin ? 14 : 4, dt);
     this.shiftCut = Math.max(0, this.shiftCut - dt);
     if (throttle < 0.1 || pedalBrake) this.driveDebt = 0;
@@ -256,7 +258,9 @@ export class Vehicle {
         // strong launch that tapers off toward top speed (~0-100 km/h in 1.7 s, top speed in ~8 s)
         const base = 17.5 * st.accel * throttle;
         const r = Math.max(ratio, 0);
-        if (ratio < 1) engine = base * (1 - Math.pow(r, 2.4)) * (1 + 0.25 * (1 - r));
+        // (an electric motor has all its torque at once, and runs out of breath toward the top)
+        const curve = this.def.electric ? 1.15 - 0.35 * r : 1;
+        if (ratio < 1) engine = base * (1 - Math.pow(r, 2.4)) * (1 + 0.25 * (1 - r)) * curve;
         else resist += (ratio - 1) * 20;
       }
       // spinning tyres and the torque gap of an upshift cost drive; it comes back as a surge once
@@ -400,11 +404,11 @@ export class Vehicle {
     this.wrongWay = align < -0.3 && this.speed > 5 ? this.wrongWay + dt : 0;
 
     // gears / rpm for audio + HUD
-    const gearTop = GEAR_TOP;
+    const gearTop = this.def.electric ? EV_GEAR_TOP : GEAR_TOP;
     const sr = clamp(Math.abs(vf) / st.topSpeed, 0, 1.5);
     // shift down a little later than up, so a speed right at a shift point doesn't hunt
     let g = this.gear;
-    while (g < 7 && sr > gearTop[g]) g++;
+    while (g < gearTop.length - 1 && sr > gearTop[g]) g++;
     while (g > 1 && sr < gearTop[g - 1] - 0.04) g--;
     if (g > this.gear) {
       this.events.push({ type: 'shift', up: true, gear: g });

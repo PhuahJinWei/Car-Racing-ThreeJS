@@ -67,7 +67,7 @@ tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, 
 
 ## The car factory
 
-The eight cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
+The twenty cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
 
 ```bash
 npm run build:cars                              # all cars, final quality (~1.5 min each)
@@ -83,7 +83,8 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Simplification: meshoptimizer, guided by the surface normals.
     - Hidden parts such as wheel wells and the underbody get coarser first.
     - Three levels of detail: about 97k (full), 49k (light, for phones) and 16k (far) triangles.
-  - Baking: normals and ambient occlusion from the field.
+    - Every border between materials keeps its full-resolution edge, so a slatted grille or a row of louvres can cost the far version thousands of triangles. A design can merge such details into their surroundings for the far version only (`farMat`, as on the VICE's tail).
+  - Baking: normals and ambient occlusion from the field. The bake reads shallow recesses as deeper than they are, so a licence plate's recess gets the occlusion of a flat panel (`PLATE_AO` in `build.mjs`; other places can use the `aoFloor` hook of `buildParts`).
 - **Separate geometry:** thin details are generated on their own (LED strips, projector lenses and glass panes), laid onto the skin by ray marching.
 - **Output:** each build writes two models, each with a gzipped twin that the game prefers, and updates `cars.json` with cache-busting hashes:
   - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
@@ -94,6 +95,7 @@ node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview 
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
   - A patrol car's light bar uses two extra materials (`beaconR`, `beaconB`) that the game flashes; with reduced flashes they glow in turn instead.
+  - Amber lenses come in two kinds: `amber` glows all the time as a position lamp, while `indicator` is an unlit amber turn-signal lens (the VICE's rear lamps), which would otherwise look stuck on at night.
   - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street.
 
 ## Adding real car models
@@ -110,7 +112,7 @@ Put `.glb` files in `public/models/cars/` and list them in `public/models/cars/c
 }
 ```
 
-- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`, `sidewinder`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
+- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`, `sidewinder`, `vesper`, `juggernaut`, `mochi`, `jukebox`, `cabbie`, `kaido`, `sleeper`, `deuce`, `surge`, `vice`, `enduro`, `apogee`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
 - **Optional fields:**
   - `rotateY` (degrees) if the car faces the wrong way
   - `length` (metres) or `scale` if auto-scaling picks the wrong size
@@ -151,7 +153,7 @@ path: [
 | What | Where |
 | --- | --- |
 | Handling (grip, drift, boost, walls, jumps) | `src/game/vehicle.js` |
-| Car stats | `src/car/car-defs.js` |
+| Car stats, and traits: `mass` (who shoves whom in a collision), `awd`, `spin` (launch wheelspin), `electric` (motor sound, one speed, no exhaust effects), `patrol`, `stock` (rivals keep its default look) | `src/car/car-defs.js` |
 | AI difficulty, mistakes and rubber-banding | `DIFFICULTY` in `src/game/ai.js` |
 | Rewards | `onRaceResults` in `src/app.js` |
 | Item prices | `src/car/customization.js` |
