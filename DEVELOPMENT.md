@@ -148,6 +148,7 @@ path: [
 - **Features:** sections (`tunnel`, `city`, `stadium`, `open`), boost pads and ramps are placed with `[commandIndex, fraction]`.
 - **Room to boost:** a nitro fired at top speed carries the car about 340 m, and braking under a boost is weak. A straight needs about 450 m before a tight city corner (about 350 m before a fast sweeper) to fit a whole nitro plus the braking. Put boost pads just past a corner exit (`[straight, 0.05–0.12]`). In reverse, a pad is mirrored along its straight, so it still follows a corner exit. Ramps go mid-straight so there is room to land either way round.
 - **Look:** `theme` chooses the decorations and `palette` sets every colour.
+- **Difficulty:** `difficulty` (1 beginner, 2 intermediate, 3 expert) is shown as pips on the setup cards. Judge it from the tight corners (radius 60 m or less), the turning per km, the jumps and the width, then drive it to confirm. The current tracks split two per level.
 
 ## Tuning
 

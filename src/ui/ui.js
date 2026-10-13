@@ -13,11 +13,20 @@ import { t, locale, LANGUAGES, carClass, carBlurb, trackTagline, itemName } from
 import districtShot from '../assets/tracks/district.jpg';
 import lumenShot from '../assets/tracks/lumen.jpg';
 import circuitShot from '../assets/tracks/circuit.jpg';
+import ringShot from '../assets/tracks/ring.jpg';
+import heightsShot from '../assets/tracks/heights.jpg';
+import parkShot from '../assets/tracks/park.jpg';
 
 const themeLabel = (def) => t(`theme.${def.theme}`);
 const modeLabel = (mode) => t(`mode.${mode === 'timetrial' || mode === 'daily' ? mode : 'race'}`);
 const diffLabel = (key) => t(`diff.${DIFFICULTY[key] ? key : 'easy'}`);
 const km = (meters) => t('km', { n: (meters / 1000).toFixed(1) });
+// difficulty pips (1-3), kept apart from the Rivals words so the two don't read as one setting
+const levelPips = (def) => {
+  const n = clamp(def.difficulty || 1, 1, 3);
+  const label = t('track.level', { level: t(`level.${n}`) });
+  return `<span class="tc-level" role="img" aria-label="${label}" title="${label}">${[1, 2, 3].map((k) => `<i${k <= n ? ' class="on"' : ''}></i>`).join('')}</span>`;
+};
 // loading-screen tips (tip.1 ... tip.8 in the interface text); tip.6 is about boost pads
 const TIPS = [1, 2, 3, 4, 5, 6, 7, 8].filter((n) => n !== 6 || BOOST_PADS_ON);
 // menu navigation actions, checked every frame
@@ -28,9 +37,12 @@ const TRACK_SHOTS = {
   district: { src: districtShot, focus: '74% 55%' },
   lumen: { src: lumenShot, focus: '52% 55%' },
   circuit: { src: circuitShot, focus: '70% 55%' },
+  ring: { src: ringShot, focus: '42% 55%' },
+  heights: { src: heightsShot, focus: '46% 55%' },
+  park: { src: parkShot, focus: '48% 55%' },
 };
 // Event setup order (TRACKS keeps its own order: the daily challenge picks from it by index)
-const SETUP_ORDER = ['district', 'lumen', 'circuit'];
+const SETUP_ORDER = ['district', 'lumen', 'circuit', 'ring', 'heights', 'park'];
 const SETUP_TRACKS = [...TRACKS].sort((a, b) => (SETUP_ORDER.indexOf(a.id) + 1 || 99) - (SETUP_ORDER.indexOf(b.id) + 1 || 99));
 
 const LOGO = (cls = '') => `<div class="logo ${cls}"><span class="l1">MIDNIGHT</span><span class="l2">OVERDRIVE</span><span class="trail"></span></div>`;
@@ -628,7 +640,7 @@ export class UI {
       <div class="screen setup-screen">
         ${this._head(isTT ? t('setup.ttEyebrow') : t('setup.raceEyebrow', { n: 5 }), modeLabel(mode), this.creditsHtml())}
         <div class="setup-body">
-          <div class="track-cards">
+          <div class="track-cards hscroll fade-x">
             ${SETUP_TRACKS.map((d, i) => {
               const shot = TRACK_SHOTS[d.id];
               return `
@@ -637,7 +649,7 @@ export class UI {
                 <span class="tc-check">${ICONS.check}</span>
                 <canvas class="tc-map" width="120" height="120"></canvas>
                 <span class="tc-text">
-                  <span class="tc-meta"></span>
+                  <span class="tc-meta"><span class="tc-about"></span>${levelPips(d)}</span>
                   <span class="tc-name">${d.name}</span>
                   <span class="tc-best"></span>
                 </span>
@@ -663,7 +675,7 @@ export class UI {
       const def = getTrackDef(card.dataset.id);
       const tr = previewTrack(def.id, forward);
       drawTrackPreview($(card, '.tc-map'), tr, { width: 1.5 });
-      $(card, '.tc-meta').textContent = `${themeLabel(def)} · ${km(tr.length)}`;
+      $(card, '.tc-about').textContent = `${themeLabel(def)} · ${km(tr.length)}`;
     }
     const refresh = () => {
       for (const card of $$(root, '.track-card')) {
@@ -691,6 +703,7 @@ export class UI {
         st.trackId = b.dataset.id;
         if (!st.lapsTouched) st.laps = getTrackDef(st.trackId).laps;
         refresh();
+        b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
       },
       seg: (b) => {
         const name = b.closest('.seg').dataset.opt;
@@ -718,7 +731,15 @@ export class UI {
       },
     });
     refresh();
-    return { el: root };
+    // past three tracks the row scrolls sideways: open on the chosen card, fade the ends with more
+    const row = $(root, '.track-cards');
+    const fade = edgeFade(row);
+    window.addEventListener('resize', fade);
+    requestAnimationFrame(() => {
+      $(row, '.track-card.selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      fade();
+    });
+    return { el: root, dispose: () => window.removeEventListener('resize', fade) };
   }
 
   // ---------------------------------------------------------------- garage

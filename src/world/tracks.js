@@ -2,6 +2,8 @@
 //   ['S', length]            straight
 //   ['L'|'R', degrees, radius] constant-radius corner
 // Feature positions are either fractions of the loop or [commandIndex, fraction].
+// difficulty: 1 beginner, 2 intermediate, 3 expert. Shown as pips on the setup cards; judged
+// from tight corners (radius 60 m or less), turning per km, jumps and width.
 
 // Boost pads are switched off for now. Their positions stay below, so turning this back on
 // restores them as they were.
@@ -13,6 +15,7 @@ export const TRACKS = [
     name: 'SKYLINE EXPRESSWAY',
     tagline: 'Elevated freeway and long tunnels above a sleeping city.',
     theme: 'tunnel',
+    difficulty: 1,
     width: 17,
     laps: 2,
     startOffset: 200,
@@ -89,6 +92,7 @@ export const TRACKS = [
     name: 'DOWNTOWN LOOP',
     tagline: 'Wet city blocks after midnight. Tight corners and one huge jump.',
     theme: 'city',
+    difficulty: 2,
     width: 16,
     laps: 3,
     startOffset: 200,
@@ -162,6 +166,7 @@ export const TRACKS = [
     name: 'MIDNIGHT CIRCUIT',
     tagline: 'Floodlit grand prix circuit. Haze, rain and a packed grandstand.',
     theme: 'stadium',
+    difficulty: 2,
     width: 16,
     laps: 3,
     startOffset: 320,
@@ -221,6 +226,236 @@ export const TRACKS = [
       stars: 0.35,
       fog: '#0e131c',
       fogDensity: 0.0032,
+      ambient: '#252c3c',
+      ground: '#050806',
+      exposure: 1.0,
+      tint: [1.0, 1.0, 1.02],
+    },
+  },
+  {
+    id: 'ring',
+    name: 'METRO RING',
+    tagline: 'A wide ring road above the city. Flat-out sweepers and one huge banked turn.',
+    theme: 'tunnel',
+    difficulty: 1,
+    width: 18,
+    laps: 2,
+    startOffset: 200,
+    bankGain: 18,
+    maxBank: 0.28,
+    path: [
+      ['S', 650], // 0 main straight
+      ['R', 70, 220], // 1
+      ['S', 400], // 2
+      ['L', 35, 260], // 3 flat-out S
+      ['R', 35, 260], // 4
+      ['S', 500], // 5
+      ['R', 150, 200], // 6 the Bowl: banked turnaround at the highest point
+      ['S', 630], // 7
+      ['L', 40, 240], // 8 jog
+      ['S', 300], // 9
+      ['R', 40, 240], // 10
+      ['S', 400], // 11
+      ['R', 80, 210], // 12 long sweeper
+      ['S', 325], // 13
+      ['R', 60, 280], // 14 last sweeper
+    ],
+    elevation: [
+      [0.0, 0],
+      [0.15, 4],
+      [0.3, 8],
+      [0.41, 14],
+      [0.5, 16],
+      [0.6, 8],
+      [0.72, 2],
+      [0.85, 6],
+      [0.95, 2],
+    ],
+    sections: [
+      { type: 'tunnel', from: [2, 0.2], to: [5, 0.4] },
+      { type: 'tunnel', from: [9, 0.0], to: [11, 0.5] },
+      { type: 'open', from: [5, 0.4], to: [9, 0.0] },
+      { type: 'open', from: [11, 0.5], to: [2, 0.2] },
+    ],
+    // no corner is tight, so every long straight has room for a pad
+    boostPads: [
+      { at: [0, 0.06], offset: 0 },
+      { at: [5, 0.08], offset: -2.5 },
+      { at: [7, 0.08], offset: -2.5 },
+      { at: [11, 0.08], offset: -2.5 },
+    ],
+    ramps: [],
+    palette: {
+      lamp: '#eef3ff',
+      lamp2: '#ffc27e',
+      primary: '#ffad4a',
+      secondary: '#e9eef7',
+      accent: '#ff3b2f',
+      warm: '#ffcf8a',
+      sign: '#0f6b3a',
+      skyTop: '#010205',
+      skyHorizon: '#0a1322',
+      skyGlow: '#22304a',
+      clouds: 0.55,
+      stars: 0.18,
+      fog: '#070b13',
+      fogDensity: 0.002,
+      ambient: '#1a2232',
+      ground: '#030406',
+      exposure: 1.0,
+      tint: [1.0, 1.0, 1.03],
+    },
+  },
+  {
+    id: 'heights',
+    name: 'UPTOWN HEIGHTS',
+    tagline: 'Hillside streets after midnight. A blind crest jump and a hairpin in the old town.',
+    theme: 'city',
+    difficulty: 3,
+    width: 16,
+    laps: 3,
+    startOffset: 200,
+    bankGain: 4,
+    maxBank: 0.1,
+    path: [
+      ['S', 650], // 0 main straight
+      ['R', 90, 50], // 1 turn 1
+      ['S', 300], // 2
+      ['R', 90, 45], // 3 step block
+      ['S', 120], // 4
+      ['L', 90, 45], // 5
+      ['S', 380], // 6 the climb
+      ['R', 45, 90], // 7
+      ['S', 260], // 8 crest jump
+      ['R', 45, 90], // 9
+      ['S', 60], // 10 downhill
+      ['L', 25, 110], // 11 esses
+      ['R', 25, 110], // 12
+      ['S', 60], // 13
+      ['R', 90, 55], // 14
+      ['S', 300], // 15
+      ['R', 90, 45], // 16 into the infield
+      ['S', 160], // 17
+      ['L', 180, 48], // 18 hairpin
+      ['S', 160], // 19
+      ['R', 90, 45], // 20
+      ['S', 520], // 21 underpass
+      ['R', 90, 50], // 22 last corner
+    ],
+    // a hill, kept to about 9 m: city buildings stand at road level, so a taller hill would leave
+    // their backs floating above the ground as it falls away
+    elevation: [
+      [0.0, 0],
+      [0.16, 1],
+      [0.33, 2],
+      [0.43, 8],
+      [0.48, 9],
+      [0.56, 4],
+      [0.62, 1],
+      [0.75, 3],
+      [0.85, -1],
+      [0.93, -1],
+    ],
+    sections: [
+      { type: 'city', from: 0, to: 0.999 },
+      { type: 'tunnel', from: [21, 0.25], to: [21, 0.8] },
+    ],
+    // the straight after turn 14 is too short before the infield corner for a pad
+    boostPads: [
+      { at: [0, 0.06], offset: 0 },
+      { at: [6, 0.1], offset: -2.5 },
+      { at: [21, 0.1], offset: 0 },
+    ],
+    // on the crest, so the car flies off the top of the hill
+    ramps: [{ at: [8, 0.45], length: 24, height: 2.4, width: 10, offset: 0 }],
+    palette: {
+      lamp: '#ffb35c',
+      lamp2: '#e4ecff',
+      primary: '#ffad4a',
+      secondary: '#e9eef7',
+      accent: '#ff3b2f',
+      warm: '#ffc98a',
+      sign: '#0f6b3a',
+      skyTop: '#010204',
+      skyHorizon: '#0d1019',
+      skyGlow: '#4f3520',
+      clouds: 0.7,
+      stars: 0.08,
+      fog: '#0b0d13',
+      fogDensity: 0.0028,
+      ambient: '#1e2230',
+      ground: '#050608',
+      exposure: 1.0,
+      tint: [1.0, 1.0, 1.02],
+    },
+  },
+  {
+    id: 'park',
+    name: 'FLOODLIGHT PARK',
+    tagline: 'A tight club circuit under the floodlights. A chicane, a hairpin and no time to breathe.',
+    theme: 'stadium',
+    difficulty: 3,
+    width: 14,
+    laps: 3,
+    startOffset: 200,
+    bankGain: 6,
+    maxBank: 0.12,
+    path: [
+      ['S', 480], // 0 main straight
+      ['R', 90, 40], // 1 turn 1
+      ['S', 140], // 2
+      ['L', 60, 45], // 3 left-right flick
+      ['R', 90, 35], // 4
+      ['S', 400], // 5 back straight
+      ['R', 45, 40], // 6 bus-stop chicane
+      ['L', 90, 40], // 7
+      ['R', 45, 40], // 8
+      ['S', 220], // 9
+      ['R', 160, 32], // 10 hairpin
+      ['S', 300], // 11
+      ['L', 90, 45], // 12 infield left
+      ['R', 45, 70], // 13
+      ['S', 220], // 14
+      ['L', 40, 60], // 15 esses
+      ['R', 40, 60], // 16
+      ['S', 150], // 17
+      ['R', 90, 40], // 18 tight right
+      ['S', 150], // 19
+      ['R', 35, 80], // 20 last corner
+    ],
+    elevation: [
+      [0.0, 0],
+      [0.2, 1],
+      [0.28, 2],
+      [0.45, 5],
+      [0.56, 6],
+      [0.7, 3],
+      [0.82, 1],
+      [0.92, 0],
+    ],
+    sections: [
+      { type: 'stadium', from: [0, 0.0], to: [1, 0.5] },
+      { type: 'stadium', from: [10, 0.0], to: [10, 1.0] },
+      { type: 'stadium', from: [18, 0.0], to: [19, 1.0] },
+    ],
+    // every other straight ends in a tight corner too soon for a pad
+    boostPads: [{ at: [0, 0.06], offset: 0 }],
+    ramps: [],
+    palette: {
+      lamp: '#f2f6ff',
+      lamp2: '#ffcf8a',
+      primary: '#ffcc33',
+      secondary: '#e9eef7',
+      accent: '#e8222b',
+      warm: '#ffe6b0',
+      sign: '#0f6b3a',
+      skyTop: '#010205',
+      skyHorizon: '#0c1220',
+      skyGlow: '#3a2a1e',
+      clouds: 0.5,
+      stars: 0.3,
+      fog: '#0e131c',
+      fogDensity: 0.0035,
       ambient: '#252c3c',
       ground: '#050806',
       exposure: 1.0,
