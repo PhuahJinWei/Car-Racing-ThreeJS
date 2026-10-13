@@ -97,6 +97,8 @@ export default {
   'setup.yourCar': '你的车辆',
   'setup.change': '更换',
   'setup.start': '开始',
+  'setup.prevTracks': '上一组赛道',
+  'setup.nextTracks': '下一组赛道',
   'setup.best': '最佳 <b>{time}</b>',
   'setup.noTime': '暂无记录',
   'setup.ghost': '幽灵车',

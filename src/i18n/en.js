@@ -102,6 +102,8 @@ export default {
   'setup.yourCar': 'YOUR CAR',
   'setup.change': 'CHANGE',
   'setup.start': 'START',
+  'setup.prevTracks': 'Previous tracks',
+  'setup.nextTracks': 'Next tracks',
   'setup.best': 'BEST <b>{time}</b>',
   'setup.noTime': 'NO TIME SET',
   'setup.ghost': 'GHOST',

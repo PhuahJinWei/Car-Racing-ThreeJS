@@ -1,4 +1,4 @@
-import { el, $, $$, delegate, edgeFade, fitText, ICONS } from './dom.js';
+import { el, $, $$, delegate, edgeFade, fitText, scrollByItem, ICONS } from './dom.js';
 import { TRACKS, getTrackDef, BOOST_PADS_ON } from '../world/tracks.js';
 import { Track } from '../world/track.js';
 import { CARS, getCarDef } from '../car/car-defs.js';
@@ -640,6 +640,7 @@ export class UI {
       <div class="screen setup-screen">
         ${this._head(isTT ? t('setup.ttEyebrow') : t('setup.raceEyebrow', { n: 5 }), modeLabel(mode), this.creditsHtml())}
         <div class="setup-body">
+          <div class="track-strip">
           <div class="track-cards hscroll fade-x">
             ${SETUP_TRACKS.map((d, i) => {
               const shot = TRACK_SHOTS[d.id];
@@ -655,6 +656,10 @@ export class UI {
                 </span>
               </button>`;
             }).join('')}
+          </div>
+          <button class="icon-btn sm ts-arrow prev" data-action="trackprev" aria-label="${t('setup.prevTracks')}">${ICONS.left}</button>
+          <button class="icon-btn sm ts-arrow next" data-action="tracknext" aria-label="${t('setup.nextTracks')}">${ICONS.right}</button>
+          <span class="ts-count"></span>
           </div>
           <section class="setup-opts glass anim-up" style="--d:290">
             <div class="opt"><label>${t('setup.conditions')}</label>${seg('weather', [['auto', `${ICONS.shuffle}${t('weather.auto')}`], ['clear', `${ICONS.moon}${t('weather.clear')}`], ['rain', `${ICONS.rain}${t('weather.rain')}`]], st.weather)}</div>
@@ -705,6 +710,8 @@ export class UI {
         refresh();
         b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
       },
+      trackprev: () => scrollByItem($(root, '.track-cards'), -1),
+      tracknext: () => scrollByItem($(root, '.track-cards'), 1),
       seg: (b) => {
         const name = b.closest('.seg').dataset.opt;
         let v = b.dataset.v;
@@ -731,15 +738,32 @@ export class UI {
       },
     });
     refresh();
-    // past three tracks the row scrolls sideways: open on the chosen card, fade the ends with more
+    // where the tracks are a sideways row (phones held sideways): open on the chosen card, fade the
+    // ends with more, and show which cards are in view, with arrows to step along
     const row = $(root, '.track-cards');
     const fade = edgeFade(row);
-    window.addEventListener('resize', fade);
+    const prev = $(root, '.ts-arrow.prev');
+    const next = $(root, '.ts-arrow.next');
+    const count = $(root, '.ts-count');
+    const nav = () => {
+      fade();
+      const max = row.scrollWidth - row.clientWidth;
+      prev.disabled = row.scrollLeft <= 2;
+      next.disabled = row.scrollLeft >= max - 2;
+      const r = row.getBoundingClientRect();
+      const cards = $$(row, '.track-card');
+      const seen = cards.map((c, i) => [c.getBoundingClientRect(), i]).filter(([b]) => b.left >= r.left - 8 && b.right <= r.right + 8);
+      const a = seen.length ? seen[0][1] + 1 : 0;
+      const z = seen.length ? seen[seen.length - 1][1] + 1 : 0;
+      count.textContent = max > 2 && a ? `${a === z ? a : `${a}–${z}`} / ${cards.length}` : '';
+    };
+    row.addEventListener('scroll', nav, { passive: true });
+    window.addEventListener('resize', nav);
     requestAnimationFrame(() => {
       $(row, '.track-card.selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      fade();
+      nav();
     });
-    return { el: root, dispose: () => window.removeEventListener('resize', fade) };
+    return { el: root, dispose: () => window.removeEventListener('resize', nav) };
   }
 
   // ---------------------------------------------------------------- garage

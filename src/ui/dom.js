@@ -36,16 +36,32 @@ export function edgeFade(n) {
     n.classList.toggle('fr', n.scrollLeft < max - 2);
   };
   n.addEventListener('scroll', update, { passive: true });
+  let lastStep = 0;
   n.addEventListener(
     'wheel',
     (e) => {
       if (Math.abs(e.deltaX) >= Math.abs(e.deltaY) || n.scrollWidth <= n.clientWidth) return;
-      n.scrollLeft += e.deltaY;
       e.preventDefault();
+      // a row that snaps to its items moves a whole item per notch (less, and the snap pulls it
+      // straight back)
+      if (getComputedStyle(n).scrollSnapType.startsWith('x')) {
+        const now = performance.now();
+        if (now - lastStep < 220) return;
+        lastStep = now;
+        scrollByItem(n, Math.sign(e.deltaY));
+      } else n.scrollLeft += e.deltaY;
     },
     { passive: false },
   );
   return update;
+}
+
+/** Scroll a sideways row by one of its items (dir: 1 on, -1 back). */
+export function scrollByItem(n, dir) {
+  const item = n.firstElementChild;
+  const gap = parseFloat(getComputedStyle(n).columnGap) || 0;
+  const step = item ? item.getBoundingClientRect().width + gap : n.clientWidth * 0.8;
+  n.scrollBy({ left: dir * step, behavior: 'smooth' });
 }
 
 /**

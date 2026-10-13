@@ -1421,26 +1421,41 @@ output {
   min-height: 0;
 }
 
-/* one card per track: an in-game shot with the layout inset and the name over a dark fade.
-   Three cards fill the row; past three they keep about that width and the row scrolls sideways,
-   with the next card peeking in under the edge fade. */
+/* one card per track: an in-game shot with the layout inset and the name over a dark fade. Three
+   to a row, every track in view at once (past two rows the grid scrolls down). Phones held
+   sideways get a single row that scrolls sideways instead (see the media queries), with arrows and
+   a count of the cards in view. */
+.track-strip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* fill the free height, but stop at two rows of cards about 1.5 times as wide as tall */
+  max-height: calc(2 * (100vw - 4rem - var(--sl) - var(--sr) - 1.2rem) / 3 / 1.5 + 0.6rem + 10px);
+}
+
 .track-cards {
   --gap: 0.6rem;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(calc((100% - 2 * var(--gap)) / 3.25), 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(8rem, 1fr);
   gap: var(--gap);
   flex: 1 1 auto;
   min-height: 0;
   /* room for the focus outline, which the scroller would otherwise clip */
   margin: -5px;
   padding: 5px;
-  scroll-padding-inline: 5px;
-  scroll-snap-type: x mandatory;
-  touch-action: pan-x;
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: pan-y;
   pointer-events: auto;
-  /* fill the free height, but stop before the cards get taller than they are wide */
-  max-height: calc((100vw - 4rem - var(--sl) - var(--sr)) / 3 / 1.15);
+}
+
+/* the sideways row's arrows and count: only where the row scrolls sideways */
+.ts-arrow,
+.ts-count {
+  display: none;
 }
 
 .track-card {
@@ -4793,9 +4808,64 @@ kbd.k-pill {
   .setup-body {
     gap: 0.5rem;
   }
+  /* a single row that scrolls sideways, about three cards in view, the next peeking in */
+  .track-strip {
+    max-height: calc((100vw - 3.2rem - var(--sl) - var(--sr)) / 3);
+  }
   .track-cards {
     --gap: 0.5rem;
-    max-height: calc((100vw - 3.2rem - var(--sl) - var(--sr)) / 3);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(calc((100% - 2 * var(--gap)) / 3.25), 1fr);
+    grid-auto-rows: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-padding-inline: 5px;
+    scroll-snap-type: x mandatory;
+    touch-action: pan-x;
+  }
+  .ts-arrow {
+    display: grid;
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    transition:
+      opacity 0.2s,
+      background 0.2s;
+  }
+  .ts-arrow.prev {
+    left: 0.25rem;
+  }
+  .ts-arrow.next {
+    right: 0.25rem;
+  }
+  .ts-arrow[disabled] {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ts-count {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 0.45rem;
+    z-index: 2;
+    transform: translateX(-50%);
+    padding: 0.15rem 0.55rem;
+    border-radius: 99px;
+    background: rgba(8, 9, 12, 0.7);
+    font-weight: 700;
+    font-size: 0.62rem;
+    letter-spacing: calc(0.16em * var(--track));
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .ts-count:empty {
+    display: none;
   }
   .tc-map {
     top: 0.45rem;
@@ -5036,6 +5106,14 @@ kbd.k-pill {
     pointer-events: auto;
   }
   /* stacked banners that share the height left over by the options */
+  .track-strip {
+    flex: 1 0 auto;
+    max-height: none;
+  }
+  .ts-arrow,
+  .ts-count {
+    display: none;
+  }
   .track-cards {
     flex: 1 0 auto;
     grid-auto-flow: row;

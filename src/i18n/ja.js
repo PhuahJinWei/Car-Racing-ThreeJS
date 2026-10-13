@@ -97,6 +97,8 @@ export default {
   'setup.yourCar': 'マイカー',
   'setup.change': '変更',
   'setup.start': 'スタート',
+  'setup.prevTracks': '前のコース',
+  'setup.nextTracks': '次のコース',
   'setup.best': 'ベスト <b>{time}</b>',
   'setup.noTime': '記録なし',
   'setup.ghost': 'ゴースト',
