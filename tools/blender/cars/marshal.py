@@ -4,7 +4,8 @@ driver's side, blue on the other) with antennas, a pillar spotlight, an upright 
 glasshouse with door handles and rubber side mouldings, a short trunk with a plate recess, and a
 mesh partition behind the front seats. Left-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/marshal.js).
+Drawings from the car factory's design (tools/car-factory/designs/marshal.js, retired: see the git
+history).
 """
 import math
 

@@ -1,5 +1,5 @@
-"""A car's 2D drawings (side, plan, front views) as dense closed outlines, drawn the way the car
-factory draws them (tools/car-factory/sdf.js densify): Catmull-Rom between control points
+"""A car's 2D drawings (side, plan, front views) as dense closed outlines, drawn the way the retired
+car factory drew them (its sdf.js densify): Catmull-Rom between control points
 (u, v[, 1]), where a point flagged 1 stays a sharp corner. The remodelled cars keep the
 factory designs' drawings, so their silhouettes and proportions stay as approved.
 """

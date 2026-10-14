@@ -4,7 +4,8 @@ bumper with fog lamps and tow hooks over a skid plate, amber clearance lamps and
 roof, a sport bar with two lamps over a ribbed bed, tall tail lamps on the bed corners, side steps,
 mud flaps, and the axles and frame showing under the lift. Left-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/juggernaut.js).
+Drawings from the car factory's design (tools/car-factory/designs/juggernaut.js, retired: see the
+git history).
 """
 import math
 

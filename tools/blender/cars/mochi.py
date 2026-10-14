@@ -8,9 +8,9 @@ bars, a lip spoiler with a third brake lamp, tall tail lamps in the back corners
 clear), a chrome garnish over the plate, a rear wiper, a fuel flap, mud flaps and one little
 exhaust. Left-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/mochi.js). The tailgate's glass
-stands 3 cm behind the tail panel below it: the two flat faces would otherwise meet edge to edge,
-and the seam frays.
+Drawings from the car factory's design (tools/car-factory/designs/mochi.js, retired: see the git
+history). The tailgate's glass stands 3 cm behind the tail panel below it: the two flat faces would
+otherwise meet edge to edge, and the seam frays.
 """
 from lib import geo, road
 from lib.road import circle, rect, rrect, smoothstep, sym

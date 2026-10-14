@@ -8,8 +8,9 @@ full-width tail-light band (red lamps, amber and clear sections inboard, a ribbe
 between them), the plate in the rear bumper and a rub strip down the flanks at the two-tone line.
 Right-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/touge.js), re-spaced (see
-views.densify). The pop-up wedges stay as the user chose them: triangles from the side.
+Drawings from the car factory's design (tools/car-factory/designs/touge.js, retired: see the git
+history), re-spaced (see views.densify). The pop-up wedges stay as the user chose them: triangles
+from the side.
 """
 import math
 

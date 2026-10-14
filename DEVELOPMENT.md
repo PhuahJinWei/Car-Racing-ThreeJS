@@ -62,40 +62,32 @@ src/
   scenes/garage.js    photo-studio showroom behind the menus
   ui/                 menus, HUD, touch controls (DOM + CSS)
 public/               icons, web manifest, service worker, car models (models/cars), model decoders
-tools/car-factory/    offline car modelling: SDF designs -> meshed, simplified, AO-baked .glb
+tools/blender/        offline modelling in headless Blender: the cars (cars/*.py) and the scenery sets
+tools/car-factory/    the .glb writer and the material table the car builds share
 ```
 
-## The car factory
+## The cars
 
-The twenty cars are modelled in code and built into `.glb` models by an offline tool in `tools/car-factory/`:
+All twenty cars are Python scripts that headless Blender builds into `.glb` models (`tools/blender/`; Blender 4.2 or newer, set `BLENDER` if it isn't in the usual place):
 
 ```bash
-npm run build:cars                              # all cars, final quality (2-8 min each, about 80 min in all)
-node tools/car-factory/build.mjs razor --quick  # one car, fast low-res preview (~10 s)
+npm run build:cars                                        # every car, final quality (about half a minute each)
+node tools/blender/build.mjs razor                        # one car
+node tools/blender/build.mjs razor --shape                # a quick sheet of six views, no export (tools/blender/out/)
+node tools/blender/build.mjs razor --shape --only=nose,tail --size=1280x800   # close-ups (see lib/studio.py)
 ```
 
-- **Designs** (`tools/car-factory/designs/*.js`):
-  - Each car is drawn as engineering views: a side silhouette, a plan outline and a cross-section rule, plus a glasshouse drawn the same way.
-  - These are combined into a signed distance field.
-  - Details are cut in (window openings, headlight pockets, intakes, wheel arches, vents) or added on (splitters, diffuser fins, wings, mirrors, a furnished cockpit).
-- **Build steps:**
-  - Meshing: sparse dual contouring on a 5 mm grid, so vertices sit on creases and corners instead of shaving them off.
-  - Material borders: every border is cut exactly where the material changes (found by bisection, well under a millimetre), so glass edges, trims and lamp outlines come out as clean lines rather than voxel staircases.
-  - Simplification: meshoptimizer, guided by the surface normals. The normals weigh heavily, so the triangles go to curves and fillets while flat panels make do with few (with less weight, long slivers across a curved shoulder shaded it in streaks).
-    - Hidden parts such as wheel wells and the underbody get coarser first.
-    - Three levels of detail: about 97k (full), 50k (light, for phones) and 11k (far) triangles. The far version has no crease splits: every seam holds the simplifier back.
-    - Every border between materials keeps its full-resolution edge, so a slatted grille or a row of louvres can cost the far version thousands of triangles. A design can merge such details into their surroundings for the far version only (`farMat`, as on the VICE's tail).
-  - Normals: from the field, split where faces meet at a real crease. Paint and plastic take theirs from the un-cut `shell`, so gaps and trims cut into the skin don't dent the reflections around them. A light smoothing pass removes the distance grids' millimetre ripple.
-  - Ambient occlusion: from the field, then smoothed. An open surface bakes to 0.6, which the game's materials are tuned for; only real crevices and overhangs go darker. (An older bake judged tilted rays wrongly, so every flat panel read as part-shadowed by an amount that swung with the slightest change in its angle, and turned invisible ripples into blotches.) A licence plate's recess gets the occlusion of a flat panel (`PLATE_AO` in `build.mjs`; other places can use the `aoFloor` hook of `buildParts`).
-- **Separate geometry:** thin details are generated on their own and laid onto the skin by ray marching from a 2D drawing in one of the views (`decals` in a design):
-  - `panel`: glass panes filling an outline.
-  - `ribbon` and `disc`: LED strips and lamp lenses.
-  - `bead`: a rounded strip standing on the skin along a path, for chrome window frames, drip rails and trims (`offsetLoop` grows a window outline into a frame's path). Painted onto the mesh as a material band, a centimetre-wide trim came out crumpled; as its own geometry it stays smooth and crisp. Its path is steadied where the view's rays graze a steep surface, such as a wraparound windshield's pillars. The KAIDO and the JUKEBOX use them for every window frame.
+- **Designs** (`tools/blender/cars/*.py`): each car is drawn as engineering views - a side silhouette, a plan outline and a section rule, plus a glasshouse drawn the same way (most began as the drawings of the retired SDF car factory, re-spaced). The road-car toolkit (`lib/road.py`) builds them:
+  - Bodies are lofted from the views. Every section has the same number of points per run, split at crease heights (`keys`) and across the top (`top_keys`), so creases run along fixed vertices and read as clean lines. Fenders, box flares, skirts and hood dips can be part of the sections (`top`, `sec`); the glasshouse is joined on.
+  - Detail is laid onto the skin by projecting 2D outlines from a view: `pocket` (cut along the view: lamp housings, intakes, window openings), `panel` (glass, lenses, plates), `ring_panel` and `frit` (window surrounds), `glass_panel` (a lens laid on the skin in a border), `ribbon`, `disc` and `bead` (light strips, lenses, trims).
+  - Booleans try Blender's Manifold solver first, then Exact and Float, and refuse a result that loses most of the target or tears it open; a WARNING line names any cut that failed (a build should print none).
+  - Pitfalls the scripts avoid (a comment at each place says why): two nearly parallel surfaces seaming, such as a fastback sliding into a deck (give it a clear step; `check_overlap` warns); glass or frames on a glasshouse's fillets; outlines whose curve overshoots (use `road.rounded` or sharp points); a pocket cut along the view into a surface that turns away from it (lay a lens on the skin instead); a wing lofted from its tips only (its shadow is baked at the vertices).
+- **Build steps** (`run.py`): three levels of detail, about 100-125k (full), 55-66k (phones) and 15-20k (far) triangles. Ambient occlusion is baked per vertex in Blender through the formula the game's materials are tuned for (an open panel at 0.6, only real crevices and overhangs darker), then smoothed within each smooth surface.
 - **Output:** each build writes two models, each with a gzipped twin that the game prefers, and updates `cars.json` with cache-busting hashes:
-  - `<id>.glb`: the full and far versions (about 1.4 MB gzipped), used on high quality.
-  - `<id>.m.glb`: the light and far versions (about 0.9 MB gzipped), used on medium and low quality, so phones download and draw less.
+  - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
+  - `<id>.m.glb`: the light and far versions (about 0.8 MB gzipped), used on medium and low quality, so phones download and draw less.
 - **In game:**
-  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once. A design can ask for whitewall tyres by setting `whitewall` (the white band's width, in metres) in its wheel layout, as the JUKEBOX and the DEUCE do.
+  - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once. A design can ask for whitewall tyres by setting `whitewall` (the white band's width, in metres) in its wheel layout, as the JUKEBOX does (the MONOPOSTO's slicks use it for a coloured band, `wallColor`).
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
   - Liveries and panel gaps are painted into an atlas of side, top, front and rear views. The paint shader projects that atlas onto the body, so the models need no UVs.
   - Design metadata in the `.glb` provides the wheel positions, light anchors, exhaust positions, panel lines and livery anchors.
@@ -118,7 +110,7 @@ Put `.glb` files in `public/models/cars/` and list them in `public/models/cars/c
 }
 ```
 
-- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`, `sidewinder`, `vesper`, `juggernaut`, `mochi`, `jukebox`, `cabbie`, `kaido`, `sleeper`, `deuce`, `surge`, `vice`, `enduro`, `apogee`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
+- **`id`:** an existing car (`volt`, `razor`, `specter`, `touge`, `marshal`, `brawler`, `ronin`, `sidewinder`, `vesper`, `juggernaut`, `mochi`, `jukebox`, `cabbie`, `kaido`, `sleeper`, `surge`, `vice`, `enduro`, `apogee`, `monoposto`) swaps its model. A new id adds a new car to the garage, copying its handling from `base`.
 - **Optional fields:**
   - `rotateY` (degrees) if the car faces the wrong way
   - `length` (metres) or `scale` if auto-scaling picks the wrong size
@@ -128,7 +120,7 @@ Put `.glb` files in `public/models/cars/` and list them in `public/models/cars/c
 **What the loader detects automatically:**
 - **Orientation and size:** the model is turned to face forward and scaled to metres (centimetre exports are fine).
 - **Wheels:** found by name (`wheel`, `tire`/`tyre`, `rim`…) or by shape. They spin and the front ones steer.
-- **Materials:** paint (name contains `paint`, `body`… or the largest coloured surface), glass, head and tail lights, tyres and rims. Paint colour, finish, rim colour, underglow and trails work in the garage. Livery and rim shape are only for car-factory and generated cars.
+- **Materials:** paint (name contains `paint`, `body`… or the largest coloured surface), glass, head and tail lights, tyres and rims. Paint colour, finish, rim colour, underglow and trails work in the garage. Livery and rim shape are only for the built-in and generated cars.
 
 **What to look for when buying or making models:**
 - glTF 2.0 binary (`.glb`). Draco, Meshopt and KTX2 compression are supported.

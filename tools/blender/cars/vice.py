@@ -1,13 +1,13 @@
-"""VICE: an 80s flat-12 supercar, low and very wide at the back. A short nose under a long convex
-hood with the pop-up lamps folded flush, a black grille band between rectangular corner lamps, one
-mirror high on the driver's windshield pillar, five thin strakes running from the middle of the
-door over the side intakes into the wide rear hips, the roof running back into two flying
-buttresses that fade into a low tail either side of a smooth engine lid (a brake-lamp pod on it, a
-black vent behind it), black slats right across the tail over the lamps, and a bumper standing out
-beneath them with a wide black panel behind the plate and four pipes in a black valance under it.
-No wing. The side elevation is traced from a reference drawing and the tail follows a photo (both
-the user's); drawings from the car factory's design (tools/car-factory/designs/vice.js).
-Left-hand drive.
+"""VICE: an 80s flat-12 supercar, low and very wide at the back. A short nose under a long convex hood
+with the pop-up lamps folded flush, a black grille band between rectangular corner lamps, one mirror
+high on the driver's windshield pillar, five thin strakes running from the middle of the door over
+the side intakes into the wide rear hips, the roof running back into two flying buttresses that fade
+into a low tail either side of a smooth engine lid (a brake-lamp pod on it, a black vent behind it),
+black slats right across the tail over the lamps, and a bumper standing out beneath them with a wide
+black panel behind the plate and four pipes in a black valance under it. No wing. The side elevation
+is traced from a reference drawing and the tail follows a photo (both the user's); drawings from the
+car factory's design (tools/car-factory/designs/vice.js, retired: see the git history). Left-hand
+drive.
 """
 import math
 

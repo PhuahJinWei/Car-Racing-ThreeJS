@@ -9,7 +9,7 @@ import json
 import bpy
 import numpy as np
 
-# The car factory's AO (tools/car-factory/mesher.js bakeAO) leaves an open flat panel at 0.6 and
+# The retired car factory's AO (its mesher.js bakeAO) leaves an open flat panel at 0.6 and
 # darkens low, downward faces as if the road were there. The game's materials are tuned to that,
 # so Blender's AO goes through the same formula.
 AO_OPEN = 0.6

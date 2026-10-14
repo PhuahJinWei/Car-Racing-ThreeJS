@@ -8,8 +8,8 @@ tail fins edged in chrome carrying twin bullet tail lamps, a chrome grille acros
 the front one (the plate standing in its middle, reversing lamps either side), bench seats front
 and back, and whitewall tyres. Left-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/jukebox.js), re-spaced (see
-views.densify).
+Drawings from the car factory's design (tools/car-factory/designs/jukebox.js, retired: see the git
+history), re-spaced (see views.densify).
 """
 import math
 
@@ -338,9 +338,9 @@ def openings(coll, n, skin, surf, lod):
     if lod != 'lod1':
         for view in ('left', 'right'):
             for win in SIDE_WINS:
-                road.pocket(skin, surf, view, win, 0.045, coll, 'trim', 'chrome', grid=0.03)
-        road.pocket(skin, surf, 'front', WINDSHIELD, 0.045, coll, 'trim', 'chrome', grid=0.03)
-        road.pocket(skin, surf, 'rear', BACKLIGHT, 0.045, coll, 'trim', 'chrome', grid=0.03)
+                road.pocket(skin, surf, view, win, 0.045, coll, 'trim', grid=0.03)
+        road.pocket(skin, surf, 'front', WINDSHIELD, 0.045, coll, 'trim', grid=0.03)
+        road.pocket(skin, surf, 'rear', BACKLIGHT, 0.045, coll, 'trim', grid=0.03)
     road.pocket(skin, surf, 'front', rrect(0, 0.545, 0.56, 0.1, 0.03), 0.05, coll, 'grille', 'chrome', grid=0.02)
     for s in (1, -1):
         for xc in HEADS:

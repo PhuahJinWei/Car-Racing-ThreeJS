@@ -15,22 +15,22 @@
       "id": "razor",
       "file": "razor.glb",
       "factory": true,
-      "v": "8e96895039",
+      "v": "d231a386e1",
       "gz": true,
       "light": {
         "file": "razor.m.glb",
-        "v": "3c6bdf69aa"
+        "v": "72dba6ea3a"
       }
     },
     {
       "id": "specter",
       "file": "specter.glb",
       "factory": true,
-      "v": "8e97a728a7",
+      "v": "b9a6181052",
       "gz": true,
       "light": {
         "file": "specter.m.glb",
-        "v": "0f8a2fcb11"
+        "v": "bed5d2981b"
       }
     },
     {
@@ -60,10 +60,10 @@
       "file": "brawler.glb",
       "gz": true,
       "factory": true,
-      "v": "4d2332d572",
+      "v": "0b6a778d6b",
       "light": {
         "file": "brawler.m.glb",
-        "v": "6422d284b6"
+        "v": "60b36162b4"
       }
     },
     {
@@ -71,10 +71,10 @@
       "file": "ronin.glb",
       "gz": true,
       "factory": true,
-      "v": "e31f586da1",
+      "v": "76f9e0381c",
       "light": {
         "file": "ronin.m.glb",
-        "v": "cdcc8f9302"
+        "v": "28812835dc"
       }
     },
     {
@@ -82,10 +82,10 @@
       "file": "sidewinder.glb",
       "gz": true,
       "factory": true,
-      "v": "ce0203bcd8",
+      "v": "75ac31c2b1",
       "light": {
         "file": "sidewinder.m.glb",
-        "v": "eb50bd3a51"
+        "v": "7c4b469ec0"
       }
     },
     {
@@ -93,10 +93,10 @@
       "file": "vesper.glb",
       "gz": true,
       "factory": true,
-      "v": "d4901d4d80",
+      "v": "df53d4c7f7",
       "light": {
         "file": "vesper.m.glb",
-        "v": "a0bfeb7e8f"
+        "v": "c4eb620107"
       }
     },
     {
@@ -126,10 +126,10 @@
       "file": "jukebox.glb",
       "gz": true,
       "factory": true,
-      "v": "b0e298a48b",
+      "v": "a70afc34a0",
       "light": {
         "file": "jukebox.m.glb",
-        "v": "f6107450ca"
+        "v": "b5f0286284"
       }
     },
     {
@@ -148,10 +148,10 @@
       "file": "kaido.glb",
       "gz": true,
       "factory": true,
-      "v": "936acf095d",
+      "v": "2a0780fdef",
       "light": {
         "file": "kaido.m.glb",
-        "v": "7faf5d9937"
+        "v": "09fa61c9ca"
       }
     },
     {
@@ -159,10 +159,10 @@
       "file": "sleeper.glb",
       "gz": true,
       "factory": true,
-      "v": "12e5ac9f40",
+      "v": "6cf72cc787",
       "light": {
         "file": "sleeper.m.glb",
-        "v": "6269ff684a"
+        "v": "740098c3c1"
       }
     },
     {
@@ -170,10 +170,10 @@
       "file": "surge.glb",
       "gz": true,
       "factory": true,
-      "v": "4835102794",
+      "v": "d5691812c5",
       "light": {
         "file": "surge.m.glb",
-        "v": "690dac61fc"
+        "v": "df1a058733"
       }
     },
     {
@@ -192,10 +192,10 @@
       "file": "enduro.glb",
       "gz": true,
       "factory": true,
-      "v": "ddb77303bb",
+      "v": "07ac9dd074",
       "light": {
         "file": "enduro.m.glb",
-        "v": "c76733baef"
+        "v": "757534562c"
       }
     },
     {
@@ -203,10 +203,10 @@
       "file": "apogee.glb",
       "gz": true,
       "factory": true,
-      "v": "edc311efc2",
+      "v": "77e7d9604c",
       "light": {
         "file": "apogee.m.glb",
-        "v": "dfa45bb8df"
+        "v": "d68710bcd3"
       }
     },
     {

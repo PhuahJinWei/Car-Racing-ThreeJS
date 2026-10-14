@@ -3,8 +3,8 @@ glasshouse with a hard shoulder line, muscular rear haunches fed by side intakes
 a full-width light bar and a big diffuser.
 
 Its drawings (side and plan views, glasshouse, section rule, hood dip) are the car factory's
-(tools/car-factory/designs/volt.js), so the silhouette is the one approved; the body is lofted
-with crisp edges and every detail is real geometry.
+(tools/car-factory/designs/volt.js, retired: see the git history), so the silhouette is the one
+approved; the body is lofted with crisp edges and every detail is real geometry.
 """
 import math
 

@@ -1,7 +1,7 @@
-// Blender cars: builds the scripted designs in ./cars into the same game-ready .glb files the car
-// factory writes (see tools/car-factory/build.mjs), so the game treats them like factory cars:
-// generated wheels, liveries, crash damage, far and phone models.
-//   npm run build:blender                        every Blender car, final quality
+// The cars: builds the scripted designs in ./cars into game-ready .glb files (written by
+// tools/car-factory/output.js, as the retired SDF car factory wrote them, so the game treats them all
+// alike: generated wheels, liveries, crash damage, far and phone models).
+//   npm run build:cars                           every car, final quality (also npm run build:blender)
 //   node tools/blender/build.mjs monoposto       one car
 //   ... --preview     also render a contact sheet of six views (tools/blender/out/<id>.png)
 //   ... --shape       only the contact sheet, full detail, no AO bake or export (quick looks;
@@ -19,7 +19,7 @@ import { MAT_PBR } from '../car-factory/parts.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../../public/models/cars');
 const WORK = resolve(here, 'out');
-const CARS = ['monoposto', 'volt', 'marshal', 'vice', 'juggernaut', 'mochi', 'jukebox', 'cabbie', 'touge'];
+const CARS = ['monoposto', 'volt', 'marshal', 'vice', 'juggernaut', 'mochi', 'jukebox', 'cabbie', 'touge', 'kaido', 'sidewinder', 'sleeper', 'brawler', 'razor', 'ronin', 'vesper', 'surge', 'specter', 'enduro', 'apogee'];
 
 /** The newest Blender in its usual install location (or $BLENDER). */
 function findBlender() {

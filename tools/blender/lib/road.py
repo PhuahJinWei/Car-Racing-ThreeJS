@@ -77,12 +77,50 @@ def _bezier(a, c, b, n):
             for t in (i / (n - 1) for i in range(n))]
 
 
-def half_section(top_y, side_x, yt, yb, keys=(), r_top=0.025, r_bot=0.035, counts=(10, 5, (12,), 4, 6), x_top=None):
+def _split_top(poly, xs, gap=0.02):
+    """A top line split at the given x positions (rising), each split point on the line. (A split
+    within `gap` of a run's end is skipped: a run that short - near a nose's tip, where the top is
+    narrow - packs its points into slivers.)"""
+    runs = []
+    rest = poly
+    for k in xs:
+        if not (rest[0][0] + gap < k < rest[-1][0] - gap):
+            continue
+        idx = next(i for i in range(len(rest) - 1) if rest[i + 1][0] >= k)
+        p, q = rest[idx], rest[idx + 1]
+        t = (k - p[0]) / (q[0] - p[0]) if q[0] != p[0] else 0
+        m = (k, p[1] + (q[1] - p[1]) * t)
+        runs.append(rest[:idx + 1] + [m])
+        rest = [m] + rest[idx + 1:]
+    runs.append(rest)
+    return runs
+
+
+def _shared(runs, counts, whole):
+    """Points per run: as given, or - when a split falls outside this section - shared out by
+    length, keeping the total (so every section has as many points)."""
+    if len(runs) == len(counts):
+        return list(counts)
+    total = sum(counts)
+    lengths = [max(_poly_len(r), 1e-9) for r in runs]
+    sizes = [max(1, round(total * ln / sum(lengths))) for ln in lengths]
+    # (the total made up on the longest run: every section's ring must have as many points)
+    i = max(range(len(runs)), key=lambda j: lengths[j])
+    sizes[i] += total - sum(sizes)
+    return sizes
+
+
+def half_section(top_y, side_x, yt, yb, keys=(), r_top=0.025, r_bot=0.035, counts=(10, 5, (12,), 4, 6), x_top=None, samples=96,
+                 top_keys=()):
     """Half cross-section, top centre round the +x side to the bottom centre (2D points (x, y)).
     top_y(x): height of the top across the car; side_x(y): the side's half-width at height y;
     yt / yb: the section's top (at the centre) and bottom; keys: heights (descending) where the
     side is split into runs (creases); counts: points per run - (top, top corner, (side runs),
-    bottom corner, bottom). x_top: where the top meets the side, if known."""
+    bottom corner, bottom). x_top: where the top meets the side, if known. samples: how finely
+    the side is traced before it's split into runs (a step in it - a box flare's top - needs
+    more than the default). top_keys: x positions (rising) where the top is split into runs the
+    same way - the foot and crown of a fender standing on a hood - its count then a tuple of points
+    per run (a crease across the top left to drift over the vertices shades in a jagged line)."""
     # where the top surface meets the side
     xc = side_x(yt) if x_top is None else x_top
     if x_top is None:
@@ -92,15 +130,23 @@ def half_section(top_y, side_x, yt, yb, keys=(), r_top=0.025, r_bot=0.035, count
     xb = side_x(yb)
     rt = max(1e-4, min(r_top, 0.45 * xc, 0.45 * max(yc - yb, 1e-4)))
     rb = max(1e-4, min(r_bot, 0.45 * xb, 0.45 * max(yc - yb, 1e-4)))
-    top = [(xc * i / 47, top_y(xc * i / 47)) for i in range(48)]
-    side = [(side_x(yc + (yb - yc) * i / 95), yc + (yb - yc) * i / 95) for i in range(96)]
+    nt = 192 if top_keys else 48
+    top = [(xc * i / (nt - 1), top_y(xc * i / (nt - 1))) for i in range(nt)]
+    side = [(side_x(yc + (yb - yc) * i / (samples - 1)), yc + (yb - yc) * i / (samples - 1)) for i in range(samples)]
     bottom = [(xb * (1 - i / 23), yb) for i in range(24)]
     t_head, a, _ = _cut_at(top, max(_poly_len(top) - rt, 0))
     _, b, s_rest = _cut_at(side, min(rt, _poly_len(side) * 0.45))
     s_head, a2, _ = _cut_at(s_rest, max(_poly_len(s_rest) - rb, 0))
     _, b2, b_rest = _cut_at(bottom, min(rb, _poly_len(bottom) * 0.45))
     n_top, n_c1, n_side, n_c2, n_bot = counts
-    out = resample(t_head, n_top)
+    if isinstance(n_top, (tuple, list)):
+        truns = _split_top(t_head, top_keys)
+        out = []
+        for r, nr in zip(truns, _shared(truns, n_top, t_head)):
+            out += resample(r, nr + 1)[:-1]
+        out.append(t_head[-1])
+    else:
+        out = resample(t_head, n_top)
     out += _bezier(a, (xc, yc), b, n_c1 + 2)[1:-1]
     # side runs split at the crease heights
     runs = []
@@ -182,10 +228,11 @@ def _tip(side, front):
 
 
 def view_body(name, coll, n, side, plan, sec=None, top=None, keys=None, r_top=0.028, r_bot=0.04, stations=130, z_range=None,
-              counts=None, role='paint'):
+              counts=None, role='paint', samples=96, top_keys=None):
     """A body lofted from its drawings: side (Outline of (z, y)), plan (Outline of (x, z)), the
     section rule sec(y, z) (share of the plan's half-width at height y), top(ax, z, yt) (the top's
-    height across the car, default flat at the silhouette) and keys(z) (crease heights)."""
+    height across the car, default flat at the silhouette), keys(z) (crease heights) and
+    top_keys(z) (creases across the top, see half_section)."""
     counts = counts or (n(14), n(6), (n(10), n(9), n(7)), n(5), n(8))
     z0, z1 = z_range or (max(side.umin, plan.vmin) + 0.003, min(side.umax, plan.vmax) - 0.003)
     rings = []
@@ -207,7 +254,8 @@ def view_body(name, coll, n, side, plan, sec=None, top=None, keys=None, r_top=0.
         def sx(y, z=z, W=W):
             return max(0.001, W * (sec(y, z) if sec else 1.0))
 
-        half = half_section(tf, sx, yt, yb, keys=keys(z) if keys else (), r_top=r_top, r_bot=r_bot, counts=counts)
+        half = half_section(tf, sx, yt, yb, keys=keys(z) if keys else (), r_top=r_top, r_bot=r_bot, counts=counts, samples=samples,
+                            top_keys=top_keys(z) if top_keys else ())
         rings.append(ring(half, z))
     # (a body cut short of the drawing's ends closes flat, not on the drawing's nose or tail)
     tips = (_tip(side, False) if z0 <= side.umin + 0.01 else None, _tip(side, True) if z1 >= side.umax - 0.01 else None)

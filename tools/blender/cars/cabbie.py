@@ -6,8 +6,8 @@ black rub strips along the doors and round both bumpers, a fuel flap, tall tail 
 and clear) either side of a red reflector band, a chrome garnish over the plate, a third brake lamp
 behind the rear glass, a taximeter on the dash and a single exhaust. Left-hand drive.
 
-Drawings from the car factory's design (tools/car-factory/designs/cabbie.js), re-spaced (see
-views.densify).
+Drawings from the car factory's design (tools/car-factory/designs/cabbie.js, retired: see the git
+history), re-spaced (see views.densify).
 """
 import math
 
