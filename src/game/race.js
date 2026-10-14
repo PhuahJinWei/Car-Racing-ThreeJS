@@ -271,7 +271,8 @@ export class Race {
       wheelHQ: isPlayer && q.carHQ && q.carDetail !== 'light',
       number: opts.number,
       liveryRes: isPlayer ? Math.min(1024, q.liveryRes ?? 1024) : 512,
-      asset: getCarAsset(def.id),
+      // rivals ride on the light model on every quality (see App.startRace)
+      asset: isPlayer ? getCarAsset(def.id) : getCarAsset(def.id, 'light'),
       damage: true,
       damageRes: isPlayer ? 512 : 256,
     });

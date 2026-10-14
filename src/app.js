@@ -244,18 +244,22 @@ export class App {
     const progress = (p) => this.ui.setLoadProgress(p);
     progress(0.05);
     await nextFrame();
-    // only the cars in this race; a rival whose model can't be fetched (offline, say) swaps to one
-    // that's here
-    const ids = [...new Set([carId, ...(full.rivals || [])])];
+    // only the cars in this race: yours at the detail in use, the rivals' light (phone) models on every
+    // quality - seen at racing distance they look the same, and download about 40% less. A rival
+    // whose model can't be fetched (offline, say) swaps to one that's here
+    const gl = this.renderer.renderer;
+    const rivals = [...new Set(full.rivals || [])].filter((id) => id !== carId);
+    const loads = [ensureCarAssets([carId], gl), ...rivals.map((id) => ensureCarAssets([id], gl, 'light'))];
     let fetched = 0;
     // and a track modelled in Blender brings its set (the park round Floodlight Park): without it
     // the track gets its plain dressing
     const scenery = ensureScenery(getTrackDef(cfg.trackId).scenery, (this.renderer.preset?.decorDensity ?? 1) < 0.8);
-    await Promise.all(ids.map((id) => ensureCarAssets([id], this.renderer.renderer).then(() => progress(0.05 + (0.4 * ++fetched) / ids.length))));
+    await Promise.all(loads.map((p) => p.then(() => progress(0.05 + (0.4 * ++fetched) / loads.length))));
     await scenery;
     if (full.rivals) {
-      const here = [carId, ...full.rivals].filter((id) => getCarAsset(id));
-      if (here.length) full.rivals = full.rivals.map((id, k) => (getCarAsset(id) || !getCarDef(id).model ? id : here[k % here.length]));
+      // (asking for light: either version will do)
+      const here = [carId, ...full.rivals].filter((id) => getCarAsset(id, 'light'));
+      if (here.length) full.rivals = full.rivals.map((id, k) => (getCarAsset(id, 'light') || !getCarDef(id).model ? id : here[k % here.length]));
     }
     progress(0.5);
     await nextFrame();

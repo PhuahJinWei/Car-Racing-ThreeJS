@@ -335,19 +335,20 @@ export class MenuStreet {
 
   _spawnPasser() {
     // any car whose model has loaded - but not only clones of yours: if no other car is here yet
-    // (races load just their own), one is fetched first
-    let ready = CARS.filter((c) => getCarAsset(c.id));
+    // (races load just their own), one is fetched first. Passers ride on the light model, as rivals
+    // do (asking for light: either version will do)
+    let ready = CARS.filter((c) => getCarAsset(c.id, 'light'));
     if (!ready.some((c) => c.id !== this.carId)) {
       if (!this._passerLoad) {
         const others = CARS.filter((c) => c.id !== this.carId && c.model);
         const pick = others[Math.floor(Math.random() * others.length)];
-        this._passerLoad = pick ? ensureCarAssets([pick.id], this.app.renderer.renderer).then(() => (this._passerLoad = 'done')) : 'done';
+        this._passerLoad = pick ? ensureCarAssets([pick.id], this.app.renderer.renderer, 'light').then(() => (this._passerLoad = 'done')) : 'done';
       }
       if (this._passerLoad !== 'done') {
         this.passTimer = 1;
         return;
       }
-      ready = CARS.filter((c) => getCarAsset(c.id));
+      ready = CARS.filter((c) => getCarAsset(c.id, 'light'));
     }
     if (!ready.length) return;
     const def = ready[Math.floor(Math.random() * ready.length)];
@@ -365,7 +366,7 @@ export class MenuStreet {
         for (const t of trails) this.effects.trails.reset(t);
         trimCarAssets();
       }
-      const model = new CarModel(def, randomCustom(rnd, def), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id) });
+      const model = new CarModel(def, randomCustom(rnd, def), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id, 'light') });
       model.group.visible = false;
       this.root.add(model.group);
       const tw = 0.06;

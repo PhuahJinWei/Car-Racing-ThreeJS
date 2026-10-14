@@ -111,20 +111,26 @@ export function hasOwnWheels(id) {
 }
 
 /**
- * 'full' or 'light': which version of the car models to load and use from now on. Light (for
- * phones) has a mid-detail near model and downloads about 40% less; cars already built keep theirs.
+ * 'full' or 'light': which version of the car models to load and use from now on (your car, the
+ * garage). Light (for phones) has a mid-detail near model and downloads about 40% less; cars already
+ * built keep theirs. The cars only seen in passing - rivals, the menu street's traffic - ask for the
+ * light version on every quality (see ensureCarAssets).
  */
 export function setCarDetail(d) {
   detail = d === 'light' ? 'light' : 'full';
 }
 
-const versionOf = (def) => (detail === 'light' && def.model?.light ? 'light' : 'full');
+const versionOf = (def, want = detail) => (want === 'light' && def.model?.light ? 'light' : 'full');
 
-/** Prepared asset for a car id (the version in use, else the other one), or null if none is loaded. */
-export function getCarAsset(id) {
+/**
+ * Prepared asset for a car id, in the version in use (or `want`), or null if none is loaded. A full
+ * model stands in for a light one, never the other way round: a car met only as a rival still gets
+ * its full model in the garage.
+ */
+export function getCarAsset(id, want) {
   const def = getCarDef(id);
-  const want = versionOf(def);
-  return assets.get(`${id}|${want}`) || assets.get(`${id}|${want === 'light' ? 'full' : 'light'}`) || null;
+  const version = versionOf(def, want);
+  return assets.get(`${id}|${version}`) || (version === 'light' && assets.get(`${id}|full`)) || null;
 }
 
 /** A car model was built from `asset`: it stays loaded until released. */
@@ -195,14 +201,19 @@ async function fetchModel(model) {
   return (await get(model.url)).buffer;
 }
 
-/** Load (and prepare) the models for the given car ids, in the version in use. Never throws. */
-export async function ensureCarAssets(ids, renderer) {
+/**
+ * Load (and prepare) the models for the given car ids, in the version in use, or in `want` ('light'
+ * for the cars only seen in passing). Never throws.
+ */
+export async function ensureCarAssets(ids, renderer, want) {
   await loadManifest();
   await Promise.all(
     [...new Set(ids)].map((id) => {
       const def = getCarDef(id);
       if (!def.model) return null;
-      const version = versionOf(def);
+      const version = versionOf(def, want);
+      // (a full model already here does for a light one, rather than downloading that as well)
+      if (version === 'light' && assets.has(`${id}|full`)) return null;
       const key = `${id}|${version}`;
       if (!assetPromises.has(key)) {
         const p = Promise.all([getLoader(renderer), fetchModel(version === 'light' ? def.model.light : def.model)])

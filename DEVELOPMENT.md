@@ -86,8 +86,8 @@ node tools/blender/build.mjs razor --shape --only=nose,tail --size=1280x800   # 
   - Pitfalls the scripts avoid (a comment at each place says why): two nearly parallel surfaces seaming, such as a fastback sliding into a deck (give it a clear step; `check_overlap` warns); glass or frames on a glasshouse's fillets; outlines whose curve overshoots (use `road.rounded` or sharp points); a pocket cut along the view into a surface that turns away from it (lay a lens on the skin instead); a wing lofted from its tips only (its shadow is baked at the vertices).
 - **Build steps** (`run.py`): three levels of detail, about 100-125k (full), 55-66k (phones) and 15-20k (far) triangles. Ambient occlusion is baked per vertex in Blender through the formula the game's materials are tuned for (an open panel at 0.6, only real crevices and overhangs darker), then smoothed within each smooth surface.
 - **Output:** each build writes two models, each with a gzipped twin that the game prefers, and updates `cars.json` with cache-busting hashes:
-  - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used on high quality.
-  - `<id>.m.glb`: the light and far versions (about 0.8 MB gzipped), used on medium and low quality, so phones download and draw less.
+  - `<id>.glb`: the full and far versions (about 1.3 MB gzipped), used for your car and the garage on high quality.
+  - `<id>.m.glb`: the light and far versions (about 0.8 MB gzipped), used for everything on medium and low quality, so phones download and draw less. Rivals and the menu street's traffic use it on every quality: at racing distance it looks the same as the full version. A full model that's already loaded stands in for a light one, never the other way round.
 - **In game:**
   - The game adds detailed wheels: tyres with tread grooves, four concave rim designs, brake discs that glow under hard braking, and calipers. Each wheel part of all four wheels is one skinned mesh (a steering and a rolling bone per wheel), so a car draws each wheel material once. A design can ask for whitewall tyres by setting `whitewall` (the white band's width, in metres) in its wheel layout, as the JUKEBOX does (the MONOPOSTO's slicks use it for a coloured band, `wallColor`).
   - Rivals switch to the far version beyond 24 m, where parts that look alike at a distance share one mesh.
@@ -96,7 +96,7 @@ node tools/blender/build.mjs razor --shape --only=nose,tail --size=1280x800   # 
   - A patrol car's light bar uses two extra materials (`beaconR`, `beaconB`) that the game flashes; with reduced flashes they glow in turn instead.
   - Amber lenses come in two kinds: `amber` glows all the time as a position lamp, while `indicator` is an unlit amber turn-signal lens (the VICE's rear lamps), which would otherwise look stuck on at night.
   - `plastic` is unpainted dark grey plastic, for a cheap car's bumpers and mouldings (the MOCHI). Far away it shares the black trim's material.
-  - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street.
+  - Models download when they're needed: your car at start-up, a race's own cars while it loads (each race draws its rivals from two or three models), a car you browse to in the garage, and one other car for the traffic on the menu street. A car seen only as a rival or in traffic downloads its full model when you first look at it in the garage on high quality.
 
 ## Adding real car models
 
