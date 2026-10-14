@@ -220,4 +220,28 @@ export class Renderer {
   render(scene, camera, fx, time) {
     this.post.render(scene, camera, fx, time);
   }
+
+  /**
+   * Compile the shaders that these scenes ([scene, camera, targetScene] each, targetScene giving the
+   * lights and fog when the first is a part of it) and the post-processing draw with, in the
+   * background where the browser can (KHR_parallel_shader_compile). Otherwise the first frame does it
+   * and stalls: on a first visit, with nothing in the browser's shader cache, for seconds. Resolves
+   * once they're ready, or after `timeout` ms at the latest (a lost context never reports them ready).
+   */
+  compileAsync(jobs, timeout = 10000) {
+    const r = this.renderer;
+    const waits = [this.post.compileAsync()];
+    // the scenes draw into the post-processing's target, so compile for that
+    r.setRenderTarget(this.post.sceneRT);
+    for (const [scene, camera, target] of jobs) {
+      try {
+        waits.push(r.compileAsync(scene, camera, target));
+      } catch (e) {
+        console.warn('[renderer] shader warm-up', e);
+      }
+    }
+    r.setRenderTarget(null);
+    const ready = Promise.all(waits).catch((e) => console.warn('[renderer] shader warm-up', e));
+    return Promise.race([ready, new Promise((res) => setTimeout(res, timeout))]);
+  }
 }

@@ -84,6 +84,7 @@ export class App {
     this.street.build();
     // other cars download when they're needed: a race's own, or one you look at in the garage
     this.street.setView('title');
+    await this._warmUpBackdrops();
     this.ui.hideLoading();
     this.state = 'title';
     this.ui.show('title');
@@ -98,12 +99,59 @@ export class App {
     this.toMenu();
   }
 
+  /**
+   * Get the menus' backdrops ready to draw while the loading screen is still up, as a race does (see
+   * _warmUp): compile the street's and the garage's shaders, then draw each once, which uploads their
+   * textures. On a first visit the title screen would otherwise freeze for seconds, and the garage
+   * again when first opened.
+   */
+  async _warmUpBackdrops() {
+    const { street, garage } = this;
+    await this.renderer.compileAsync([
+      [street.scene, street.camera],
+      [garage.scene, garage.camera],
+    ]);
+    await nextFrame();
+    garage.update(0);
+    garage.render();
+    street.update(0);
+    street.render();
+  }
+
   /** Menus play out on the street with your car; the garage keeps its studio. */
   _toStreet(view) {
     const S = this.storage;
-    this.street.build();
+    if (!this.street.built) {
+      this._rebuildStreet(view);
+      return;
+    }
     this.street.syncCar(S.data.car, S.customFor(S.data.car));
     this.street.setView(view);
+  }
+
+  /**
+   * After a race the street is built again: behind the loading screen, with its shaders compiled
+   * before it shows (see _warmUpBackdrops). The screen that asked for it opens beneath meanwhile.
+   */
+  async _rebuildStreet(view) {
+    const state = this.state;
+    const job = (this._loadJob = (this._loadJob || 0) + 1);
+    this.state = 'loading';
+    this.ui.showLoading(t('loading'));
+    await nextFrame();
+    // (a race may have started meanwhile, or another screen asked for the street)
+    if (job !== this._loadJob) return;
+    const S = this.storage;
+    const street = this.street;
+    street.build();
+    street.syncCar(S.data.car, S.customFor(S.data.car));
+    street.setView(view);
+    await this.renderer.compileAsync([[street.scene, street.camera]]);
+    if (job !== this._loadJob) return;
+    street.update(0);
+    street.render();
+    this.state = state;
+    this.ui.hideLoading();
   }
 
   toMenu() {
@@ -183,6 +231,8 @@ export class App {
     // restarts keep the same rivals
     else if (!full.rivals) full.rivals = pickRivals(full.opponents, full.seed != null ? `${key}|${full.seed}` : null);
     this.lastRaceCfg = full;
+    // (a street still being built behind the loading screen stops there)
+    this._loadJob = (this._loadJob || 0) + 1;
     this._teardownRace();
     // the race builds its own world; the menu street comes back afterwards
     this.street?.dispose();
@@ -248,17 +298,8 @@ export class App {
    * post-processing - otherwise all of that freezes the race's first frame.
    */
   async _warmUp(race, progress) {
-    const gl = this.renderer.renderer;
     race.resize(this.renderer.aspect);
-    try {
-      // the scene draws into the post-processing target, so compile for that
-      gl.setRenderTarget(this.renderer.post.sceneRT);
-      await gl.compileAsync(race.scene, race.camera);
-    } catch (e) {
-      console.warn('[race] shader warm-up', e);
-    } finally {
-      gl.setRenderTarget(null);
-    }
+    await this.renderer.compileAsync([[race.scene, race.camera]]);
     progress(0.85);
     await nextFrame();
     race.render();

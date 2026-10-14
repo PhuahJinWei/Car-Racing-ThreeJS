@@ -66,6 +66,8 @@ tools/blender/        offline modelling in headless Blender: the cars (cars/*.py
 tools/car-factory/    the .glb writer and the material table the car builds share
 ```
 
+**Loading:** every scene compiles its shaders before it shows, behind the loading screen (`Renderer.compileAsync`, in the background where the browser supports `KHR_parallel_shader_compile`), and then draws a frame there, which uploads its textures. That covers the title street and the garage at start-up, the street again after a race, and a race while it loads. A new kind of car for the menu street's traffic compiles before it first drives past. A car put in the garage or parked on the street takes over the shaders of the car it replaces before that one is freed (three.js deletes a shader once no material uses it), and the garage only repaints a car it already shows rather than rebuilding it. On a first visit, with nothing in the browser's shader cache, compiling on the first frame instead freezes the game for seconds.
+
 ## The cars
 
 All twenty cars are Python scripts that headless Blender builds into `.glb` models (`tools/blender/`; Blender 4.2 or newer, set `BLENDER` if it isn't in the usual place):

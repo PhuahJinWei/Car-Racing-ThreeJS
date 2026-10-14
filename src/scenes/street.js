@@ -141,6 +141,8 @@ export class MenuStreet {
     this.scene.remove(this.root);
     if (this.car) this.car.dispose();
     this.car = null;
+    this._retired?.dispose();
+    this._retired = null;
     for (const ps of this.passers) ps.model.dispose();
     this.passers = [];
     this.effects.dispose();
@@ -164,7 +166,9 @@ export class MenuStreet {
     }
     if (this.car) {
       this.root.remove(this.car.group);
-      this.car.dispose();
+      // (kept until the next car is in, so its shaders are still there for that one)
+      this._retired?.dispose();
+      this._retired = this.car;
       this.car = null;
     }
     const q = this.app.renderer.preset;
@@ -183,6 +187,11 @@ export class MenuStreet {
     // parked: no moving light streaks over the paint
     this.car.setStreaks(0, 0.05);
     this.root.add(this.car.group);
+    // its shaders: the car before's, taken over before that one lets them go, and any it didn't
+    // have compiled in the background
+    this.app.renderer.compileAsync([[this.car.group, this.camera, this.scene]]);
+    this._retired?.dispose();
+    this._retired = null;
     this.car.group.updateMatrixWorld(true);
     const a = this.anchor.position;
     castCarShadow(this.world, this.car, this.spotI, a.x, a.y, a.z, 0);
@@ -357,18 +366,27 @@ export class MenuStreet {
         trimCarAssets();
       }
       const model = new CarModel(def, randomCustom(rnd, def), { envMap: this.world.envMap, hq: false, number: 10 + Math.floor(rnd() * 89), liveryRes: 512, asset: getCarAsset(def.id) });
+      model.group.visible = false;
       this.root.add(model.group);
       const tw = 0.06;
-      ps = { def, model, frame: {}, trails: trails || [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)] };
+      ps = { def, model, frame: {}, trails: trails || [this.effects.trails.create(tw, model.trailColor), this.effects.trails.create(tw, model.trailColor)], ready: false };
       if (!ps.trails[0] || !ps.trails[1]) {
         this.root.remove(model.group);
         model.dispose();
         return;
       }
       this.passers.push(ps);
+      // a new kind of passer compiles its shaders in the background before it first drives past:
+      // on a first visit, compiling them on the frame it shows up would stall the menu
+      this.app.renderer.compileAsync([[model.group, this.camera, this.scene]]).then(() => (ps.ready = true));
     } else {
       ps.model.setCustomization(randomCustom(rnd, ps.def));
       this.passers.push(...this.passers.splice(this.passers.indexOf(ps), 1));
+    }
+    // (still compiling: it goes by next time)
+    if (!ps.ready) {
+      this.passTimer = 1;
+      return;
     }
     ps.active = true;
     ps.whooshed = false;

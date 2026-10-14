@@ -166,9 +166,19 @@ export class Garage {
    * fetched first, with the turntable empty meanwhile; resolves once that's settled.
    */
   setCar(carId, custom) {
+    // the car already there only changes its look: rebuilt, it would repaint its livery and compile
+    // its shaders all over again (the garage puts your car back on as it opens, for one)
+    if (this.car && this.carId === carId && this.car.asset === getCarAsset(carId) && this.car.opts.liveryRes === this._liveryRes()) {
+      this.custom = custom;
+      this.car.setCustomization(custom);
+      this._swingIn();
+      return Promise.resolve();
+    }
     if (this.car) {
       this.scene.remove(this.car.group);
-      this.car.dispose();
+      // (kept until the next car is in, so its shaders are still there for that one)
+      this._retired?.dispose();
+      this._retired = this.car;
       this.car = null;
     }
     this.carId = carId;
@@ -185,20 +195,33 @@ export class Garage {
 
   _placeCar() {
     const def = getCarDef(this.carId);
-    this.car = new CarModel(def, this.custom, { envMap: this.envRT.texture, hq: true, number: 7, beams: false, liveryRes: this.app.renderer.preset?.liveryRes ?? 1024, asset: getCarAsset(this.carId) });
+    this.car = new CarModel(def, this.custom, { envMap: this.envRT.texture, hq: true, number: 7, beams: false, liveryRes: this._liveryRes(), asset: getCarAsset(this.carId) });
     this.car.group.position.y = 0.12;
     // the studio's own softboxes do the reflections here; the moving street-light streaks are a
     // racing effect and, frozen in place, they turn the glass into a chrome band
     this.car.setStreaks(0, 0.05);
     this.scene.add(this.car.group);
+    // its shaders: the car before's, taken over before that one lets them go, and any it didn't
+    // have compiled in the background
+    this.app.renderer.compileAsync([[this.car.group, this.camera, this.scene]]);
+    this._retired?.dispose();
+    this._retired = null;
     this.measure = this._measure();
-    // a new car swings in to the front three-quarter view
+    this._swingIn();
+    // (cars browsed earlier and no longer shown are freed, bar the last few)
+    trimCarAssets();
+  }
+
+  /** A car put on the turntable swings in to the front three-quarter view. */
+  _swingIn() {
     this.shot = 'hero';
     this.userYaw = 0;
     this.zoom = 1;
     this.yaw = SHOTS.hero(this.measure).yaw - 1.1;
-    // (cars browsed earlier and no longer shown are freed, bar the last few)
-    trimCarAssets();
+  }
+
+  _liveryRes() {
+    return this.app.renderer.preset?.liveryRes ?? 1024;
   }
 
   setCustom(custom) {

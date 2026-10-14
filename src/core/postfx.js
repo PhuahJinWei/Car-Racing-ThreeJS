@@ -518,6 +518,25 @@ export class PostFX {
     }
   }
 
+  /** Compile the passes' shaders in the background where the browser can (see Renderer.compileAsync). */
+  compileAsync() {
+    const r = this.renderer;
+    if (!this.sceneRT) this._allocTargets();
+    const waits = [];
+    for (const mat of [this.prefilterMat, this.downMat, this.upMat, this.reflMat, this.streakMat, this.baseInitMat, this.baseJumpMat, this.compositeMat]) {
+      this.quad.material = mat;
+      // the passes draw into targets, the composite onto the screen (their shaders differ by that)
+      r.setRenderTarget(mat === this.compositeMat ? null : this.mips[0]);
+      try {
+        waits.push(r.compileAsync(this.quadScene, this.quadCam));
+      } catch (e) {
+        console.warn('[postfx] shader warm-up', e);
+      }
+    }
+    r.setRenderTarget(null);
+    return Promise.all(waits);
+  }
+
   _pass(mat, target, clear = true) {
     const r = this.renderer;
     this.quad.material = mat;
